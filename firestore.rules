@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function memorial(memorialId) { return get(/databases/$(database)/documents/memorials/$(memorialId)).data; }
+    function ownsMemorial(memorialId) { return signedIn() && memorial(memorialId).ownerId == request.auth.uid; }
+    function memorialVisible(memorialId) { return memorial(memorialId).visibility in ['public','unlisted']; }
+
+    match /memorials/{id} {
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow get: if resource.data.visibility in ['public','unlisted'] || (signedIn() && resource.data.ownerId == request.auth.uid);
+      allow list: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /contributions/{id} {
+      allow create: if request.resource.data.status == 'pending'
+        && request.resource.data.memorialId is string
+        && request.resource.data.contributorName is string;
+      allow read: if ownsMemorial(resource.data.memorialId)
+        || (resource.data.status == 'approved' && memorialVisible(resource.data.memorialId));
+      allow update, delete: if ownsMemorial(resource.data.memorialId);
+    }
+  }
+}

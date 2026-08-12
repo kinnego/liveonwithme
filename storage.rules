@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function memorial(memorialId) {
+      return firestore.get(/databases/(default)/documents/memorials/$(memorialId)).data;
+    }
+    function owner(memorialId) {
+      return request.auth != null && memorial(memorialId).ownerId == request.auth.uid;
+    }
+    function visible(memorialId) {
+      return memorial(memorialId).visibility in ['public', 'unlisted'];
+    }
+    function validImage() {
+      return request.resource.size < 15 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
+    }
+
+    match /memorials/{memorialId}/{fileName} {
+      allow read: if owner(memorialId) || visible(memorialId);
+      allow create, update, delete: if owner(memorialId) && (request.resource == null || validImage());
+    }
+
+    match /contributions/{memorialId}/{fileName} {
+      allow create: if validImage();
+      allow read: if owner(memorialId) || visible(memorialId);
+      allow update, delete: if owner(memorialId);
+    }
+  }
+}
