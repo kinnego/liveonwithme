@@ -17,10 +17,19 @@ A peaceful, family-controlled memorial platform.
 ## Firebase setup
 1. Create a Firebase project.
 2. Enable Authentication > Email/Password.
-3. Create Firestore and Storage.
-4. Copy `.env.example` to `.env.local` and fill in your Firebase web config.
-5. Install Firebase CLI and deploy rules with `firebase deploy --only firestore:rules,storage`.
-6. When Firebase asks, enable the cross-service permission that lets Storage Security Rules read Firestore documents. This is used to make family/private storage access follow memorial ownership and visibility.
+3. Enable Authentication > Email link (passwordless sign-in) — this is how bereaved contacts claim a memorial a funeral director set up for them.
+4. Under Authentication > Settings > Authorized domains, add the domain(s) you'll run the app on (e.g. your Vercel/Cloudflare URL) so claim-invite emails work there, not just `localhost`.
+5. Create Firestore and Storage.
+6. Copy `.env.example` to `.env.local` and fill in your Firebase web config.
+7. Install Firebase CLI and deploy rules with `firebase deploy --only firestore:rules,storage`.
+8. When Firebase asks, enable the cross-service permission that lets Storage Security Rules read Firestore documents. This is used to make family/private storage access follow memorial ownership and visibility.
+
+## Funeral director accounts
+There's no self-service sign-up for the funeral director role — it's granted by hand so it stays limited to people you actually work with:
+1. Have the funeral director register a normal account at `/auth`.
+2. In the Firebase console, open Firestore > `users` > their document (matches their Auth UID), and change `role` from `family` to `funeral_director`.
+3. They can now open `/fd` to see their referrals and `/fd/new` to add one — entering their commission/payout reference, the bereaved contact's details, and what they know about the deceased (name, nicknames, address, dates).
+4. Saving a referral emails the bereaved contact a sign-in link to `/claim/[referralId]`. Opening it on any device creates their account (or signs them in), pre-fills a new memorial from what the director entered, and takes them straight to its family controls to add photos and the story.
 
 ## Run
 ```bash

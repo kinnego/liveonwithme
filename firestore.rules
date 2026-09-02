@@ -5,6 +5,8 @@ service cloud.firestore {
     function memorial(memorialId) { return get(/databases/$(database)/documents/memorials/$(memorialId)).data; }
     function ownsMemorial(memorialId) { return signedIn() && memorial(memorialId).ownerId == request.auth.uid; }
     function memorialVisible(memorialId) { return memorial(memorialId).visibility in ['public','unlisted']; }
+    function userRole(uid) { return get(/databases/$(database)/documents/users/$(uid)).data.role; }
+    function isFuneralDirector() { return signedIn() && userRole(request.auth.uid) == 'funeral_director'; }
 
     match /memorials/{id} {
       allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
@@ -20,6 +22,40 @@ service cloud.firestore {
       allow read: if ownsMemorial(resource.data.memorialId)
         || (resource.data.status == 'approved' && memorialVisible(resource.data.memorialId));
       allow update, delete: if ownsMemorial(resource.data.memorialId);
+    }
+
+    // A user's own profile. role starts as 'family' on signup and is client-immutable from then on —
+    // promoting an account to 'funeral_director' is done by the site admin directly in the Firebase console.
+    match /users/{uid} {
+      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.role == 'family';
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn() && request.auth.uid == uid && request.resource.data.role == resource.data.role;
+      allow list, delete: if false;
+    }
+
+    // Funeral-director-authored referrals. Personal details (bereaved contact, deceased info, commission)
+    // are only readable by the referring director or by the bereaved contact once they've signed in with
+    // the email the invite was sent to — never by an unauthenticated visitor with just the link.
+    match /referrals/{id} {
+      allow create: if isFuneralDirector()
+        && request.resource.data.funeralDirectorUid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow get: if signedIn() && (
+        resource.data.funeralDirectorUid == request.auth.uid
+        || resource.data.bereavedEmail == request.auth.token.email
+      );
+      allow list: if isFuneralDirector() && resource.data.funeralDirectorUid == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.funeralDirectorUid == request.auth.uid
+        || (
+          resource.data.status == 'pending'
+          && resource.data.bereavedEmail == request.auth.token.email
+          && request.resource.data.status == 'claimed'
+          && request.resource.data.claimedByUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','claimedByUid','memorialId'])
+        )
+      );
+      allow delete: if isFuneralDirector() && resource.data.funeralDirectorUid == request.auth.uid;
     }
   }
 }
