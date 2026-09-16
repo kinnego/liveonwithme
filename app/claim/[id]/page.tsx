@@ -5,6 +5,8 @@ import { doc, getDoc, serverTimestamp, setDoc, writeBatch } from 'firebase/fires
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+
 const slugify=(s:string)=>s.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
 
 export default function Claim({params}:{params:Promise<{id:string}>}){const [id,setId]=useState('');const [needsEmail,setNeedsEmail]=useState(false);const [status,setStatus]=useState<'checking'|'claiming'|'error'>('checking');const [error,setError]=useState('');const router=useRouter();

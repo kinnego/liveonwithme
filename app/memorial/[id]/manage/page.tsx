@@ -14,6 +14,8 @@ import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
 function ContributionPhoto({ path }: { path: string }) {
