@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import CemeterySearch from '@/components/CemeterySearch';
 
 export default function Home() {
   return (
@@ -43,6 +44,20 @@ export default function Home() {
             <div className="muted">From Anna · awaiting family approval</div>
           </div>
         </div>
+      </section>
+
+      <section className="section center" id="find">
+        <div className="eyebrow">Find someone</div>
+        <h2>Looking for a loved one&rsquo;s memorial?</h2>
+        <p className="lead" style={{ margin: '0 auto 30px' }}>
+          Search by the cemetery where they are resting.
+        </p>
+        <div style={{ maxWidth: 520, margin: '0 auto' }}>
+          <CemeterySearch />
+        </div>
+        <p className="muted" style={{ marginTop: 14, fontSize: 13 }}>
+          Only memorials families have chosen to make public will appear.
+        </p>
       </section>
 
       <section className="section center">

@@ -24,7 +24,12 @@ service cloud.firestore {
       allow get: if (resource.data.status == 'live' && resource.data.visibility in ['public','unlisted'])
         || (signedIn() && resource.data.ownerId == request.auth.uid);
 
-      allow list: if signedIn() && resource.data.ownerId == request.auth.uid;
+      // Owner can list their own memorials. Public visitors can list live+public memorials
+      // (used by cemetery search — the query itself must include status=='live' and
+      // visibility=='public' filters, or rule evaluation will fail per-document).
+      allow list: if
+        (signedIn() && resource.data.ownerId == request.auth.uid)
+        || (resource.data.status == 'live' && resource.data.visibility == 'public');
 
       // Owner can update memorial content, but NOT payment/status fields (those are server-side only)
       allow update: if signedIn()

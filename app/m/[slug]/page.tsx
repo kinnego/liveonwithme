@@ -19,18 +19,143 @@ export const dynamic = 'force-dynamic';
 
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
+const demoPhotoUrls: Record<string, string> = {
+  'demo-hero': 'https://picsum.photos/id/1015/1800/1000',
+  'demo-1': 'https://picsum.photos/id/1080/1000/1200',
+  'demo-2': 'https://picsum.photos/id/1084/1000/1200',
+  'demo-3': 'https://picsum.photos/id/106/1000/1200',
+  'demo-4': 'https://picsum.photos/id/152/1200/900',
+  'demo-5': 'https://picsum.photos/id/431/1200/900',
+  'demo-6': 'https://picsum.photos/id/338/1200/900',
+  'demo-7': 'https://picsum.photos/id/292/1200/900',
+};
+
+const demoContributions = [
+  {
+    id: 'demo-1',
+    photoPath: 'demo-1',
+    caption: 'On the pier at Howth',
+    contributorName: 'Aoife',
+    relationship: 'Daughter',
+    audience: 'public',
+    focalX: 0.5,
+    focalY: 0.35,
+  },
+  {
+    id: 'demo-2',
+    photoPath: 'demo-2',
+    caption: 'The garden she loved',
+    contributorName: 'Kieran',
+    relationship: 'Son',
+    audience: 'public',
+    focalX: 0.5,
+    focalY: 0.4,
+  },
+  {
+    id: 'demo-3',
+    photoPath: 'demo-3',
+    caption: 'Tea and a chat, always',
+    contributorName: 'Nora',
+    relationship: 'Neighbour',
+    audience: 'public',
+    focalX: 0.5,
+    focalY: 0.5,
+  },
+  {
+    id: 'demo-4',
+    photoPath: 'demo-4',
+    caption: 'One of her Sunday walks',
+    contributorName: 'Michael',
+    relationship: 'Nephew',
+    audience: 'public',
+  },
+  {
+    id: 'demo-5',
+    photoPath: 'demo-5',
+    caption: 'Tomatoes, finally',
+    contributorName: 'Aoife',
+    relationship: 'Daughter',
+    audience: 'public',
+  },
+  {
+    id: 'demo-6',
+    photoPath: 'demo-6',
+    caption: 'A gathering that ran late',
+    contributorName: 'Kieran',
+    relationship: 'Son',
+    audience: 'public',
+  },
+  {
+    id: 'demo-7',
+    photoPath: 'demo-7',
+    caption: 'The sea, her favourite',
+    contributorName: 'Aoife',
+    relationship: 'Daughter',
+    audience: 'public',
+  },
+  {
+    id: 'demo-mem-1',
+    memory:
+      "The best thing about her was that you always left her house feeling better than when you arrived. Every visit ended with something for the road — a scone, a story, or the last of the biscuits she'd swear she wasn't eating.",
+    contributorName: 'Nora',
+    relationship: 'Neighbour',
+    audience: 'public',
+  },
+  {
+    id: 'demo-mem-2',
+    memory:
+      "Mam wrote every birthday card by hand and always slipped a fiver inside 'for a treat'. She did it for grandchildren, grand-nieces, the postman's daughter — anyone she'd ever met.",
+    contributorName: 'Aoife',
+    relationship: 'Daughter',
+    audience: 'public',
+  },
+  {
+    id: 'demo-mem-3',
+    memory:
+      "She sang along to the radio while she peeled potatoes. Off-key, always the wrong lyrics, and completely unbothered by either. It was one of the happiest sounds in the world.",
+    contributorName: 'Kieran',
+    relationship: 'Son',
+    audience: 'public',
+  },
+  {
+    id: 'demo-mem-4',
+    memory:
+      "I was new to the road and she brought over a shepherd's pie on my second day. I've never forgotten it. She had a way of making you feel like you were already family.",
+    contributorName: 'Sinéad',
+    relationship: 'Neighbour',
+    audience: 'public',
+  },
+];
+
 const demo = {
   id: 'demo',
   fullName: "Mary O'Donnell",
+  nickname: 'Mam',
   born: '1948-03-12',
   died: '2025-11-04',
+  ageAtDeath: 77,
   epitaph: 'She made everyone feel like they belonged.',
   story: `Mary had an extraordinary way of making ordinary days feel important. Her kitchen was rarely quiet, the kettle was nearly always on, and there was always room for one more person at the table. She remembered birthdays, asked about the small things, and laughed with her whole face.
 
-She loved her family fiercely, adored the sea, grew tomatoes with mixed success, and believed no journey was complete without something sweet for the road. This is a place for all the pieces of Mary that live on in the people who knew her.`,
+She loved her family fiercely, adored the sea, grew tomatoes with mixed success, and believed no journey was complete without something sweet for the road. She raised three children in a small house that somehow always had room for one more, kept up with every neighbour on the road, and was the first to arrive with a casserole whenever anyone needed one.
+
+Mary spent forty-two years as a primary-school teacher in Dún Laoghaire. Generations of children learned to read on her lap. Long after they'd grown, she'd still meet them in town and ask how they were getting on — and remember every answer.
+
+This is a place for all the pieces of Mary that live on in the people who knew her.`,
+  heroPhotoUrl: demoPhotoUrls['demo-hero'],
   heroPhotoPath: '',
   slug: 'mary-demo',
   status: 'live',
+  visibility: 'public',
+  cemetery: {
+    name: "Glasnevin Cemetery",
+    address: 'Finglas Rd, Glasnevin, Dublin 11, Ireland',
+    placeId: 'ChIJyaMkOMwOZ0gRXpImTPzTKN0',
+    lat: 53.3719,
+    lng: -6.2814,
+  },
+  featuredContributionIds: ['demo-1', 'demo-2', 'demo-3'],
+  galleryDisplayMode: 'square',
 };
 
 type LoadState = 'loading' | 'not_found' | 'draft_no_access' | 'ready';
@@ -46,6 +171,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
   const [isPreview, setIsPreview] = useState(false);
 
   useEffect(() => {
+    if (!auth) return;
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
   }, []);
@@ -54,6 +180,13 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
     params.then(async (p) => {
       if (p.slug === 'mary-demo') {
         setMemorial(demo);
+        setHero(demo.heroPhotoUrl);
+        setApproved(demoContributions);
+        const urlMap: Record<string, string> = {};
+        for (const c of demoContributions) {
+          if ((c as any).photoPath) urlMap[c.id] = demoPhotoUrls[(c as any).photoPath];
+        }
+        setPhotoUrls(urlMap);
         setLoadState('ready');
         return;
       }
@@ -235,14 +368,12 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
             <p style={{ marginTop: 12, fontSize: 15, opacity: 0.9 }}>
               Resting at{' '}
               {cemetery.placeId ? (
-                <a
-                  href={`https://www.google.com/maps/place/?q=place_id:${cemetery.placeId}`}
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  href={`/cemetery/${encodeURIComponent(cemetery.placeId)}?name=${encodeURIComponent(cemetery.name)}`}
                   style={{ textDecoration: 'underline', color: 'inherit' }}
                 >
                   {cemetery.name}
-                </a>
+                </Link>
               ) : (
                 cemetery.name
               )}
