@@ -1,0 +1,23 @@
+{
+  "name": "LiveOnWith.me",
+  "short_name": "LiveOnWith.me",
+  "description": "A peaceful place to remember someone you love.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f4ee",
+  "theme_color": "#688076",
+  "icons": [
+    {
+      "src": "/brand/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,5 +1,11 @@
 export type MemorialVisibility = 'public' | 'private' | 'unlisted';
 
+export type MemorialStatus = 'draft' | 'awaiting_payment' | 'live';
+
+export type PaymentStatus = 'unpaid' | 'paid' | 'paid_via_funeral_director';
+
+export type SalesChannel = 'direct' | 'funeral_director';
+
 export interface Memorial {
   id: string;
   ownerId: string;
@@ -11,9 +17,16 @@ export interface Memorial {
   born?: string;
   died?: string;
   heroPhotoUrl?: string;
+  heroPhotoPath?: string;
   epitaph?: string;
   story?: string;
   visibility: MemorialVisibility;
+  status: MemorialStatus;
+  paymentStatus: PaymentStatus;
+  salesChannel: SalesChannel;
+  funeralDirectorId?: string | null;
+  referralId?: string | null;
+  publishedAt?: unknown;
   createdAt?: unknown;
   updatedAt?: unknown;
 }
@@ -41,6 +54,9 @@ export interface UserProfile {
   createdAt?: unknown;
 }
 
+export type ReferralStatus = 'pending' | 'claimed';
+export type CommercialStatus = 'referred' | 'setup' | 'paid' | 'live';
+
 export interface Referral {
   id: string;
   funeralDirectorUid: string;
@@ -56,8 +72,34 @@ export interface Referral {
   deceasedAddress?: string;
   deceasedBorn?: string;
   deceasedDied?: string;
-  status: 'pending' | 'claimed';
+  status: ReferralStatus;
+  commercialStatus: CommercialStatus;
   claimedByUid?: string;
   memorialId?: string;
+  customerPrice: number;
+  liveOnWithMeAmount: number;
+  commissionAmountEuro: number;
   createdAt?: unknown;
+  updatedAt?: unknown;
 }
+
+export type PaymentProvider = 'stripe';
+export type PaymentRecordStatus = 'pending' | 'succeeded' | 'failed' | 'refunded';
+
+export interface Payment {
+  id: string;
+  memorialId: string;
+  customerId: string;
+  amount: number;
+  currency: string;
+  status: PaymentRecordStatus;
+  provider: PaymentProvider;
+  providerPaymentId: string;
+  salesChannel: SalesChannel;
+  createdAt?: unknown;
+  paidAt?: unknown;
+}
+
+export const MEMORIAL_PRICE_EUR = 199;
+export const FUNERAL_DIRECTOR_COMMISSION_EUR = 49;
+export const LIVEONWITHME_REVENUE_EUR = 150;

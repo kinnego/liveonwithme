@@ -1,5 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   collection,
   addDoc,
@@ -10,7 +11,8 @@ import {
   serverTimestamp,
   where,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +29,10 @@ const demo = {
 She loved her family fiercely, adored the sea, grew tomatoes with mixed success, and believed no journey was complete without something sweet for the road. This is a place for all the pieces of Mary that live on in the people who knew her.`,
   heroPhotoPath: '',
   slug: 'mary-demo',
+  status: 'live',
 };
+
+type LoadState = 'loading' | 'not_found' | 'draft_no_access' | 'ready';
 
 export default function Memorial({ params }: { params: Promise<{ slug: string }> }) {
   const [memorial, setMemorial] = useState<any>();
@@ -35,20 +40,46 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
   const [approved, setApproved] = useState<any[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [sent, setSent] = useState(false);
+  const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [user, setUser] = useState<User | null>(null);
+  const [isPreview, setIsPreview] = useState(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     params.then(async (p) => {
-      if (p.slug === 'mary-demo') return setMemorial(demo);
+      if (p.slug === 'mary-demo') {
+        setMemorial(demo);
+        setLoadState('ready');
+        return;
+      }
 
       const s = await getDoc(doc(db, 'memorials', p.slug));
-      if (s.exists()) {
-        const data = { id: s.id, ...s.data() };
-        setMemorial(data);
+      if (!s.exists()) {
+        setLoadState('not_found');
+        return;
+      }
 
-        if ((data as any).heroPhotoPath) {
-          setHero(`${R2_PUBLIC_URL}/${(data as any).heroPhotoPath}`);
-        }
+      const data: any = { id: s.id, ...s.data() };
+      const isOwner = user?.uid === data.ownerId;
+      const isLive = data.status === 'live';
 
+      if (!isLive && !isOwner) {
+        setLoadState('draft_no_access');
+        return;
+      }
+
+      setMemorial(data);
+      setIsPreview(!isLive && isOwner);
+
+      if (data.heroPhotoPath) {
+        setHero(`${R2_PUBLIC_URL}/${data.heroPhotoPath}`);
+      }
+
+      if (isLive) {
         const c = await getDocs(
           query(
             collection(db, 'contributions'),
@@ -67,8 +98,10 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
           }
         }
       }
+
+      setLoadState('ready');
     });
-  }, [params]);
+  }, [params, user]);
 
   async function uploadToR2(file: File, path: string) {
     const formData = new FormData();
@@ -86,7 +119,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
 
   async function contribute(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!memorial || memorial.id === 'demo') {
+    if (!memorial || memorial.id === 'demo' || isPreview) {
       setSent(true);
       return;
     }
@@ -115,12 +148,29 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
     setSent(true);
   }
 
-  if (!memorial)
+  if (loadState === 'loading') {
     return (
       <main className="shell">
         <p>Opening this memorial…</p>
       </main>
     );
+  }
+
+  if (loadState === 'not_found' || loadState === 'draft_no_access') {
+    return (
+      <main className="shell">
+        <div className="formCard center">
+          <h2>Memorial not found</h2>
+          <p className="muted">
+            This memorial may have been moved, or it isn't published yet.
+          </p>
+          <Link href="/" className="button" style={{ marginTop: 20 }}>
+            Return home
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   const years = `${memorial.born?.slice(0, 4) || ''} — ${memorial.died?.slice(0, 4) || ''}`;
   const photos = approved.filter((x) => x.photoPath);
@@ -128,6 +178,27 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
 
   return (
     <main>
+      {isPreview && (
+        <div
+          style={{
+            background: '#b28f69',
+            color: 'white',
+            textAlign: 'center',
+            padding: '10px 16px',
+            fontSize: 14,
+            fontWeight: 600,
+          }}
+        >
+          Preview mode — this is how visitors will see it. Only you can view this until it's live.{' '}
+          <Link
+            href={`/memorial/${memorial.id}/manage`}
+            style={{ textDecoration: 'underline', marginLeft: 8 }}
+          >
+            Go back to manage
+          </Link>
+        </div>
+      )}
+
       <section
         className="memorialHero"
         style={
@@ -151,7 +222,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         <a href="#story">Their story</a>
         <a href="#photos">Photographs</a>
         <a href="#memories">Memories</a>
-        <a href="#share">Share something</a>
+        {!isPreview && <a href="#share">Share something</a>}
       </div>
 
       <section id="story" className="section">
@@ -218,58 +289,60 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         )}
       </section>
 
-      <section id="share" className="section">
-        <div className="formCard">
-          {sent ? (
-            <div className="center">
-              <div className="iconCircle" style={{ margin: '0 auto 20px' }}>
-                ♡
-              </div>
-              <h2>Thank you.</h2>
-              <p className="muted">
-                Your contribution has been sent privately to the family. They can choose to add it
-                to the memorial.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="eyebrow">Share something with the family</div>
-              <h2>Do you have a memory or photograph?</h2>
-              <p className="muted">
-                What you send is private until the family chooses to publish it.
-              </p>
-              <form onSubmit={contribute}>
-                <label>Your name</label>
-                <input name="name" required />
-
-                <div className="twoCol">
-                  <div>
-                    <label>Email (optional)</label>
-                    <input name="email" type="email" />
-                  </div>
-                  <div>
-                    <label>How did you know them?</label>
-                    <input name="relationship" placeholder="Friend, cousin, colleague…" />
-                  </div>
+      {!isPreview && (
+        <section id="share" className="section">
+          <div className="formCard">
+            {sent ? (
+              <div className="center">
+                <div className="iconCircle" style={{ margin: '0 auto 20px' }}>
+                  ♡
                 </div>
+                <h2>Thank you.</h2>
+                <p className="muted">
+                  Your contribution has been sent privately to the family. They can choose to add it
+                  to the memorial.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="eyebrow">Share something with the family</div>
+                <h2>Do you have a memory or photograph?</h2>
+                <p className="muted">
+                  What you send is private until the family chooses to publish it.
+                </p>
+                <form onSubmit={contribute}>
+                  <label>Your name</label>
+                  <input name="name" required />
 
-                <label>Share a memory</label>
-                <textarea name="memory" placeholder="A story, a small moment, something they used to say…" />
+                  <div className="twoCol">
+                    <div>
+                      <label>Email (optional)</label>
+                      <input name="email" type="email" />
+                    </div>
+                    <div>
+                      <label>How did you know them?</label>
+                      <input name="relationship" placeholder="Friend, cousin, colleague…" />
+                    </div>
+                  </div>
 
-                <label>Add a photograph</label>
-                <input name="photo" type="file" accept="image/*" />
+                  <label>Share a memory</label>
+                  <textarea name="memory" placeholder="A story, a small moment, something they used to say…" />
 
-                <label>Photo caption (optional)</label>
-                <input name="caption" />
+                  <label>Add a photograph</label>
+                  <input name="photo" type="file" accept="image/*" />
 
-                <button className="button" style={{ marginTop: 24 }}>
-                  Send privately to the family
-                </button>
-              </form>
-            </>
-          )}
-        </div>
-      </section>
+                  <label>Photo caption (optional)</label>
+                  <input name="caption" />
+
+                  <button className="button" style={{ marginTop: 24 }}>
+                    Send privately to the family
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

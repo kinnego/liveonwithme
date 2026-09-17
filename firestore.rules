@@ -4,24 +4,56 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function memorial(memorialId) { return get(/databases/$(database)/documents/memorials/$(memorialId)).data; }
     function ownsMemorial(memorialId) { return signedIn() && memorial(memorialId).ownerId == request.auth.uid; }
-    function memorialVisible(memorialId) { return memorial(memorialId).visibility in ['public','unlisted']; }
+    function memorialIsLive(memorialId) { return memorial(memorialId).status == 'live'; }
+    function memorialIsLiveAndVisible(memorialId) {
+      let m = memorial(memorialId);
+      return m.status == 'live' && m.visibility in ['public','unlisted'];
+    }
     function userRole(uid) { return get(/databases/$(database)/documents/users/$(uid)).data.role; }
     function isFuneralDirector() { return signedIn() && userRole(request.auth.uid) == 'funeral_director'; }
 
     match /memorials/{id} {
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow get: if resource.data.visibility in ['public','unlisted'] || (signedIn() && resource.data.ownerId == request.auth.uid);
+      // Create must set status=draft, paymentStatus=unpaid, and preserve funeral director linkage
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'draft'
+        && request.resource.data.paymentStatus in ['unpaid', 'paid_via_funeral_director']
+        && request.resource.data.salesChannel in ['direct', 'funeral_director'];
+
+      // Public read only when live and visibility allows; owner always reads
+      allow get: if (resource.data.status == 'live' && resource.data.visibility in ['public','unlisted'])
+        || (signedIn() && resource.data.ownerId == request.auth.uid);
+
       allow list: if signedIn() && resource.data.ownerId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      // Owner can update memorial content, but NOT payment/status fields (those are server-side only)
+      allow update: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.paymentStatus == resource.data.paymentStatus
+        && request.resource.data.salesChannel == resource.data.salesChannel
+        && request.resource.data.funeralDirectorId == resource.data.funeralDirectorId
+        && request.resource.data.referralId == resource.data.referralId;
+
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid && resource.data.status != 'live';
     }
 
     match /contributions/{id} {
+      // Only allow contributions to live memorials
       allow create: if request.resource.data.status == 'pending'
         && request.resource.data.memorialId is string
-        && request.resource.data.contributorName is string;
+        && request.resource.data.contributorName is string
+        && memorialIsLive(request.resource.data.memorialId);
       allow read: if ownsMemorial(resource.data.memorialId)
-        || (resource.data.status == 'approved' && memorialVisible(resource.data.memorialId));
+        || (resource.data.status == 'approved' && memorialIsLiveAndVisible(resource.data.memorialId));
       allow update, delete: if ownsMemorial(resource.data.memorialId);
+    }
+
+    // Payments are server-only. Clients can read their own payments but never write.
+    match /payments/{id} {
+      allow read: if signedIn() && resource.data.customerId == request.auth.uid;
+      allow write: if false;
     }
 
     // A user's own profile. role starts as 'family' on signup and is client-immutable from then on —
@@ -39,22 +71,31 @@ service cloud.firestore {
     match /referrals/{id} {
       allow create: if isFuneralDirector()
         && request.resource.data.funeralDirectorUid == request.auth.uid
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        && request.resource.data.commercialStatus in ['referred', 'setup'];
+
       allow get: if signedIn() && (
         resource.data.funeralDirectorUid == request.auth.uid
         || resource.data.bereavedEmail == request.auth.token.email
       );
+
       allow list: if isFuneralDirector() && resource.data.funeralDirectorUid == request.auth.uid;
+
+      // FD can update most fields but not commercialStatus (that goes to server-authoritative flow)
+      // Bereaved contact can claim (limited field update)
       allow update: if signedIn() && (
-        resource.data.funeralDirectorUid == request.auth.uid
+        (resource.data.funeralDirectorUid == request.auth.uid
+          && request.resource.data.commercialStatus == resource.data.commercialStatus)
         || (
           resource.data.status == 'pending'
           && resource.data.bereavedEmail == request.auth.token.email
           && request.resource.data.status == 'claimed'
           && request.resource.data.claimedByUid == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','claimedByUid','memorialId'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','claimedByUid','memorialId','commercialStatus','updatedAt'])
+          && request.resource.data.commercialStatus in ['setup']
         )
       );
+
       allow delete: if isFuneralDirector() && resource.data.funeralDirectorUid == request.auth.uid;
     }
   }

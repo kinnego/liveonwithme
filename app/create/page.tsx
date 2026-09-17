@@ -50,6 +50,12 @@ export default function Create() {
       story: String(fd.get('story') || ''),
       visibility: String(fd.get('visibility') || 'unlisted'),
       heroPhotoPath: '',
+      status: 'draft',
+      paymentStatus: 'unpaid',
+      salesChannel: 'direct',
+      funeralDirectorId: null,
+      referralId: null,
+      publishedAt: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
