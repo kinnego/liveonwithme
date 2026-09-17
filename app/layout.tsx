@@ -2,6 +2,7 @@ import './globals.css';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
+import SiteNav from '@/components/SiteNav';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://liveonwith.me'),
@@ -52,20 +53,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             />
             <span className="brandName">LiveOnWith.me</span>
           </Link>
-          <nav>
-            <Link href="/auth">Sign in</Link>
-            <Link className="button small" href="/create">
-              Create a memorial
-            </Link>
-          </nav>
+          <SiteNav />
         </header>
         {children}
-        <footer>
-          Made for remembering, gently and privately. ·{' '}
-          <Link href="/fd" className="muted">
-            For funeral directors
-          </Link>
-        </footer>
+        <footer>Made for remembering, gently and privately. · Powered by Freastar</footer>
       </body>
     </html>
   );

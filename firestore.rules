@@ -40,11 +40,21 @@ service cloud.firestore {
     }
 
     match /contributions/{id} {
-      // Only allow contributions to live memorials
-      allow create: if request.resource.data.status == 'pending'
-        && request.resource.data.memorialId is string
-        && request.resource.data.contributorName is string
-        && memorialIsLive(request.resource.data.memorialId);
+      // Public visitors: only allow contributions to live memorials, must start as pending
+      // Family (memorial owner): can create at any status, only for memorials they own — used for
+      // family-written memories and family-uploaded photos.
+      allow create: if
+        (
+          request.resource.data.status == 'pending'
+          && request.resource.data.memorialId is string
+          && request.resource.data.contributorName is string
+          && memorialIsLive(request.resource.data.memorialId)
+        )
+        || (
+          signedIn()
+          && ownsMemorial(request.resource.data.memorialId)
+          && request.resource.data.source == 'family'
+        );
       allow read: if ownsMemorial(resource.data.memorialId)
         || (resource.data.status == 'approved' && memorialIsLiveAndVisible(resource.data.memorialId));
       allow update, delete: if ownsMemorial(resource.data.memorialId);

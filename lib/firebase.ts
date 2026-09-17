@@ -11,34 +11,14 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Lazy initialization - only initialize when actually used (not at build time)
-let _auth: Auth | null = null;
-let _db: Firestore | null = null;
+// Init only when env is present. During Cloudflare Pages build without env,
+// module loads without crashing; runtime pages use `dynamic = 'force-dynamic'`
+// so they never invoke Firebase server-side.
+const app = firebaseConfig.apiKey
+  ? getApps().length
+    ? getApps()[0]
+    : initializeApp(firebaseConfig)
+  : null;
 
-function getFirebaseApp() {
-  if (typeof window === 'undefined') {
-    // Server-side rendering - return null, Firebase will initialize client-side
-    return null;
-  }
-  return getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-}
-
-export const auth = new Proxy({} as Auth, {
-  get(target, prop) {
-    if (!_auth) {
-      const app = getFirebaseApp();
-      if (app) _auth = getAuth(app);
-    }
-    return _auth ? (_auth as any)[prop] : undefined;
-  }
-});
-
-export const db = new Proxy({} as Firestore, {
-  get(target, prop) {
-    if (!_db) {
-      const app = getFirebaseApp();
-      if (app) _db = getFirestore(app);
-    }
-    return _db ? (_db as any)[prop] : undefined;
-  }
-});
+export const auth = (app ? getAuth(app) : null) as Auth;
+export const db = (app ? getFirestore(app) : null) as Firestore;

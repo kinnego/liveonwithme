@@ -6,6 +6,14 @@ export type PaymentStatus = 'unpaid' | 'paid' | 'paid_via_funeral_director';
 
 export type SalesChannel = 'direct' | 'funeral_director';
 
+export interface Cemetery {
+  name: string;
+  address: string;
+  placeId: string;
+  lat: number | null;
+  lng: number | null;
+}
+
 export interface Memorial {
   id: string;
   ownerId: string;
@@ -16,6 +24,10 @@ export interface Memorial {
   address?: string;
   born?: string;
   died?: string;
+  ageAtDeath?: number | null;
+  cemetery?: Cemetery | null;
+  featuredContributionIds?: string[];
+  galleryDisplayMode?: GalleryDisplayMode;
   heroPhotoUrl?: string;
   heroPhotoPath?: string;
   epitaph?: string;
@@ -31,6 +43,10 @@ export interface Memorial {
   updatedAt?: unknown;
 }
 
+export type ContributionSource = 'family' | 'visitor';
+export type ContributionAudience = 'public' | 'family_only';
+export type GalleryDisplayMode = 'square' | 'natural';
+
 export interface Contribution {
   id: string;
   memorialId: string;
@@ -42,6 +58,10 @@ export interface Contribution {
   photoPath?: string;
   caption?: string;
   status: 'pending' | 'approved' | 'rejected';
+  source?: ContributionSource;
+  audience?: ContributionAudience;
+  focalX?: number;
+  focalY?: number;
   createdAt?: unknown;
 }
 

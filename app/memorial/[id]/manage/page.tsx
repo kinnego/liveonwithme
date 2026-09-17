@@ -247,16 +247,27 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
       )}
 
       {/* Existing management cards */}
-      <div className="featureGrid">
+      <div className="featureGrid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
         <div className="card">
           <h3>Edit their story</h3>
           <p className="muted">Name, dates, introduction, life story and privacy.</p>
-          <button className="button soft">Edit memorial</button>
+          <Link href={`/memorial/${m.id}/edit`} className="button soft">
+            Edit memorial
+          </Link>
         </div>
         <div className="card">
           <h3>Photographs</h3>
-          <p className="muted">Organise the family gallery and download originals.</p>
-          <button className="button soft">Open gallery</button>
+          <p className="muted">Upload photographs, star up to 4 favourites for the highlighted strip.</p>
+          <Link href={`/memorial/${m.id}/gallery`} className="button soft">
+            Open gallery
+          </Link>
+        </div>
+        <div className="card">
+          <h3>Family memories</h3>
+          <p className="muted">Write your own memories &mdash; the family&rsquo;s voice on the memorial.</p>
+          <Link href={`/memorial/${m.id}/memories`} className="button soft">
+            Write memories
+          </Link>
         </div>
         <div className="card">
           <h3>Invite people</h3>
@@ -274,45 +285,82 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
       {isLive && (
         <section style={{ marginTop: 55 }}>
           <div className="eyebrow">Contributions inbox</div>
-          <h2>Waiting for your approval</h2>
+          <h2>Waiting for you</h2>
           {items.length === 0 ? (
             <div className="card">
               <p className="muted">There are no contributions waiting at the moment.</p>
             </div>
           ) : (
-            items.map((c) => (
-              <div className="card contribution" key={c.id} style={{ marginBottom: 12 }}>
-                {c.photoPath ? (
-                  <ContributionPhoto path={c.photoPath} />
-                ) : (
-                  <div className="thumb" />
-                )}
-                <div>
-                  <strong>{c.contributorName}</strong>
-                  {c.relationship && <span className="muted"> · {c.relationship}</span>}
-                  <p>{c.memory || c.caption || 'Photograph submitted'}</p>
-                </div>
-                <div className="toolbar">
-                  <button className="button small" onClick={() => contribStatus(c.id, 'approved')}>
-                    Approve
-                  </button>
-                  {c.photoPath && (
+            items.map((c) => {
+              const isPrivate = c.audience === 'family_only';
+              return (
+                <div className="card contribution" key={c.id} style={{ marginBottom: 12 }}>
+                  {c.photoPath ? (
+                    <ContributionPhoto path={c.photoPath} />
+                  ) : (
+                    <div className="thumb" />
+                  )}
+                  <div>
+                    <strong>{c.contributorName}</strong>
+                    {c.relationship && <span className="muted"> · {c.relationship}</span>}
+                    {isPrivate && (
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          marginLeft: 10,
+                          padding: '3px 10px',
+                          borderRadius: 999,
+                          background: '#f0e8d8',
+                          color: '#8b6f30',
+                          fontSize: 11,
+                          fontWeight: 750,
+                          letterSpacing: '.04em',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Private message
+                      </span>
+                    )}
+                    <p>{c.memory || c.caption || 'Photograph submitted'}</p>
+                    {isPrivate && (
+                      <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                        The sender asked that this stays with the family only — it won&rsquo;t appear
+                        on the memorial.
+                      </p>
+                    )}
+                  </div>
+                  <div className="toolbar">
+                    {!isPrivate && (
+                      <button className="button small" onClick={() => contribStatus(c.id, 'approved')}>
+                        Approve for the memorial
+                      </button>
+                    )}
+                    {isPrivate && (
+                      <button
+                        className="button small"
+                        onClick={() => contribStatus(c.id, 'approved')}
+                      >
+                        Keep in family archive
+                      </button>
+                    )}
+                    {c.photoPath && (
+                      <button
+                        className="button secondary small"
+                        onClick={() => download(c.photoPath, c.caption)}
+                      >
+                        Download
+                      </button>
+                    )}
                     <button
                       className="button secondary small"
-                      onClick={() => download(c.photoPath, c.caption)}
+                      onClick={() => contribStatus(c.id, 'rejected')}
                     >
-                      Download
+                      {isPrivate ? 'Delete' : 'Not now'}
                     </button>
-                  )}
-                  <button
-                    className="button secondary small"
-                    onClick={() => contribStatus(c.id, 'rejected')}
-                  >
-                    Not now
-                  </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </section>
       )}

@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
+import { resizeForMobile } from '@/lib/image';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,7 +80,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         setHero(`${R2_PUBLIC_URL}/${data.heroPhotoPath}`);
       }
 
-      if (isLive) {
+      if (isLive || isOwner) {
         const c = await getDocs(
           query(
             collection(db, 'contributions'),
@@ -129,10 +130,12 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
     let photoPath = '';
 
     if (photo?.size) {
-      photoPath = `contributions/${memorial.id}/${crypto.randomUUID()}-${photo.name}`;
-      await uploadToR2(photo, photoPath);
+      const optimised = await resizeForMobile(photo);
+      photoPath = `contributions/${memorial.id}/${crypto.randomUUID()}-${optimised.name}`;
+      await uploadToR2(optimised, photoPath);
     }
 
+    const audience = fd.get('audience') === 'family_only' ? 'family_only' : 'public';
     await addDoc(collection(db, 'contributions'), {
       memorialId: memorial.id,
       contributorName: String(fd.get('name')),
@@ -142,6 +145,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
       caption: String(fd.get('caption') || ''),
       photoPath,
       status: 'pending',
+      audience,
       createdAt: serverTimestamp(),
     });
 
@@ -173,8 +177,15 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
   }
 
   const years = `${memorial.born?.slice(0, 4) || ''} — ${memorial.died?.slice(0, 4) || ''}`;
-  const photos = approved.filter((x) => x.photoPath);
-  const memories = approved.filter((x) => x.memory);
+  const publicApproved = approved.filter((x) => x.audience !== 'family_only');
+  const photos = publicApproved.filter((x) => x.photoPath);
+  const memories = publicApproved.filter((x) => x.memory);
+  const featuredIds: string[] = memorial.featuredContributionIds || [];
+  const featuredPhotos = featuredIds
+    .map((id) => photos.find((p) => p.id === id))
+    .filter(Boolean) as any[];
+  const cemetery = memorial.cemetery;
+  const ageAtDeath = memorial.ageAtDeath;
 
   return (
     <main>
@@ -210,16 +221,39 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         }
       >
         <div>
-          <div className="dates">{years}</div>
+          <div className="dates">
+            {years}
+            {ageAtDeath !== undefined && ageAtDeath !== null && (
+              <span style={{ marginLeft: 12 }}>· Aged {ageAtDeath}</span>
+            )}
+          </div>
           <h1>{memorial.fullName}</h1>
           <p style={{ fontFamily: 'Georgia,serif', fontSize: 22, fontStyle: 'italic' }}>
             {memorial.epitaph}
           </p>
+          {cemetery?.name && (
+            <p style={{ marginTop: 12, fontSize: 15, opacity: 0.9 }}>
+              Resting at{' '}
+              {cemetery.placeId ? (
+                <a
+                  href={`https://www.google.com/maps/place/?q=place_id:${cemetery.placeId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ textDecoration: 'underline', color: 'inherit' }}
+                >
+                  {cemetery.name}
+                </a>
+              ) : (
+                cemetery.name
+              )}
+            </p>
+          )}
         </div>
       </section>
 
       <div className="memorialNav">
         <a href="#story">Their story</a>
+        {featuredPhotos.length > 0 && <a href="#favourites">Favourites</a>}
         <a href="#photos">Photographs</a>
         <a href="#memories">Memories</a>
         {!isPreview && <a href="#share">Share something</a>}
@@ -237,10 +271,52 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         </div>
       </section>
 
+      {featuredPhotos.length > 0 && (
+        <section id="favourites" className="section">
+          <div className="eyebrow center">Favourites</div>
+          <h2 className="center">The photographs the family holds closest</h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${Math.min(featuredPhotos.length, 4)}, 1fr)`,
+              gap: 14,
+              marginTop: 35,
+            }}
+            className="favourites"
+          >
+            {featuredPhotos.map((x) => (
+              <div
+                key={x.id}
+                style={{
+                  aspectRatio: '3/4',
+                  borderRadius: 20,
+                  overflow: 'hidden',
+                  boxShadow: 'var(--shadow)',
+                  background: '#dde5df',
+                }}
+              >
+                {photoUrls[x.id] && (
+                  <img
+                    src={photoUrls[x.id]}
+                    alt={x.caption || `A memory of ${memorial.fullName}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: `${(x.focalX ?? 0.5) * 100}% ${(x.focalY ?? 0.5) * 100}%`,
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section id="photos" className="section">
         <div className="eyebrow center">Photographs</div>
         <h2 className="center">Moments worth keeping</h2>
-        <div className="gallery">
+        <div className={`gallery ${memorial.galleryDisplayMode === 'natural' ? 'natural' : ''}`}>
           {photos.length ? (
             photos.map((x) => (
               <div className="photo" key={x.id}>
@@ -248,6 +324,9 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
                   <img
                     src={photoUrls[x.id]}
                     alt={x.caption || `A memory of ${memorial.fullName}`}
+                    style={{
+                      objectPosition: `${(x.focalX ?? 0.5) * 100}% ${(x.focalY ?? 0.5) * 100}%`,
+                    }}
                   />
                 )}
               </div>
@@ -278,7 +357,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
               </p>
             </div>
           ))
-        ) : (
+        ) : memorial.id === 'demo' ? (
           <>
             <div className="quote">
               "The best thing about her was that you always left her house feeling better than
@@ -286,6 +365,19 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
             </div>
             <p className="muted">— A family memory</p>
           </>
+        ) : isPreview ? (
+          <p className="muted">
+            No memories yet. Write the first one so it appears here when the memorial goes live.
+          </p>
+        ) : (
+          <p className="muted">Memories from family and friends will appear here.</p>
+        )}
+        {isPreview && (
+          <div style={{ marginTop: 24 }}>
+            <Link href={`/memorial/${memorial.id}/memories`} className="button secondary small">
+              {memories.length ? 'Edit memories' : 'Write a memory'}
+            </Link>
+          </div>
         )}
       </section>
 
@@ -334,8 +426,59 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
                   <label>Photo caption (optional)</label>
                   <input name="caption" />
 
+                  <fieldset
+                    style={{
+                      border: '1px solid var(--line)',
+                      borderRadius: 14,
+                      padding: '14px 18px',
+                      marginTop: 22,
+                    }}
+                  >
+                    <legend style={{ fontSize: 13, fontWeight: 750, padding: '0 6px' }}>
+                      Who is this for?
+                    </legend>
+                    <label
+                      style={{
+                        display: 'flex',
+                        gap: 10,
+                        alignItems: 'flex-start',
+                        margin: '8px 0',
+                        fontWeight: 500,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="audience"
+                        value="public"
+                        defaultChecked
+                        style={{ width: 'auto', marginTop: 4 }}
+                      />
+                      <span>
+                        Share with family and friends on the memorial (the family will review before
+                        it appears)
+                      </span>
+                    </label>
+                    <label
+                      style={{
+                        display: 'flex',
+                        gap: 10,
+                        alignItems: 'flex-start',
+                        margin: '8px 0',
+                        fontWeight: 500,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="audience"
+                        value="family_only"
+                        style={{ width: 'auto', marginTop: 4 }}
+                      />
+                      <span>Just share it privately with the family — do not add it to the memorial</span>
+                    </label>
+                  </fieldset>
+
                   <button className="button" style={{ marginTop: 24 }}>
-                    Send privately to the family
+                    Send to the family
                   </button>
                 </form>
               </>

@@ -3,6 +3,8 @@ import { FormEvent, useState } from 'react';
 import { doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { calculateAgeAtDeath } from '@/lib/age';
+import { resizeForMobile } from '@/lib/image';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,12 +42,18 @@ export default function Create() {
     const slug = `${slugify(fullName)}-${Math.random().toString(36).slice(2, 7)}`;
     const memorialRef = doc(db, 'memorials', slug);
 
+    const born = String(fd.get('born') || '');
+    const died = String(fd.get('died') || '');
+
     await setDoc(memorialRef, {
       ownerId: auth.currentUser.uid,
       slug,
       fullName,
-      born: String(fd.get('born') || ''),
-      died: String(fd.get('died') || ''),
+      born,
+      died,
+      ageAtDeath: calculateAgeAtDeath(born, died),
+      cemetery: null,
+      featuredContributionIds: [],
       epitaph: String(fd.get('epitaph') || ''),
       story: String(fd.get('story') || ''),
       visibility: String(fd.get('visibility') || 'unlisted'),
@@ -62,8 +70,9 @@ export default function Create() {
 
     const photo = fd.get('photo') as File;
     if (photo?.size) {
-      const heroPhotoPath = `memorials/${slug}/${crypto.randomUUID()}-${photo.name}`;
-      await uploadToR2(photo, heroPhotoPath);
+      const optimised = await resizeForMobile(photo);
+      const heroPhotoPath = `memorials/${slug}/${crypto.randomUUID()}-${optimised.name}`;
+      await uploadToR2(optimised, heroPhotoPath);
       await updateDoc(memorialRef, {
         heroPhotoPath,
         updatedAt: serverTimestamp(),
