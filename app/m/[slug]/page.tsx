@@ -28,6 +28,8 @@ const demoPhotoUrls: Record<string, string> = {
   'demo-5': 'https://picsum.photos/id/431/1200/900',
   'demo-6': 'https://picsum.photos/id/338/1200/900',
   'demo-7': 'https://picsum.photos/id/292/1200/900',
+  'demo-mem-photo-1': 'https://picsum.photos/id/30/1200/800',
+  'demo-mem-photo-3': 'https://picsum.photos/id/425/1200/800',
 };
 
 const demoContributions = [
@@ -95,6 +97,7 @@ const demoContributions = [
   },
   {
     id: 'demo-mem-1',
+    photoPath: 'demo-mem-photo-1',
     memory:
       "The best thing about her was that you always left her house feeling better than when you arrived. Every visit ended with something for the road — a scone, a story, or the last of the biscuits she'd swear she wasn't eating.",
     contributorName: 'Nora',
@@ -111,6 +114,7 @@ const demoContributions = [
   },
   {
     id: 'demo-mem-3',
+    photoPath: 'demo-mem-photo-3',
     memory:
       "She sang along to the radio while she peeled potatoes. Off-key, always the wrong lyrics, and completely unbothered by either. It was one of the happiest sounds in the world.",
     contributorName: 'Kieran',
@@ -311,7 +315,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
 
   const years = `${memorial.born?.slice(0, 4) || ''} — ${memorial.died?.slice(0, 4) || ''}`;
   const publicApproved = approved.filter((x) => x.audience !== 'family_only');
-  const photos = publicApproved.filter((x) => x.photoPath);
+  const photos = publicApproved.filter((x) => x.photoPath && !x.memory);
   const memories = publicApproved.filter((x) => x.memory);
   const featuredIds: string[] = memorial.featuredContributionIds || [];
   const featuredPhotos = featuredIds
@@ -480,8 +484,25 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         <h2>Memories of {memorial.fullName.split(' ')[0]}</h2>
         {memories.length ? (
           memories.map((x) => (
-            <div key={x.id}>
-              <div className="quote">"{x.memory}"</div>
+            <div key={x.id} style={{ marginBottom: 45 }}>
+              {x.photoPath && photoUrls[x.id] && (
+                <div
+                  style={{
+                    maxWidth: 520,
+                    margin: '0 auto 22px',
+                    borderRadius: 20,
+                    overflow: 'hidden',
+                    boxShadow: 'var(--shadow)',
+                  }}
+                >
+                  <img
+                    src={photoUrls[x.id]}
+                    alt={`A memory shared by ${x.contributorName}`}
+                    style={{ width: '100%', height: 'auto', display: 'block' }}
+                  />
+                </div>
+              )}
+              <div className="quote">&ldquo;{x.memory}&rdquo;</div>
               <p className="muted">
                 — {x.contributorName}
                 {x.relationship ? `, ${x.relationship}` : ''}
@@ -529,7 +550,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
             ) : (
               <>
                 <div className="eyebrow">Share something with the family</div>
-                <h2>Do you have a memory or photograph?</h2>
+                <h2>Do you have a memory or photograph of {memorial.fullName.split(' ')[0]}?</h2>
                 <p className="muted">
                   What you send is private until the family chooses to publish it.
                 </p>
