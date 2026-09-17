@@ -1,0 +1,14 @@
+# Netlify secret-scanner omits.
+#
+# NEXT_PUBLIC_* env vars are inlined into the client bundle by Next.js — that
+# is what the prefix means. They are not secrets. Firebase project ID and the
+# Firebase Web-SDK config are also inherently public (they appear in the
+# browser); Firebase security relies on Firestore/Storage rules, not on
+# hiding these values. The Google Maps key is public but is restricted by
+# HTTP-referrer at the Google Cloud console.
+#
+# Anything genuinely secret (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+# R2_SECRET_ACCESS_KEY, FIREBASE_ADMIN_PRIVATE_KEY, FIREBASE_ADMIN_CLIENT_EMAIL,
+# etc.) is left in the scan and will still fail the build if leaked.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_FIREBASE_API_KEY,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,NEXT_PUBLIC_FIREBASE_PROJECT_ID,NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,NEXT_PUBLIC_FIREBASE_APP_ID,NEXT_PUBLIC_R2_PUBLIC_URL,NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,NEXT_PUBLIC_SITE_URL,FIREBASE_ADMIN_PROJECT_ID"

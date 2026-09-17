@@ -6,7 +6,7 @@ Last updated: 2026-09-17, branch `claude/ubuntu-machine-or-phone-ovt1xa`.
 
 - P0 requirements from REQUIREMENTS.md are implemented (memorial lifecycle, Go Live UX, Stripe payment, funeral director paid path, QR codes).
 - Brand assets wired into layout, manifest, favicons, OG tags.
-- Firestore rules updated and deployed to production project `liveonwithme`.
+- Firestore rules updated and deployed to production project `<your-firebase-project-id>`.
 - Build passes locally; changes pushed but not yet verified on Cloudflare Pages.
 - App works locally with the existing `.env.local`. New env vars needed before Stripe/Go-Live flow will function (see below).
 
@@ -20,13 +20,13 @@ NEXT_PUBLIC_SITE_URL=https://liveonwith.me  (or your deployed URL)
 STRIPE_SECRET_KEY=sk_live_... (or sk_test_ for dev)
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-FIREBASE_ADMIN_PROJECT_ID=liveonwithme
-FIREBASE_ADMIN_CLIENT_EMAIL=firebase-adminsdk-...@liveonwithme.iam.gserviceaccount.com
+FIREBASE_ADMIN_PROJECT_ID=<your-firebase-project-id>
+FIREBASE_ADMIN_CLIENT_EMAIL=firebase-adminsdk-...@<your-firebase-project-id>.iam.gserviceaccount.com
 FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
 Get Firebase Admin credentials at:
-https://console.firebase.google.com/project/liveonwithme/settings/serviceaccounts/adminsdk → "Generate new private key"
+https://console.firebase.google.com/project/<your-firebase-project-id>/settings/serviceaccounts/adminsdk → "Generate new private key"
 
 Configure Stripe webhook at:
 https://dashboard.stripe.com/webhooks → Add endpoint → `https://liveonwith.me/api/stripe/webhook` → Listen for `checkout.session.completed`, `checkout.session.expired`, `checkout.session.async_payment_failed`
