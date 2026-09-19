@@ -106,6 +106,30 @@ export default function Home() {
           </Link>
         </div>
       </section>
+
+      <section className="section center">
+        <div
+          className="card"
+          style={{
+            padding: '45px 28px',
+            background: '#faf7f0',
+            borderColor: '#e6dfc9',
+          }}
+        >
+          <div className="eyebrow">For funeral directors</div>
+          <h2 style={{ marginTop: 6, marginBottom: 14 }}>
+            Offer families a beautiful place for their loved one&rsquo;s memories
+          </h2>
+          <p className="lead" style={{ margin: '0 auto 26px', maxWidth: 620 }}>
+            Partner with us and give the families you serve a peaceful digital
+            keepsake — set up in minutes and cared for by them for a lifetime.
+            You focus on the family; we handle the technology.
+          </p>
+          <Link href="/partner/apply" className="button">
+            Become a partner
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }

@@ -68,12 +68,21 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // New visitors arriving from /create almost certainly don't have an account
-  // yet — default to register so we're not asking them for a password they
-  // never set. Existing users can flip to login with one click.
+  // Visitors arriving from a "start something" route almost certainly don't
+  // have an account yet — default to register so we're not asking them for a
+  // password they never set. Existing users can flip to login with one click.
+  const [flowContext, setFlowContext] = useState<'default' | 'partner' | 'help'>('default');
   useEffect(() => {
     const next = nextPath();
-    if (next === '/create') setMode('register');
+    if (next?.startsWith('/partner/')) setFlowContext('partner');
+    else if (next?.startsWith('/help/')) setFlowContext('help');
+    if (
+      next === '/create' ||
+      next?.startsWith('/partner/') ||
+      next?.startsWith('/help/')
+    ) {
+      setMode('register');
+    }
   }, []);
 
   async function submitEmail(e: FormEvent<HTMLFormElement>) {
@@ -123,13 +132,23 @@ export default function AuthPage() {
 
   const title = {
     login: 'Welcome back',
-    register: 'Create your account',
+    register:
+      flowContext === 'partner'
+        ? 'Create your partner account'
+        : flowContext === 'help'
+          ? 'Sign in or create an account'
+          : 'Create your account',
     reset: 'Reset your password',
   }[mode];
 
   const subtitle = {
     login: 'Sign in to manage memorials, legacies and contributions.',
-    register: 'Your account gives you a private place to build memorials or your own legacy.',
+    register:
+      flowContext === 'partner'
+        ? 'Set up your account so you can offer LiveOnWith.me to the families you serve.'
+        : flowContext === 'help'
+          ? 'You\'ll need a quick account before we can look at your request.'
+          : 'Your account gives you a private place to build memorials or your own legacy.',
     reset: 'Enter your email and we\'ll send you a reset link.',
   }[mode];
 
