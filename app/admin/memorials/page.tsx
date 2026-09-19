@@ -112,9 +112,9 @@ export default function AdminMemorials() {
                     )}
                   </td>
                   <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                    <Link href={`/m/${m.slug}`} target="_blank">public</Link>
+                    <Link href={`/admin/memorials/${m.id}`}>inspect</Link>
                     {' · '}
-                    <Link href={`/memorial/${m.id}/manage`} target="_blank">manage</Link>
+                    <Link href={`/m/${m.slug}`} target="_blank" rel="noopener">public ↗</Link>
                   </td>
                 </tr>
               ))}

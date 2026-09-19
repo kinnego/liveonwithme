@@ -69,10 +69,12 @@ service cloud.firestore {
       allow get: if
         (resource.data.status == 'live' && resource.data.visibility in ['public','unlisted'])
         || (signedIn() && resource.data.ownerId == request.auth.uid)
+        || (signedIn() && request.auth.uid in resource.data.get('successorUids', []))
         || isSuperAdmin();
 
       allow list: if
         (signedIn() && resource.data.ownerId == request.auth.uid)
+        || (signedIn() && request.auth.uid in resource.data.get('successorUids', []))
         || (resource.data.status == 'live' && resource.data.visibility == 'public')
         || isSuperAdmin();
 

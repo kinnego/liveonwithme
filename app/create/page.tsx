@@ -1,15 +1,16 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
-import { doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { calculateAgeAtDeath } from '@/lib/age';
 import { resizeForMobile } from '@/lib/image';
 import { createPerson } from '@/lib/person';
 import { slugify } from '@/lib/ids';
 import { writeAudit } from '@/lib/audit';
-import type { MemorialKind } from '@/lib/types';
+import { attachMemorialToExistingPlot } from '@/lib/plot';
+import type { MemorialKind, Plot } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,15 @@ export default function Create() {
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const [draft, setDraft] = useState<Record<string, string>>({});
+  // If arriving with ?plot=[plotId], we're adding a second/third memorial
+  // to an existing plot. Cemetery + plot linkage are inherited from the plot
+  // so the user never has to re-enter them, and the go-live price is the
+  // secondary rate.
+  const [presetPlot, setPresetPlot] = useState<Plot | null>(null);
+  const [presetPlotError, setPresetPlotError] = useState('');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const presetPlotId = searchParams?.get('plot') || '';
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => setUser(u));
@@ -66,6 +75,36 @@ export default function Create() {
     } catch {}
   }, [user]);
 
+  useEffect(() => {
+    // Force memorial mode as soon as we know we're attaching to a plot — a
+    // legacy (pre-death) page isn't a physical resting place.
+    if (presetPlotId) setMode('memorial');
+  }, [presetPlotId]);
+
+  useEffect(() => {
+    if (!user || !presetPlotId || !db) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'plots', presetPlotId));
+        if (!snap.exists()) {
+          setPresetPlotError('That plot could not be found.');
+          return;
+        }
+        const p = { id: snap.id, ...(snap.data() as any) } as Plot;
+        const canAdd =
+          p.plotAdminUid === user.uid ||
+          (p.plotAdminSuccessorUids || []).includes(user.uid);
+        if (!canAdd) {
+          setPresetPlotError('Only the plot administrator can add memorials to this plot.');
+          return;
+        }
+        setPresetPlot(p);
+      } catch (err: any) {
+        setPresetPlotError(err?.message || 'Could not load that plot.');
+      }
+    })();
+  }, [user, presetPlotId]);
+
   function persistDraft(next: Record<string, string>) {
     setDraft(next);
     try {
@@ -78,7 +117,10 @@ export default function Create() {
       window.localStorage.setItem('createMode', next);
     } catch {}
     if (!user) {
-      router.push(`/auth?next=${encodeURIComponent('/create')}`);
+      const nextPath = presetPlotId
+        ? `/create?plot=${encodeURIComponent(presetPlotId)}`
+        : '/create';
+      router.push(`/auth?next=${encodeURIComponent(nextPath)}`);
       return;
     }
     setMode(next);
@@ -135,7 +177,7 @@ export default function Create() {
         born,
         died,
         ageAtDeath: died ? calculateAgeAtDeath(born, died) : null,
-        cemetery: null,
+        cemetery: presetPlot?.cemetery ?? null,
         featuredContributionIds: [],
         epitaph: '',
         story: '',
@@ -150,6 +192,16 @@ export default function Create() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      if (presetPlot) {
+        setProgress('Adding to the plot…');
+        await attachMemorialToExistingPlot({
+          memorialId: slug,
+          personId,
+          plotId: presetPlot.id,
+          requestedByUid: auth.currentUser.uid,
+        });
+      }
 
       const photo = fd.get('photo') as File;
       if (photo?.size) {
@@ -327,30 +379,65 @@ export default function Create() {
   }
 
   const c = COPY[mode];
+  const attachingToPlot = !!presetPlotId;
+  const presetPlotReady = attachingToPlot ? !!presetPlot && !presetPlotError : true;
 
   return (
     <main className="shell">
       <div className="formCard">
-        <div className="eyebrow">{c.eyebrow}</div>
-        <h2>{c.heading}</h2>
-        <p className="muted">{c.intro}</p>
-        <p style={{ fontSize: 13, marginTop: -6 }}>
-          <button
-            type="button"
-            onClick={() => setMode(null)}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              color: 'var(--sage)',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-              fontSize: 13,
-            }}
-          >
-            ← This is actually a different kind of page
-          </button>
+        <div className="eyebrow">{attachingToPlot ? 'Adding to a resting place' : c.eyebrow}</div>
+        <h2>{attachingToPlot ? 'Add another memorial to this plot.' : c.heading}</h2>
+        <p className="muted">
+          {attachingToPlot
+            ? 'The QR code already engraved on the stone will simply update to include this person too — nothing to change on the stone itself.'
+            : c.intro}
         </p>
+
+        {attachingToPlot && presetPlotError && (
+          <div
+            className="card"
+            style={{ marginTop: 16, background: '#fdecea', borderColor: '#f5c6c6' }}
+          >
+            <p style={{ margin: 0, color: '#a94442', fontSize: 14 }}>{presetPlotError}</p>
+          </div>
+        )}
+        {attachingToPlot && presetPlot && (
+          <div
+            className="card"
+            style={{ marginTop: 16, background: '#f0e8d8', borderColor: '#e0c890' }}
+          >
+            <div className="eyebrow" style={{ marginBottom: 4 }}>Existing plot</div>
+            <p style={{ margin: 0, fontSize: 14 }}>
+              <strong>{presetPlot.name || presetPlot.cemetery.name}</strong>
+              {presetPlot.cemetery.address && (
+                <span className="muted"> · {presetPlot.cemetery.address}</span>
+              )}
+            </p>
+            <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }}>
+              Publishing this second memorial uses the reduced rate for additional names on the same plot.
+            </p>
+          </div>
+        )}
+
+        {!attachingToPlot && (
+          <p style={{ fontSize: 13, marginTop: -6 }}>
+            <button
+              type="button"
+              onClick={() => setMode(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: 'var(--sage)',
+                textDecoration: 'underline',
+                cursor: 'pointer',
+                fontSize: 13,
+              }}
+            >
+              ← This is actually a different kind of page
+            </button>
+          </p>
+        )}
 
         <form onSubmit={submit}>
           <label htmlFor="fullName">{c.nameLabel}</label>
@@ -415,8 +502,16 @@ export default function Create() {
             <p style={{ color: '#a94442', marginTop: 14, fontSize: 14 }}>{error}</p>
           )}
 
-          <button disabled={saving} className="button" style={{ width: '100%', marginTop: 26 }}>
-            {saving ? (progress || 'Creating…') : c.submitLabel}
+          <button
+            disabled={saving || !presetPlotReady}
+            className="button"
+            style={{ width: '100%', marginTop: 26 }}
+          >
+            {saving
+              ? progress || 'Creating…'
+              : attachingToPlot
+                ? 'Add this memorial'
+                : c.submitLabel}
           </button>
 
           <p className="muted" style={{ fontSize: 13, marginTop: 18, textAlign: 'center' }}>

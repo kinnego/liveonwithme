@@ -18,8 +18,9 @@ import { useRouter } from 'next/navigation';
 import { ensurePlotForMemorial } from '@/lib/plot';
 import { writeAudit } from '@/lib/audit';
 import { longToken } from '@/lib/ids';
-import { readQuotas } from '@/lib/config';
-import { DEFAULT_QUOTAS, MediaQuotasConfig } from '@/lib/types';
+import { readQuotas, readPricing } from '@/lib/config';
+import { isSecondaryOnPlot } from '@/lib/pricing';
+import { DEFAULT_PRICING, DEFAULT_QUOTAS, MediaQuotasConfig, PricingConfig } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
 function humanBytes(n: number): string {
@@ -32,7 +33,6 @@ function humanBytes(n: number): string {
 export const dynamic = 'force-dynamic';
 
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
-const PRICE_EUR = 199;
 
 function ContributionPhoto({ path }: { path: string }) {
   const [url, setUrl] = useState('');
@@ -90,6 +90,8 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const [savingNomination, setSavingNomination] = useState(false);
   const [quotas, setQuotas] = useState<MediaQuotasConfig>(DEFAULT_QUOTAS);
   const [usageBytes, setUsageBytes] = useState<number>(0);
+  const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
+  const [isSecondary, setIsSecondary] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -132,6 +134,12 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           }
         );
         readQuotas().then(setQuotas).catch(() => {});
+        readPricing().then(setPricing).catch(() => {});
+        if (memData.plotId) {
+          isSecondaryOnPlot(id, memData.plotId)
+            .then(setIsSecondary)
+            .catch(() => {});
+        }
       })
     );
     return () => {
@@ -284,6 +292,8 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const pageWordCap = isLegacy ? 'Page' : 'Memorial';
   const firstName = m.fullName.split(' ')[0];
   const publicUrl = typeof window !== 'undefined' ? `${window.location.origin}/m/${m.slug}` : `/m/${m.slug}`;
+  const priceCents = isSecondary ? pricing.secondaryDirectPriceCents : pricing.directPriceCents;
+  const priceEur = Math.round(priceCents / 100);
 
   return (
     <main className="shell">
@@ -300,7 +310,10 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             )}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <Link href="/dashboard" className="button secondary">
+            ← Dashboard
+          </Link>
           <Link href={`/m/${m.slug}`} className="button secondary">
             {isLive ? `View ${pageWord}` : 'Preview'}
           </Link>
@@ -332,13 +345,13 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             <p className="muted">
               Take your time — nothing here goes anywhere until you&rsquo;re ready. Publishing
               makes the page reachable at its link (you still choose who can see it). A one-time
-              fee of <strong>€{PRICE_EUR}</strong> covers hosting for life, so it&rsquo;s here for
+              fee of <strong>€{priceEur}</strong> covers hosting for life, so it&rsquo;s here for
               whenever it&rsquo;s needed.
             </p>
           ) : (
             <p className="muted">
               Take your time building the memorial. When you're ready, going live activates the
-              memorial for family and friends. A one-time fee of <strong>€{PRICE_EUR}</strong> covers
+              memorial for family and friends. A one-time fee of <strong>€{priceEur}</strong> covers
               hosting for life.
             </p>
           )}
@@ -353,7 +366,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                 ? 'Working…'
                 : isPartnerPaid
                   ? 'Go Live'
-                  : `Go Live · €${PRICE_EUR}`}
+                  : `Go Live · €${priceEur}`}
             </button>
             <Link href={`/m/${m.slug}`} className="button secondary">
               Preview first
@@ -415,7 +428,17 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                 <Link href={`/plot/${m.plotId}`} className="button secondary">
                   View plot page
                 </Link>
+                <Link
+                  href={`/create?plot=${encodeURIComponent(m.plotId)}`}
+                  className="button secondary"
+                >
+                  Add another memorial to this plot
+                </Link>
               </div>
+              <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>
+                Additional names on this plot use the reduced rate — the QR is already engraved
+                on the stone, so nothing physical needs to change.
+              </p>
             </>
           ) : m.cemetery?.placeId ? (
             <>

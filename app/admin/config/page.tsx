@@ -149,6 +149,28 @@ export default function AdminConfig() {
           </div>
         </div>
 
+        <p className="muted" style={{ fontSize: 13, marginTop: 14, marginBottom: 4 }}>
+          Second and subsequent memorials on the same plot (the QR is already engraved).
+        </p>
+        <div className="twoCol">
+          <div>
+            <label>Secondary direct price (cents)</label>
+            <input
+              type="number"
+              value={pricing.secondaryDirectPriceCents}
+              onChange={(e) => setPricing({ ...pricing, secondaryDirectPriceCents: Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <label>Secondary partner wholesale (cents)</label>
+            <input
+              type="number"
+              value={pricing.secondaryPartnerWholesalePriceCents}
+              onChange={(e) => setPricing({ ...pricing, secondaryPartnerWholesalePriceCents: Number(e.target.value) })}
+            />
+          </div>
+        </div>
+
         <label>Currency (Stripe code)</label>
         <input
           value={pricing.currency}

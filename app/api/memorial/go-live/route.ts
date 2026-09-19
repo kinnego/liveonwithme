@@ -4,6 +4,7 @@ import { adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import { getStripe, siteUrl } from '@/lib/stripe';
 import { readPricingAdmin } from '@/lib/config-admin';
 import { writeAuditAdmin } from '@/lib/audit-admin';
+import { isSecondaryOnPlot } from '@/lib/pricing-admin';
 
 export const runtime = 'nodejs';
 
@@ -55,7 +56,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Direct customer path: create Stripe checkout for the direct price.
+    // If this memorial is joining a plot that already has a paid, live
+    // memorial, the plot QR is already engraved and we charge the secondary
+    // price instead of the full price.
     const pricing = await readPricingAdmin();
+    const secondary =
+      !!memorial.plotId && (await isSecondaryOnPlot(memorialId, memorial.plotId));
+    const amount = secondary
+      ? pricing.secondaryDirectPriceCents
+      : pricing.directPriceCents;
+    const paymentKind = secondary ? 'secondary_memorial' : 'direct_memorial';
+
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -64,10 +75,12 @@ export async function POST(req: NextRequest) {
         {
           price_data: {
             currency: pricing.currency,
-            unit_amount: pricing.directPriceCents,
+            unit_amount: amount,
             product_data: {
               name: `Memorial for ${memorial.fullName}`,
-              description: 'Lifetime hosting for a LiveOnWith.me memorial.',
+              description: secondary
+                ? 'Adding a name to an existing plot on LiveOnWith.me — lifetime hosting.'
+                : 'Lifetime hosting for a LiveOnWith.me memorial.',
             },
           },
           quantity: 1,
@@ -78,7 +91,7 @@ export async function POST(req: NextRequest) {
         memorialId,
         customerId: uid,
         salesChannel: 'direct',
-        paymentKind: 'direct_memorial',
+        paymentKind,
       },
       success_url: `${siteUrl()}/memorial/${memorialId}/manage?paid=1`,
       cancel_url: `${siteUrl()}/memorial/${memorialId}/manage?cancelled=1`,
@@ -92,8 +105,8 @@ export async function POST(req: NextRequest) {
     await db.collection('payments').add({
       memorialId,
       customerId: uid,
-      kind: 'direct_memorial',
-      amount: pricing.directPriceCents,
+      kind: paymentKind,
+      amount,
       currency: pricing.currency,
       status: 'pending',
       provider: 'stripe',

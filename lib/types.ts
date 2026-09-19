@@ -329,7 +329,14 @@ export interface Referral {
 
 export type PaymentProvider = 'stripe';
 export type PaymentRecordStatus = 'pending' | 'succeeded' | 'failed' | 'refunded';
-export type PaymentKind = 'direct_memorial' | 'partner_wholesale';
+// direct_memorial / partner_wholesale = first memorial on a plot (full price).
+// secondary_* = 2nd+ memorial on the same plot (discounted — the plot QR is
+// already engraved, so the marginal cost of adding another name is lower).
+export type PaymentKind =
+  | 'direct_memorial'
+  | 'partner_wholesale'
+  | 'secondary_memorial'
+  | 'secondary_partner_wholesale';
 
 export interface Payment {
   id: string;
@@ -372,12 +379,19 @@ export const DEFAULT_QUOTAS: MediaQuotasConfig = {
 export interface PricingConfig {
   directPriceCents: number;
   partnerWholesalePriceCents: number;
+  // Second and subsequent memorials on the same plot. The QR is already
+  // engraved on the stone and the plot page updates automatically, so we
+  // charge less for each additional name.
+  secondaryDirectPriceCents: number;
+  secondaryPartnerWholesalePriceCents: number;
   currency: string;
 }
 
 export const DEFAULT_PRICING: PricingConfig = {
   directPriceCents: 19900, // €199.00
   partnerWholesalePriceCents: 15000, // €150.00
+  secondaryDirectPriceCents: 15000, // €150.00 — 2nd+ memorial on same plot
+  secondaryPartnerWholesalePriceCents: 10000, // €100.00 — 2nd+ via partner
   currency: 'eur',
 };
 

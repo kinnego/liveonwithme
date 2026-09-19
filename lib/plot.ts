@@ -37,13 +37,13 @@ export async function createPlot(input: CreatePlotInput): Promise<Plot> {
   const sId = await generateUniquePlotShortId();
   const plot: Omit<Plot, 'id'> = {
     shortId: sId,
-    name: input.name,
     cemetery: input.cemetery,
     plotAdminUid: input.plotAdminUid,
     plotAdminSuccessorUids: [],
     createdByUid: input.createdByUid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    ...(input.name ? { name: input.name } : {}),
   };
   await (
     await import('firebase/firestore')
@@ -104,12 +104,13 @@ export async function requestPlotMembership(input: {
   const ref = await addDoc(collection(db, 'plotMemberships'), {
     plotId: input.plotId,
     memorialId: input.memorialId,
-    personId: input.personId,
     requestedByUid: input.requestedByUid,
     status,
-    approvedByUid: input.autoApprove ? input.requestedByUid : undefined,
-    approvedAt: input.autoApprove ? serverTimestamp() : undefined,
     createdAt: serverTimestamp(),
+    ...(input.personId ? { personId: input.personId } : {}),
+    ...(input.autoApprove
+      ? { approvedByUid: input.requestedByUid, approvedAt: serverTimestamp() }
+      : {}),
   });
   if (input.autoApprove) {
     await updateDoc(doc(db, 'memorials', input.memorialId), {
@@ -147,4 +148,37 @@ export async function ensurePlotForMemorial(m: Memorial): Promise<string | null>
     autoApprove: true,
   });
   return plot.id;
+}
+
+// Attaches a newly-created memorial to an existing plot the caller
+// administers. Copies the plot's cemetery onto the memorial so the memorial
+// page renders consistently, and creates an auto-approved PlotMembership.
+export async function attachMemorialToExistingPlot(input: {
+  memorialId: string;
+  personId?: string;
+  plotId: string;
+  requestedByUid: string;
+}): Promise<void> {
+  if (!db) throw new Error('Firestore not available');
+  const plot = await readPlot(input.plotId);
+  if (!plot) throw new Error('Plot not found');
+  const isAdmin =
+    plot.plotAdminUid === input.requestedByUid ||
+    plot.plotAdminSuccessorUids.includes(input.requestedByUid);
+  await requestPlotMembership({
+    plotId: input.plotId,
+    memorialId: input.memorialId,
+    personId: input.personId,
+    requestedByUid: input.requestedByUid,
+    autoApprove: isAdmin,
+  });
+  if (isAdmin) {
+    await (
+      await import('firebase/firestore')
+    ).updateDoc(doc(db, 'memorials', input.memorialId), {
+      plotId: input.plotId,
+      cemetery: plot.cemetery,
+      updatedAt: serverTimestamp(),
+    });
+  }
 }
