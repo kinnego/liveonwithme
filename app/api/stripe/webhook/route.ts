@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
 import { getStripe, STRIPE_WEBHOOK_SECRET } from '@/lib/stripe';
+import { writeAuditAdmin } from '@/lib/audit-admin';
 
 export const runtime = 'nodejs';
 
@@ -33,13 +34,10 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as any;
         const memorialId = session.metadata?.memorialId || session.client_reference_id;
         const customerId = session.metadata?.customerId;
+        const paymentKind: string = session.metadata?.paymentKind || 'direct_memorial';
+        const referralId: string | undefined = session.metadata?.referralId;
 
-        if (!memorialId) {
-          console.warn('Webhook: missing memorialId', session.id);
-          break;
-        }
-
-        // Idempotency: check if payment already recorded as succeeded
+        // Idempotency: check if payment already recorded as succeeded.
         const paymentsSnap = await db
           .collection('payments')
           .where('providerPaymentId', '==', session.id)
@@ -56,28 +54,52 @@ export async function POST(req: NextRequest) {
             paidAt: FieldValue.serverTimestamp(),
           });
         } else {
-          // Create payment record if it wasn't pre-created
           await db.collection('payments').add({
-            memorialId,
+            memorialId: memorialId || null,
+            referralId: referralId || null,
             customerId,
+            kind: paymentKind,
             amount: session.amount_total,
             currency: session.currency,
             status: 'succeeded',
             provider: 'stripe',
             providerPaymentId: session.id,
-            salesChannel: 'direct',
+            salesChannel: paymentKind === 'partner_wholesale' ? 'partner' : 'direct',
             createdAt: FieldValue.serverTimestamp(),
             paidAt: FieldValue.serverTimestamp(),
           });
         }
 
-        // Mark memorial as live
-        await db.collection('memorials').doc(memorialId).update({
-          status: 'live',
-          paymentStatus: 'paid',
-          publishedAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        if (paymentKind === 'partner_wholesale' && referralId) {
+          // Partner has paid €150 wholesale for setting up a family; mark
+          // referral as paid so the family can claim + go live for free.
+          await db.collection('referrals').doc(referralId).update({
+            wholesalePaymentStatus: 'paid',
+            wholesalePaymentId: session.id,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          await writeAuditAdmin({
+            entityType: 'referral',
+            entityId: referralId,
+            action: 'wholesale_paid',
+            actorUid: customerId || 'stripe',
+            details: { session: session.id, amount: session.amount_total },
+          });
+        } else if (memorialId) {
+          await db.collection('memorials').doc(memorialId).update({
+            status: 'live',
+            paymentStatus: 'paid',
+            publishedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          await writeAuditAdmin({
+            entityType: 'memorial',
+            entityId: memorialId,
+            action: 'published_direct_paid',
+            actorUid: customerId || 'stripe',
+            details: { session: session.id, amount: session.amount_total },
+          });
+        }
 
         break;
       }
@@ -86,29 +108,28 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.async_payment_failed': {
         const session = event.data.object as any;
         const memorialId = session.metadata?.memorialId || session.client_reference_id;
+        const paymentKind: string = session.metadata?.paymentKind || 'direct_memorial';
 
-        if (memorialId) {
-          // Revert memorial to draft so customer can try again
+        if (memorialId && paymentKind === 'direct_memorial') {
           await db.collection('memorials').doc(memorialId).update({
             status: 'draft',
             updatedAt: FieldValue.serverTimestamp(),
           });
+        }
 
-          const paymentsSnap = await db
-            .collection('payments')
-            .where('providerPaymentId', '==', session.id)
-            .limit(1)
-            .get();
+        const paymentsSnap = await db
+          .collection('payments')
+          .where('providerPaymentId', '==', session.id)
+          .limit(1)
+          .get();
 
-          if (!paymentsSnap.empty) {
-            await paymentsSnap.docs[0].ref.update({ status: 'failed' });
-          }
+        if (!paymentsSnap.empty) {
+          await paymentsSnap.docs[0].ref.update({ status: 'failed' });
         }
         break;
       }
 
       default:
-        // Ignore unhandled events
         break;
     }
 

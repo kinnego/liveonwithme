@@ -56,7 +56,34 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <SiteNav />
         </header>
         {children}
-        <footer>Made for remembering, gently and privately. · Powered by Freastar</footer>
+        <footer>
+          <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 24px' }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: 20,
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+                marginBottom: 10,
+                fontSize: 13,
+              }}
+            >
+              <Link href="/partner/apply" style={{ color: 'var(--muted)' }}>
+                For funeral directors &amp; partners
+              </Link>
+              <Link href="/help/succession" style={{ color: 'var(--muted)' }}>
+                Need help managing a memorial?
+              </Link>
+              <Link href="/terms" style={{ color: 'var(--muted)' }}>
+                Fair-use terms
+              </Link>
+              <a href="mailto:hello@freastar.com" style={{ color: 'var(--muted)' }}>
+                hello@freastar.com
+              </a>
+            </div>
+            <div>Made for remembering, gently and privately. · Powered by Freastar</div>
+          </div>
+        </footer>
       </body>
     </html>
   );

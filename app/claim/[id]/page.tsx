@@ -4,11 +4,12 @@ import { isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { createPerson } from '@/lib/person';
+import { slugify } from '@/lib/ids';
+import { writeAudit } from '@/lib/audit';
+import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
-
-const slugify = (s: string) =>
-  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
 export default function Claim({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState('');
@@ -49,11 +50,23 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
         throw new Error('This memorial has already been claimed.');
       }
 
+      const personId = await createPerson({
+        fullName: referral.deceasedFullName,
+        born: referral.deceasedBorn || undefined,
+        died: referral.deceasedDied || undefined,
+        isLiving: !referral.deceasedDied,
+        createdByUid: u.uid,
+      });
+
       const slug = `${slugify(referral.deceasedFullName)}-${Math.random().toString(36).slice(2, 7)}`;
       const batch = writeBatch(db);
 
       batch.set(doc(db, 'memorials', slug), {
         ownerId: u.uid,
+        createdByUid: u.uid,
+        personId,
+        plotId: null,
+        successorUids: [],
         slug,
         fullName: referral.deceasedFullName,
         nickname: referral.deceasedNickname || '',
@@ -61,14 +74,15 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
         address: referral.deceasedAddress || '',
         born: referral.deceasedBorn || '',
         died: referral.deceasedDied || '',
+        kind: referral.deceasedDied ? 'memorial' : 'legacy',
         epitaph: '',
         story: '',
         visibility: 'unlisted',
         heroPhotoPath: '',
         status: 'draft',
-        paymentStatus: 'paid_via_funeral_director',
-        salesChannel: 'funeral_director',
-        funeralDirectorId: referral.funeralDirectorUid,
+        paymentStatus: 'paid_via_partner',
+        salesChannel: 'partner',
+        partnerUid: referral.partnerUid || referral.funeralDirectorUid || null,
         referralId,
         publishedAt: null,
         createdAt: serverTimestamp(),
@@ -79,11 +93,20 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
         status: 'claimed',
         claimedByUid: u.uid,
         memorialId: slug,
-        commercialStatus: 'setup',
         updatedAt: serverTimestamp(),
       });
 
       await batch.commit();
+
+      await writeAudit({
+        entityType: 'memorial',
+        entityId: slug,
+        action: 'claimed_from_partner_referral',
+        actorUid: u.uid,
+        actorEmail: u.email || undefined,
+        details: { referralId, partnerUid: referral.partnerUid || referral.funeralDirectorUid || null },
+      });
+
       router.push(`/memorial/${slug}/manage`);
     } catch (err: any) {
       setError(err.message);
@@ -106,7 +129,7 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
     if (!id) return;
     if (!isSignInWithEmailLink(auth, window.location.href)) {
       setError(
-        "This invite link isn't valid or has expired. Please contact the funeral home for a new invite."
+        "This invite link isn't valid or has expired. Please contact the person who sent it to you for a new invite."
       );
       setStatus('error');
       return;
@@ -132,7 +155,7 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
     return (
       <main className="shell">
         <div className="card">
-          <h3>We couldn't open this invite</h3>
+          <h3>We couldn&rsquo;t open this invite</h3>
           <p className="muted">{error}</p>
         </div>
       </main>
@@ -142,12 +165,12 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
     return (
       <main className="shell">
         <div className="formCard">
-          <div className="eyebrow">Confirm it's you</div>
+          <div className="eyebrow">Confirm it&rsquo;s you</div>
           <h2>Confirm your email</h2>
           <p className="muted">Enter the email address the invite was sent to.</p>
           <form onSubmit={submitEmail}>
-            <label>Email</label>
-            <input name="email" type="email" required />
+            <label htmlFor="email">Email</label>
+            <input id="email" name="email" type="email" required />
             <button className="button" style={{ width: '100%', marginTop: 24 }}>
               Continue
             </button>
@@ -156,5 +179,5 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
       </main>
     );
 
-  return <main className="shell">Setting up the memorial page…</main>;
+  return <PageSkeleton variant="compact" label="Setting up the memorial page" />;
 }

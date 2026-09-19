@@ -9,6 +9,7 @@ import { calculateAgeAtDeath } from '@/lib/age';
 import { resizeForMobile } from '@/lib/image';
 import type { Cemetery } from '@/lib/types';
 import CemeteryPicker from '@/components/CemeteryPicker';
+import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
   const [born, setBorn] = useState('');
   const [died, setDied] = useState('');
   const [cemetery, setCemetery] = useState<Cemetery | null>(null);
+  const [showDiedField, setShowDiedField] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -36,19 +38,22 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
         setBorn(data.born || '');
         setDied(data.died || '');
         setCemetery(data.cemetery || null);
+        if (data.kind === 'legacy' && data.died) setShowDiedField(true);
       })
     );
   }, [params, router]);
 
   const derivedAge = calculateAgeAtDeath(born, died);
 
-  async function uploadToR2(file: File, path: string) {
+  async function uploadToR2(file: File, path: string, memorialId?: string) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('path', path);
+    if (memorialId) formData.append('memorialId', memorialId);
     const res = await fetch('/api/upload', { method: 'POST', body: formData });
-    if (!res.ok) throw new Error('Photo upload failed');
-    return await res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Photo upload failed');
+    return data as { path: string; sizeBytes: number };
   }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -70,13 +75,29 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
         cemetery: cemetery ?? null,
         updatedAt: serverTimestamp(),
       };
+      // A legacy page transitions to a memorial the moment a died date is set.
+      if (m.kind === 'legacy' && died) {
+        updates.kind = 'memorial';
+        if (m.personId) {
+          try {
+            await updateDoc(doc(db, 'persons', m.personId), {
+              died,
+              isLiving: false,
+              updatedAt: serverTimestamp(),
+            });
+          } catch {
+            // Non-blocking: the memorial doc is the source of truth for display.
+          }
+        }
+      }
 
       const photo = fd.get('photo') as File;
       if (photo?.size) {
         const optimised = await resizeForMobile(photo);
         const heroPhotoPath = `memorials/${m.id}/${crypto.randomUUID()}-${optimised.name}`;
-        await uploadToR2(optimised, heroPhotoPath);
+        const uploaded = await uploadToR2(optimised, heroPhotoPath, m.id);
         updates.heroPhotoPath = heroPhotoPath;
+        updates.heroPhotoSize = uploaded.sizeBytes;
       }
 
       await updateDoc(doc(db, 'memorials', m.id), updates);
@@ -88,23 +109,28 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
     }
   }
 
-  if (!m) return <main className="shell">Loading…</main>;
+  if (!m) return <PageSkeleton variant="form" label="Loading" />;
 
   const heroUrl = m.heroPhotoPath ? `${R2_PUBLIC_URL}/${m.heroPhotoPath}` : '';
+  const isLegacy = m.kind === 'legacy';
+  const pageWord = isLegacy ? 'page' : 'memorial';
+  const nameLabel = isLegacy ? 'Full name' : 'Their full name';
+  const epitaphLabel = isLegacy ? 'A few words beneath the name' : 'A few words beneath their name';
+  const storyLabel = isLegacy ? 'The story' : 'Their story';
 
   return (
     <main className="shell">
       <div className="formCard">
-        <div className="eyebrow">Edit memorial</div>
+        <div className="eyebrow">Edit {pageWord}</div>
         <h2>{m.fullName}</h2>
-        <p className="muted">Change anything — it saves back to this memorial.</p>
+        <p className="muted">Change anything — it saves back to this {pageWord}.</p>
 
         <form onSubmit={submit}>
-          <label htmlFor="fullName">Their full name</label>
+          <label htmlFor="fullName">{nameLabel}</label>
           <input id="fullName" name="fullName" defaultValue={m.fullName} required />
 
-          <div className="twoCol">
-            <div>
+          {isLegacy && !showDiedField ? (
+            <>
               <label htmlFor="born">Born</label>
               <input
                 id="born"
@@ -113,22 +139,54 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
                 value={born}
                 onChange={(e) => setBorn(e.target.value)}
               />
-            </div>
-            <div>
-              <label htmlFor="died">Died</label>
-              <input
-                id="died"
-                name="died"
-                type="date"
-                value={died}
-                onChange={(e) => setDied(e.target.value)}
-              />
-            </div>
-          </div>
-          {derivedAge !== null && (
-            <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-              Age at passing: <strong>{derivedAge}</strong>
-            </p>
+              <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDiedField(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    color: 'var(--brand)',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                  }}
+                >
+                  If the time has come, add a date of passing — this page becomes a memorial.
+                </button>
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="twoCol">
+                <div>
+                  <label htmlFor="born">Born</label>
+                  <input
+                    id="born"
+                    name="born"
+                    type="date"
+                    value={born}
+                    onChange={(e) => setBorn(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="died">Died</label>
+                  <input
+                    id="died"
+                    name="died"
+                    type="date"
+                    value={died}
+                    onChange={(e) => setDied(e.target.value)}
+                  />
+                </div>
+              </div>
+              {derivedAge !== null && (
+                <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+                  Age at passing: <strong>{derivedAge}</strong>
+                </p>
+              )}
+            </>
           )}
 
           <span className="fieldLabel">Cemetery or resting place</span>
@@ -155,10 +213,10 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
           )}
           <input id="photo" name="photo" type="file" accept="image/*" />
 
-          <label htmlFor="epitaph">A few words beneath their name</label>
+          <label htmlFor="epitaph">{epitaphLabel}</label>
           <input id="epitaph" name="epitaph" defaultValue={m.epitaph || ''} />
 
-          <label htmlFor="story">Their story</label>
+          <label htmlFor="story">{storyLabel}</label>
           <textarea id="story" name="story" defaultValue={m.story || ''} />
 
           <label htmlFor="visibility">Who can see it?</label>

@@ -1,53 +1,99 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ─── helpers ─────────────────────────────────────────────────────────────
     function signedIn() { return request.auth != null; }
-    function memorial(memorialId) { return get(/databases/$(database)/documents/memorials/$(memorialId)).data; }
-    function ownsMemorial(memorialId) { return signedIn() && memorial(memorialId).ownerId == request.auth.uid; }
-    function memorialIsLive(memorialId) { return memorial(memorialId).status == 'live'; }
-    function memorialIsLiveAndVisible(memorialId) {
-      let m = memorial(memorialId);
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+    function userRole(uid) { return userDoc(uid).role; }
+    function isSuperAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).role == 'super_admin';
+    }
+    function isApprovedPartner() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).role == 'partner'
+        && userDoc(request.auth.uid).get('partnerStatus', 'pending') == 'approved';
+    }
+
+    function memorial(id) { return get(/databases/$(database)/documents/memorials/$(id)).data; }
+    function ownsMemorial(id) { return signedIn() && memorial(id).ownerId == request.auth.uid; }
+    function memorialIsLive(id) { return memorial(id).status == 'live'; }
+    function memorialIsLiveAndVisible(id) {
+      let m = memorial(id);
       return m.status == 'live' && m.visibility in ['public','unlisted'];
     }
-    function userRole(uid) { return get(/databases/$(database)/documents/users/$(uid)).data.role; }
-    function isFuneralDirector() { return signedIn() && userRole(request.auth.uid) == 'funeral_director'; }
 
+    function plot(id) { return get(/databases/$(database)/documents/plots/$(id)).data; }
+    function isPlotAdmin(pid) {
+      return signedIn() && plot(pid).plotAdminUid == request.auth.uid;
+    }
+
+    // ─── public config (read-only from clients) ──────────────────────────────
+    match /configPublic/{doc} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // ─── persons ─────────────────────────────────────────────────────────────
+    match /persons/{id} {
+      // Any signed-in user can create a person record.
+      allow create: if signedIn()
+        && request.resource.data.createdByUid == request.auth.uid;
+
+      // Persons are readable by anyone signed-in (they hold no sensitive data
+      // beyond name/dates that appear on public memorials anyway). Public read
+      // is allowed too so SSR memorial pages don't need auth.
+      allow get, list: if true;
+
+      // Updates only by the creator (for MVP; later: by the current custodian
+      // of a memorial that references this person, via server function).
+      allow update: if signedIn() && resource.data.createdByUid == request.auth.uid;
+      allow delete: if isSuperAdmin();
+    }
+
+    // ─── memorials ───────────────────────────────────────────────────────────
     match /memorials/{id} {
-      // Create must set status=draft, paymentStatus=unpaid, and preserve funeral director linkage
       allow create: if signedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.status == 'draft'
-        && request.resource.data.paymentStatus in ['unpaid', 'paid_via_funeral_director']
-        && request.resource.data.salesChannel in ['direct', 'funeral_director'];
+        && request.resource.data.paymentStatus in ['unpaid', 'paid_via_partner']
+        && request.resource.data.salesChannel in ['direct', 'partner'];
 
-      // Public read only when live and visibility allows; owner always reads
-      allow get: if (resource.data.status == 'live' && resource.data.visibility in ['public','unlisted'])
-        || (signedIn() && resource.data.ownerId == request.auth.uid);
+      allow get: if
+        (resource.data.status == 'live' && resource.data.visibility in ['public','unlisted'])
+        || (signedIn() && resource.data.ownerId == request.auth.uid)
+        || isSuperAdmin();
 
-      // Owner can list their own memorials. Public visitors can list live+public memorials
-      // (used by cemetery search — the query itself must include status=='live' and
-      // visibility=='public' filters, or rule evaluation will fail per-document).
       allow list: if
         (signedIn() && resource.data.ownerId == request.auth.uid)
-        || (resource.data.status == 'live' && resource.data.visibility == 'public');
+        || (resource.data.status == 'live' && resource.data.visibility == 'public')
+        || isSuperAdmin();
 
-      // Owner can update memorial content, but NOT payment/status fields (those are server-side only)
+      // Custodian can edit content but never payment/status/custody fields.
       allow update: if signedIn()
         && resource.data.ownerId == request.auth.uid
         && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.status == resource.data.status
         && request.resource.data.paymentStatus == resource.data.paymentStatus
         && request.resource.data.salesChannel == resource.data.salesChannel
-        && request.resource.data.funeralDirectorId == resource.data.funeralDirectorId
-        && request.resource.data.referralId == resource.data.referralId;
+        && request.resource.data.get('partnerUid', null) == resource.data.get('partnerUid', null)
+        && request.resource.data.get('referralId', null) == resource.data.get('referralId', null);
+
+      // Super admin can do administrative fixes (rare, audited).
+      allow update, delete: if isSuperAdmin();
 
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid && resource.data.status != 'live';
     }
 
+    // ─── contributions ───────────────────────────────────────────────────────
     match /contributions/{id} {
-      // Public visitors: only allow contributions to live memorials, must start as pending
-      // Family (memorial owner): can create at any status, only for memorials they own — used for
-      // family-written memories and family-uploaded photos.
       allow create: if
         (
           request.resource.data.status == 'pending'
@@ -61,57 +107,232 @@ service cloud.firestore {
           && request.resource.data.source == 'family'
         );
       allow read: if ownsMemorial(resource.data.memorialId)
-        || (resource.data.status == 'approved' && memorialIsLiveAndVisible(resource.data.memorialId));
-      allow update, delete: if ownsMemorial(resource.data.memorialId);
+        || (resource.data.status == 'approved' && memorialIsLiveAndVisible(resource.data.memorialId))
+        || isSuperAdmin();
+      allow update, delete: if ownsMemorial(resource.data.memorialId) || isSuperAdmin();
     }
 
-    // Payments are server-only. Clients can read their own payments but never write.
+    // ─── plots ───────────────────────────────────────────────────────────────
+    match /plots/{id} {
+      // Any signed-in user can create a plot (they become the initial admin).
+      allow create: if signedIn()
+        && request.resource.data.plotAdminUid == request.auth.uid
+        && request.resource.data.createdByUid == request.auth.uid;
+
+      // Plots are publicly readable (drives the /p/[shortId] QR resolution and
+      // /plot/[id] page). Contains no private data — the cemetery info is
+      // physically present in the world.
+      allow get, list: if true;
+
+      // Only plot admin (or super admin) may edit; ownership transfer via
+      // successor acceptance is handled by server.
+      allow update: if signedIn()
+        && (isPlotAdmin(id) || isSuperAdmin())
+        && request.resource.data.plotAdminUid == resource.data.plotAdminUid
+        && request.resource.data.createdByUid == resource.data.createdByUid;
+      allow delete: if isSuperAdmin();
+    }
+
+    // ─── plot memberships ────────────────────────────────────────────────────
+    match /plotMemberships/{id} {
+      // Anyone signed in can request association; auto-approval happens when
+      // the requester is the plot admin (rule can't easily check that at
+      // create time without a lookup, so we allow the client to set status
+      // freely and rely on plot admins to prune unwanted requests).
+      allow create: if signedIn()
+        && request.resource.data.requestedByUid == request.auth.uid
+        && request.resource.data.plotId is string
+        && request.resource.data.memorialId is string
+        && request.resource.data.status in ['requested', 'approved']
+        // If self-approving, must be plot admin
+        && (
+          request.resource.data.status == 'requested'
+          || isPlotAdmin(request.resource.data.plotId)
+        );
+
+      allow get, list: if true;
+
+      // Only the plot admin can flip status; only the requester can withdraw.
+      allow update: if signedIn() && (
+        isPlotAdmin(resource.data.plotId)
+        || resource.data.requestedByUid == request.auth.uid
+        || isSuperAdmin()
+      );
+      allow delete: if signedIn() && (
+        resource.data.requestedByUid == request.auth.uid
+        || isPlotAdmin(resource.data.plotId)
+        || isSuperAdmin()
+      );
+    }
+
+    // ─── custody transfers ───────────────────────────────────────────────────
+    match /custodyTransfers/{id} {
+      // Only the current custodian of the memorial may create a transfer.
+      allow create: if signedIn()
+        && ownsMemorial(request.resource.data.memorialId)
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.nominationType in ['primary', 'backup'];
+
+      // Read: the sender, the invited email owner (once signed in), super admin.
+      allow get: if signedIn() && (
+        resource.data.fromUid == request.auth.uid
+        || resource.data.toEmail == request.auth.token.email
+        || isSuperAdmin()
+      );
+
+      allow list: if signedIn() && (
+        (resource.data.fromUid == request.auth.uid)
+        || (resource.data.toEmail == request.auth.token.email)
+        || isSuperAdmin()
+      );
+
+      // Sender can cancel; invitee can accept/decline (server-side custodian
+      // swap done through a callable/API route with admin rights).
+      allow update: if signedIn() && (
+        (resource.data.fromUid == request.auth.uid && request.resource.data.status in ['cancelled'])
+        || (
+          resource.data.toEmail == request.auth.token.email
+          && resource.data.status == 'pending'
+          && request.resource.data.status in ['accepted', 'declined']
+          && request.resource.data.toUidWhenAccepted == request.auth.uid
+        )
+        || isSuperAdmin()
+      );
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // ─── partner applications ────────────────────────────────────────────────
+    match /partnerApplications/{id} {
+      // Any signed-in user may apply for themselves.
+      allow create: if signedIn()
+        && request.resource.data.applicantUid == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // Applicant reads their own; super admin reads all.
+      allow get: if signedIn() && (
+        resource.data.applicantUid == request.auth.uid
+        || isSuperAdmin()
+      );
+      allow list: if isSuperAdmin() || (
+        signedIn() && resource.data.applicantUid == request.auth.uid
+      );
+
+      // Only super admin may change status. Applicant may edit content while
+      // still pending (in case they need to correct info).
+      allow update: if isSuperAdmin() || (
+        signedIn()
+        && resource.data.applicantUid == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'pending'
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // ─── succession requests ─────────────────────────────────────────────────
+    match /successionRequests/{id} {
+      allow create: if signedIn()
+        && request.resource.data.requesterUid == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      allow get: if signedIn() && (
+        resource.data.requesterUid == request.auth.uid
+        || resource.data.get('assignedPartnerUid', '') == request.auth.uid
+        || isSuperAdmin()
+      );
+      allow list: if isSuperAdmin() || (
+        signedIn()
+        && (
+          resource.data.requesterUid == request.auth.uid
+          || resource.data.get('assignedPartnerUid', '') == request.auth.uid
+        )
+      );
+
+      // Requester can cancel; assigned partner can add notes; super admin can
+      // resolve/assign.
+      allow update: if isSuperAdmin() || (
+        signedIn() && resource.data.get('assignedPartnerUid', '') == request.auth.uid
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // ─── payments (server-only writes) ───────────────────────────────────────
     match /payments/{id} {
-      allow read: if signedIn() && resource.data.customerId == request.auth.uid;
+      allow read: if signedIn() && (
+        resource.data.customerId == request.auth.uid
+        || isSuperAdmin()
+      );
       allow write: if false;
     }
 
-    // A user's own profile. role starts as 'family' on signup and is client-immutable from then on —
-    // promoting an account to 'funeral_director' is done by the site admin directly in the Firebase console.
-    match /users/{uid} {
-      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.role == 'family';
-      allow get: if signedIn() && request.auth.uid == uid;
-      allow update: if signedIn() && request.auth.uid == uid && request.resource.data.role == resource.data.role;
-      allow list, delete: if false;
-    }
-
-    // Funeral-director-authored referrals. Personal details (bereaved contact, deceased info, commission)
-    // are only readable by the referring director or by the bereaved contact once they've signed in with
-    // the email the invite was sent to — never by an unauthenticated visitor with just the link.
+    // ─── referrals (partner → family setup) ──────────────────────────────────
     match /referrals/{id} {
-      allow create: if isFuneralDirector()
-        && request.resource.data.funeralDirectorUid == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.commercialStatus in ['referred', 'setup'];
+      allow create: if (isApprovedPartner() || isSuperAdmin())
+        && request.resource.data.partnerUid == request.auth.uid
+        && request.resource.data.status == 'pending';
 
       allow get: if signedIn() && (
-        resource.data.funeralDirectorUid == request.auth.uid
+        resource.data.partnerUid == request.auth.uid
         || resource.data.bereavedEmail == request.auth.token.email
+        || isSuperAdmin()
+      );
+      allow list: if isSuperAdmin() || (
+        signedIn() && resource.data.partnerUid == request.auth.uid
       );
 
-      allow list: if isFuneralDirector() && resource.data.funeralDirectorUid == request.auth.uid;
-
-      // FD can update most fields but not commercialStatus (that goes to server-authoritative flow)
-      // Bereaved contact can claim (limited field update)
+      // Partner can update most content but not wholesalePaymentStatus (server).
+      // Bereaved can claim.
       allow update: if signedIn() && (
-        (resource.data.funeralDirectorUid == request.auth.uid
-          && request.resource.data.commercialStatus == resource.data.commercialStatus)
+        (
+          resource.data.partnerUid == request.auth.uid
+          && request.resource.data.wholesalePaymentStatus == resource.data.wholesalePaymentStatus
+        )
         || (
           resource.data.status == 'pending'
           && resource.data.bereavedEmail == request.auth.token.email
           && request.resource.data.status == 'claimed'
           && request.resource.data.claimedByUid == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','claimedByUid','memorialId','commercialStatus','updatedAt'])
-          && request.resource.data.commercialStatus in ['setup']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status','claimedByUid','memorialId','updatedAt'
+          ])
         )
+        || isSuperAdmin()
       );
 
-      allow delete: if isFuneralDirector() && resource.data.funeralDirectorUid == request.auth.uid;
+      allow delete: if isSuperAdmin() || (
+        signedIn() && resource.data.partnerUid == request.auth.uid
+      );
+    }
+
+    // ─── audit events (append-only from clients; broad read for admins) ──────
+    match /auditEvents/{id} {
+      // Best-effort audit: any signed-in user can write an event about their
+      // own action. Server-side writes via admin SDK bypass these rules.
+      allow create: if signedIn()
+        && request.resource.data.actorUid == request.auth.uid;
+      allow get, list: if isSuperAdmin();
+      allow update, delete: if false;
+    }
+
+    // ─── users ───────────────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow create: if isSelf(uid)
+        && (
+          request.resource.data.role == 'family'
+          || (request.resource.data.role == 'super_admin' && request.resource.data.email == 'hello@freastar.com')
+        );
+      allow get: if isSelf(uid) || isSuperAdmin();
+      allow list: if isSuperAdmin();
+
+      // User can update their own profile but cannot elevate role/partner
+      // status themselves — those are super-admin controlled.
+      allow update: if (isSelf(uid)
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.get('partnerStatus', null) == resource.data.get('partnerStatus', null)
+      ) || isSuperAdmin();
+
+      allow delete: if isSuperAdmin();
     }
   }
 }

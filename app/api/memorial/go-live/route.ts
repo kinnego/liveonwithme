@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import { getStripe, siteUrl } from '@/lib/stripe';
-import { MEMORIAL_PRICE_EUR } from '@/lib/types';
+import { readPricingAdmin } from '@/lib/config-admin';
+import { writeAuditAdmin } from '@/lib/audit-admin';
 
 export const runtime = 'nodejs';
 
@@ -33,26 +34,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Memorial is already live', alreadyLive: true }, { status: 200 });
     }
 
-    // Path 1: Funeral director already paid → publish immediately
-    if (memorial.paymentStatus === 'paid_via_funeral_director') {
+    // Partner-paid path: partner has already paid wholesale — publish free.
+    if (memorial.paymentStatus === 'paid_via_partner' || memorial.paymentStatus === 'paid_via_funeral_director') {
       await memRef.update({
         status: 'live',
+        paymentStatus: 'paid_via_partner',
         publishedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
 
-      // Update referral commercialStatus to 'live'
-      if (memorial.referralId) {
-        await db.collection('referrals').doc(memorial.referralId).update({
-          commercialStatus: 'live',
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
+      await writeAuditAdmin({
+        entityType: 'memorial',
+        entityId: memorialId,
+        action: 'published_via_partner',
+        actorUid: uid,
+        details: { referralId: memorial.referralId || null },
+      });
 
       return NextResponse.json({ success: true, live: true });
     }
 
-    // Path 2: Direct customer → create Stripe checkout session
+    // Direct customer path: create Stripe checkout for the direct price.
+    const pricing = await readPricingAdmin();
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -60,8 +63,8 @@ export async function POST(req: NextRequest) {
       line_items: [
         {
           price_data: {
-            currency: 'eur',
-            unit_amount: MEMORIAL_PRICE_EUR * 100,
+            currency: pricing.currency,
+            unit_amount: pricing.directPriceCents,
             product_data: {
               name: `Memorial for ${memorial.fullName}`,
               description: 'Lifetime hosting for a LiveOnWith.me memorial.',
@@ -75,12 +78,12 @@ export async function POST(req: NextRequest) {
         memorialId,
         customerId: uid,
         salesChannel: 'direct',
+        paymentKind: 'direct_memorial',
       },
       success_url: `${siteUrl()}/memorial/${memorialId}/manage?paid=1`,
       cancel_url: `${siteUrl()}/memorial/${memorialId}/manage?cancelled=1`,
     });
 
-    // Mark memorial as awaiting_payment and record pending payment
     await memRef.update({
       status: 'awaiting_payment',
       updatedAt: FieldValue.serverTimestamp(),
@@ -89,8 +92,9 @@ export async function POST(req: NextRequest) {
     await db.collection('payments').add({
       memorialId,
       customerId: uid,
-      amount: MEMORIAL_PRICE_EUR * 100,
-      currency: 'eur',
+      kind: 'direct_memorial',
+      amount: pricing.directPriceCents,
+      currency: pricing.currency,
       status: 'pending',
       provider: 'stripe',
       providerPaymentId: session.id,

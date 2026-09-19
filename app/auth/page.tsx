@@ -1,5 +1,5 @@
 'use client';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -9,11 +9,22 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { isSuperAdminEmail } from '@/lib/roles';
 import { useRouter } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 type Mode = 'login' | 'register' | 'reset';
+
+// Returns a same-origin path from ?next=, or null. Absolute URLs are ignored to
+// prevent open-redirect abuse.
+function nextPath(): string | null {
+  if (typeof window === 'undefined') return null;
+  const raw = new URLSearchParams(window.location.search).get('next');
+  if (!raw) return null;
+  if (!raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
+}
 
 function friendlyError(code: string, message: string): string {
   const map: Record<string, string> = {
@@ -32,16 +43,21 @@ function friendlyError(code: string, message: string): string {
   return map[code] || message;
 }
 
-async function ensureUserProfile(uid: string, email: string | null) {
+async function ensureUserProfile(uid: string, email: string | null, displayName?: string | null) {
+  if (!db) return;
   const ref = doc(db, 'users', uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
     await setDoc(ref, {
       uid,
       email: email || '',
-      role: 'family',
+      displayName: displayName || '',
+      role: isSuperAdminEmail(email) ? 'super_admin' : 'family',
       createdAt: serverTimestamp(),
     });
+  } else if (isSuperAdminEmail(email) && snap.data().role !== 'super_admin') {
+    // Auto-promote the known super admin email if it was created before.
+    await setDoc(ref, { role: 'super_admin' }, { merge: true });
   }
 }
 
@@ -51,6 +67,14 @@ export default function AuthPage() {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  // New visitors arriving from /create almost certainly don't have an account
+  // yet — default to register so we're not asking them for a password they
+  // never set. Existing users can flip to login with one click.
+  useEffect(() => {
+    const next = nextPath();
+    if (next === '/create') setMode('register');
+  }, []);
 
   async function submitEmail(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -64,11 +88,12 @@ export default function AuthPage() {
     try {
       if (mode === 'register') {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await ensureUserProfile(cred.user.uid, cred.user.email);
-        router.push('/dashboard');
+        await ensureUserProfile(cred.user.uid, cred.user.email, cred.user.displayName);
+        router.push(nextPath() || '/dashboard');
       } else if (mode === 'login') {
-        await signInWithEmailAndPassword(auth, email, password);
-        router.push('/dashboard');
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        await ensureUserProfile(cred.user.uid, cred.user.email, cred.user.displayName);
+        router.push(nextPath() || '/dashboard');
       } else if (mode === 'reset') {
         await sendPasswordResetEmail(auth, email);
         setNotice(`Password reset email sent to ${email}. Check your inbox.`);
@@ -87,8 +112,8 @@ export default function AuthPage() {
     try {
       const provider = new GoogleAuthProvider();
       const cred = await signInWithPopup(auth, provider);
-      await ensureUserProfile(cred.user.uid, cred.user.email);
-      router.push('/dashboard');
+      await ensureUserProfile(cred.user.uid, cred.user.email, cred.user.displayName);
+      router.push(nextPath() || '/dashboard');
     } catch (err: any) {
       setError(friendlyError(err.code, err.message));
     } finally {
@@ -103,8 +128,8 @@ export default function AuthPage() {
   }[mode];
 
   const subtitle = {
-    login: 'Sign in to manage memorials and contributions.',
-    register: 'Your account gives you control of memorials, contributions and privacy.',
+    login: 'Sign in to manage memorials, legacies and contributions.',
+    register: 'Your account gives you a private place to build memorials or your own legacy.',
     reset: 'Enter your email and we\'ll send you a reset link.',
   }[mode];
 

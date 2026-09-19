@@ -33,20 +33,30 @@ function StatusBadge({ status }: { status?: string }) {
 }
 
 export default function Dashboard() {
-  const [items, setItems] = useState<any[]>([]);
+  const [owned, setOwned] = useState<any[]>([]);
+  const [nominated, setNominated] = useState<any[]>([]);
   const router = useRouter();
 
-  useEffect(
-    () =>
-      onAuthStateChanged(auth, (u) => {
-        if (!u) return router.push('/auth');
-        return onSnapshot(
-          query(collection(db, 'memorials'), where('ownerId', '==', u.uid)),
-          (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() })))
-        );
-      }),
-    [router]
-  );
+  useEffect(() => {
+    let stopOwned: any;
+    let stopNominated: any;
+    const stopAuth = onAuthStateChanged(auth, (u) => {
+      if (!u) return router.push('/auth');
+      stopOwned = onSnapshot(
+        query(collection(db, 'memorials'), where('ownerId', '==', u.uid)),
+        (s) => setOwned(s.docs.map((d) => ({ id: d.id, ...d.data() })))
+      );
+      stopNominated = onSnapshot(
+        query(collection(db, 'memorials'), where('successorUids', 'array-contains', u.uid)),
+        (s) => setNominated(s.docs.map((d) => ({ id: d.id, ...d.data() })))
+      );
+    });
+    return () => {
+      stopAuth();
+      stopOwned?.();
+      stopNominated?.();
+    };
+  }, [router]);
 
   return (
     <main className="shell">
@@ -56,19 +66,21 @@ export default function Dashboard() {
           <h2 style={{ marginBottom: 0 }}>Memorials</h2>
         </div>
         <Link href="/create" className="button">
-          Create a memorial
+          Create a page
         </Link>
       </div>
-      {items.length === 0 ? (
+      {owned.length === 0 ? (
         <div className="card">
           <h3>No memorials yet</h3>
           <p className="muted">
-            When you're ready, create a peaceful space for someone you love.
+            When you&rsquo;re ready, create a peaceful space for someone you love.
+            If you&rsquo;re looking after a memorial someone else created, you&rsquo;ll find it
+            below once you accept the invitation.
           </p>
         </div>
       ) : (
         <div className="featureGrid">
-          {items.map((m) => (
+          {owned.map((m) => (
             <Link
               href={`/memorial/${m.id}/manage`}
               className="card"
@@ -77,12 +89,38 @@ export default function Dashboard() {
               <StatusBadge status={m.status} />
               <h3 style={{ marginTop: 18 }}>{m.fullName}</h3>
               <p className="muted">
-                {m.born?.slice(0, 4)} — {m.died?.slice(0, 4)}
+                {m.kind === 'legacy'
+                  ? m.born?.slice(0, 4) || 'A legacy page'
+                  : `${m.born?.slice(0, 4) || ''}${m.died ? ` — ${m.died.slice(0, 4)}` : ''}`}
               </p>
-              <span>Manage memorial →</span>
+              <span>Manage {m.kind === 'legacy' ? 'page' : 'memorial'} →</span>
             </Link>
           ))}
         </div>
+      )}
+
+      {nominated.length > 0 && (
+        <section style={{ marginTop: 40 }}>
+          <div className="eyebrow">Looked after by others</div>
+          <h3 style={{ marginTop: 6 }}>You&rsquo;re a backup for these memorials</h3>
+          <p className="muted" style={{ marginBottom: 20 }}>
+            You don&rsquo;t need to do anything today — this is just so you know they&rsquo;ll come
+            to you if the current custodian is ever unable to look after them.
+          </p>
+          <div className="featureGrid">
+            {nominated.map((m) => (
+              <Link href={`/m/${m.slug}`} className="card" key={m.id}>
+                <h3 style={{ marginTop: 0 }}>{m.fullName}</h3>
+                <p className="muted">
+                  {m.kind === 'legacy'
+                    ? m.born?.slice(0, 4) || 'A legacy page'
+                    : `${m.born?.slice(0, 4) || ''}${m.died ? ` — ${m.died.slice(0, 4)}` : ''}`}
+                </p>
+                <span>View {m.kind === 'legacy' ? 'page' : 'memorial'} →</span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
     </main>
   );

@@ -9,10 +9,25 @@ import {
   query,
   where,
   updateDoc,
+  addDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { ensurePlotForMemorial } from '@/lib/plot';
+import { writeAudit } from '@/lib/audit';
+import { longToken } from '@/lib/ids';
+import { readQuotas } from '@/lib/config';
+import { DEFAULT_QUOTAS, MediaQuotasConfig } from '@/lib/types';
+import { PageSkeleton } from '@/components/Skeleton';
+
+function humanBytes(n: number): string {
+  if (!n || n < 1024) return `${Math.max(0, n || 0)} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${Math.round(n / (1024 * 1024))} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -65,17 +80,30 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const [items, setItems] = useState<any[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
+  const [linkingPlot, setLinkingPlot] = useState(false);
+  const [plotError, setPlotError] = useState('');
+  const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
+  const [successorEmail, setSuccessorEmail] = useState('');
+  const [successorType, setSuccessorType] = useState<'backup' | 'primary'>('backup');
+  const [nominationError, setNominationError] = useState('');
+  const [nominationLink, setNominationLink] = useState('');
+  const [savingNomination, setSavingNomination] = useState(false);
+  const [quotas, setQuotas] = useState<MediaQuotasConfig>(DEFAULT_QUOTAS);
+  const [usageBytes, setUsageBytes] = useState<number>(0);
   const router = useRouter();
 
   useEffect(() => {
-    let stop: any;
+    let stopContrib: any;
+    let stopTransfers: any;
+    let stopAll: any;
     params.then(({ id }) =>
       onAuthStateChanged(auth, async (u) => {
         if (!u) return router.push('/auth');
         const snap = await getDoc(doc(db, 'memorials', id));
         if (!snap.exists() || snap.data().ownerId !== u.uid) return router.push('/dashboard');
-        setM({ id: snap.id, ...snap.data() });
-        stop = onSnapshot(
+        const memData: any = { id: snap.id, ...snap.data() };
+        setM(memData);
+        stopContrib = onSnapshot(
           query(
             collection(db, 'contributions'),
             where('memorialId', '==', id),
@@ -83,9 +111,34 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           ),
           (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() })))
         );
+        stopTransfers = onSnapshot(
+          query(
+            collection(db, 'custodyTransfers'),
+            where('memorialId', '==', id),
+            where('fromUid', '==', u.uid),
+            where('status', '==', 'pending')
+          ),
+          (s) => setPendingTransfers(s.docs.map((d) => ({ id: d.id, ...d.data() })))
+        );
+        stopAll = onSnapshot(
+          query(collection(db, 'contributions'), where('memorialId', '==', id)),
+          (s) => {
+            let sum = memData.heroPhotoSize || 0;
+            s.forEach((d) => {
+              const data = d.data() as any;
+              if (typeof data.sizeBytes === 'number') sum += data.sizeBytes;
+            });
+            setUsageBytes(sum);
+          }
+        );
+        readQuotas().then(setQuotas).catch(() => {});
       })
     );
-    return () => stop?.();
+    return () => {
+      stopContrib?.();
+      stopTransfers?.();
+      stopAll?.();
+    };
   }, [params, router]);
 
   async function refreshMemorial() {
@@ -128,6 +181,89 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
     await updateDoc(doc(db, 'contributions', id), { status: value });
   }
 
+  async function nominate() {
+    if (!m || !auth.currentUser) return;
+    if (!successorEmail.trim()) {
+      setNominationError('Please add an email address for the person you\u2019re nominating.');
+      return;
+    }
+    setSavingNomination(true);
+    setNominationError('');
+    setNominationLink('');
+    try {
+      const token = longToken(32);
+      const ref = await addDoc(collection(db, 'custodyTransfers'), {
+        memorialId: m.id,
+        fromUid: auth.currentUser.uid,
+        toEmail: successorEmail.trim().toLowerCase(),
+        token,
+        nominationType: successorType,
+        status: 'pending',
+        invitedAt: serverTimestamp(),
+      });
+      await writeAudit({
+        entityType: 'custodyTransfer',
+        entityId: ref.id,
+        action: 'invited',
+        actorUid: auth.currentUser.uid,
+        actorEmail: auth.currentUser.email || undefined,
+        details: {
+          memorialId: m.id,
+          toEmail: successorEmail.trim().toLowerCase(),
+          nominationType: successorType,
+        },
+      });
+      const link = `${window.location.origin}/custody/accept/${token}`;
+      setNominationLink(link);
+      setSuccessorEmail('');
+    } catch (err: any) {
+      setNominationError(err.message || 'Something went wrong sending the invitation.');
+    } finally {
+      setSavingNomination(false);
+    }
+  }
+
+  async function cancelNomination(id: string) {
+    if (!auth.currentUser) return;
+    await updateDoc(doc(db, 'custodyTransfers', id), {
+      status: 'cancelled',
+      respondedAt: serverTimestamp(),
+    });
+    await writeAudit({
+      entityType: 'custodyTransfer',
+      entityId: id,
+      action: 'cancelled',
+      actorUid: auth.currentUser.uid,
+      actorEmail: auth.currentUser.email || undefined,
+    });
+  }
+
+  async function linkPlot() {
+    if (!m || !auth.currentUser) return;
+    setLinkingPlot(true);
+    setPlotError('');
+    try {
+      const plotId = await ensurePlotForMemorial(m);
+      if (!plotId) {
+        setPlotError('Please add a cemetery to the memorial first so we know where the plot is.');
+        return;
+      }
+      await writeAudit({
+        entityType: 'plot',
+        entityId: plotId,
+        action: 'linked_to_memorial',
+        actorUid: auth.currentUser.uid,
+        actorEmail: auth.currentUser.email || undefined,
+        details: { memorialId: m.id },
+      });
+      await refreshMemorial();
+    } catch (err: any) {
+      setPlotError(err.message || 'Something went wrong linking the plot.');
+    } finally {
+      setLinkingPlot(false);
+    }
+  }
+
   async function download(path: string, name: string) {
     const url = `${R2_PUBLIC_URL}/${path}`;
     const a = document.createElement('a');
@@ -137,32 +273,36 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
     a.click();
   }
 
-  if (!m) return <main className="shell">Opening family controls…</main>;
+  if (!m) return <PageSkeleton variant="detail" label="Opening controls" />;
 
   const isDraft = m.status === 'draft';
   const isLive = m.status === 'live';
   const isAwaitingPayment = m.status === 'awaiting_payment';
-  const isFuneralDirectorPaid = m.paymentStatus === 'paid_via_funeral_director';
+  const isPartnerPaid = m.paymentStatus === 'paid_via_partner' || m.paymentStatus === 'paid_via_funeral_director';
+  const isLegacy = m.kind === 'legacy';
+  const pageWord = isLegacy ? 'page' : 'memorial';
+  const pageWordCap = isLegacy ? 'Page' : 'Memorial';
+  const firstName = m.fullName.split(' ')[0];
   const publicUrl = typeof window !== 'undefined' ? `${window.location.origin}/m/${m.slug}` : `/m/${m.slug}`;
 
   return (
     <main className="shell">
       <div className="dashboardHead">
         <div>
-          <div className="eyebrow">Family controls</div>
+          <div className="eyebrow">{isLegacy ? 'Your page' : 'Family controls'}</div>
           <h2 style={{ marginBottom: 5 }}>{m.fullName}</h2>
           <p className="muted" style={{ margin: 0 }}>
             <StatusBadge status={m.status} />
-            {isFuneralDirectorPaid && (
+            {isPartnerPaid && (
               <span style={{ marginLeft: 10, fontSize: 13 }}>
-                · Paid via funeral director
+                · Set up for you by a partner
               </span>
             )}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <Link href={`/m/${m.slug}`} className="button secondary">
-            {isLive ? 'View memorial' : 'Preview'}
+            {isLive ? `View ${pageWord}` : 'Preview'}
           </Link>
         </div>
       </div>
@@ -178,11 +318,22 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           }}
         >
           <div className="eyebrow">Ready when you are</div>
-          <h3 style={{ marginTop: 10 }}>Make {m.fullName.split(' ')[0]}'s memorial live</h3>
-          {isFuneralDirectorPaid ? (
+          <h3 style={{ marginTop: 10 }}>
+            {isLegacy
+              ? `Publish your ${pageWord}`
+              : `Make ${firstName}'s ${pageWord} live`}
+          </h3>
+          {isPartnerPaid ? (
             <p className="muted">
-              Your funeral director has already covered the cost. When you're ready, publish the
-              memorial so family and friends can visit it and share their memories.
+              Your partner has already covered the cost. When you&rsquo;re ready, publish the
+              {' '}{pageWord} so family and friends can visit it and share their memories.
+            </p>
+          ) : isLegacy ? (
+            <p className="muted">
+              Take your time — nothing here goes anywhere until you&rsquo;re ready. Publishing
+              makes the page reachable at its link (you still choose who can see it). A one-time
+              fee of <strong>€{PRICE_EUR}</strong> covers hosting for life, so it&rsquo;s here for
+              whenever it&rsquo;s needed.
             </p>
           ) : (
             <p className="muted">
@@ -200,7 +351,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             <button className="button" onClick={goLive} disabled={publishing}>
               {publishing
                 ? 'Working…'
-                : isFuneralDirectorPaid
+                : isPartnerPaid
                   ? 'Go Live'
                   : `Go Live · €${PRICE_EUR}`}
             </button>
@@ -209,7 +360,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             </Link>
           </div>
 
-          {isAwaitingPayment && !isFuneralDirectorPaid && (
+          {isAwaitingPayment && !isPartnerPaid && (
             <p className="muted" style={{ marginTop: 15, fontSize: 13 }}>
               You started checkout but payment wasn't completed. Click Go Live to try again.
             </p>
@@ -226,21 +377,249 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             borderColor: '#a8bcae',
           }}
         >
-          <div className="eyebrow">Memorial is live</div>
-          <h3 style={{ marginTop: 10 }}>Share {m.fullName.split(' ')[0]}'s memorial</h3>
+          <div className="eyebrow">{pageWordCap} is live</div>
+          <h3 style={{ marginTop: 10 }}>
+            {isLegacy ? `Share your ${pageWord}` : `Share ${firstName}'s ${pageWord}`}
+          </h3>
           <p className="muted">
-            This memorial is live and accessible via the link below. Share it with family and
-            friends.
+            {isLegacy
+              ? `Your page is live at the link below. Share it with whoever you'd like — or just keep the link somewhere safe for when it's needed.`
+              : `This memorial is live and accessible via the link below. Share it with family and friends.`}
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
             <button
               className="button"
               onClick={() => navigator.clipboard.writeText(publicUrl)}
             >
-              Copy memorial link
+              Copy {pageWord} link
             </button>
-            <Link href={`/memorial/${m.id}/qr`} className="button secondary">
-              Get QR code
+          </div>
+        </div>
+      )}
+
+      {isLive && (
+        <div className="card" style={{ marginBottom: 30 }}>
+          <div className="eyebrow">Headstone QR</div>
+          <h3 style={{ marginTop: 10 }}>A QR code for the resting place</h3>
+          {m.plotId ? (
+            <>
+              <p className="muted">
+                This memorial is linked to a plot. The QR code sits with the plot, so anyone who
+                scans it sees everyone remembered at that resting place — a beautiful way to
+                honour a family grave.
+              </p>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+                <Link href={`/plot/${m.plotId}/qr`} className="button">
+                  Get QR code (SVG + PNG)
+                </Link>
+                <Link href={`/plot/${m.plotId}`} className="button secondary">
+                  View plot page
+                </Link>
+              </div>
+            </>
+          ) : m.cemetery?.placeId ? (
+            <>
+              <p className="muted">
+                Create the plot for {m.fullName.split(' ')[0]}&rsquo;s resting place and we&rsquo;ll
+                generate an etchable QR code the stonemason can add to the headstone. The QR links
+                to a page listing everyone remembered at that plot — so future family members can
+                be added over time without ever changing the code on the stone.
+              </p>
+              {plotError && (
+                <p style={{ color: '#a94442', marginTop: 12, fontSize: 14 }}>{plotError}</p>
+              )}
+              <button className="button" style={{ marginTop: 16 }} onClick={linkPlot} disabled={linkingPlot}>
+                {linkingPlot ? 'Creating plot…' : 'Create plot & get QR code'}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="muted">
+                To generate a headstone QR, first add the cemetery to the memorial. The plot lives
+                at that cemetery, and the QR code links to the plot.
+              </p>
+              <Link href={`/memorial/${m.id}/edit`} className="button secondary" style={{ marginTop: 16 }}>
+                Add cemetery details
+              </Link>
+            </>
+          )}
+        </div>
+      )}
+
+      {isLive && quotas.totalBytesPerMemorial > 0 && (
+        <div className="card" style={{ marginBottom: 30, display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 260px' }}>
+            <div className="eyebrow" style={{ marginBottom: 4 }}>Storage</div>
+            <p style={{ margin: 0, fontSize: 14 }}>
+              {humanBytes(usageBytes)} used of {humanBytes(quotas.totalBytesPerMemorial)}
+            </p>
+            <div style={{ height: 8, background: '#f0e8d8', borderRadius: 999, marginTop: 8, overflow: 'hidden' }}>
+              <div
+                style={{
+                  width: `${Math.min(100, Math.round((usageBytes / quotas.totalBytesPerMemorial) * 100))}%`,
+                  height: '100%',
+                  background: usageBytes / quotas.totalBytesPerMemorial > 0.9 ? '#a05a00' : '#8bab99',
+                }}
+              />
+            </div>
+          </div>
+          {usageBytes / quotas.totalBytesPerMemorial > 0.85 && (
+            <p className="muted" style={{ margin: 0, fontSize: 13, flex: '1 1 260px' }}>
+              You&rsquo;re nearing the allowance. Email <a href="mailto:hello@freastar.com">hello@freastar.com</a> and
+              we&rsquo;ll happily raise it — no upload will ever fail silently.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="card" style={{ marginBottom: 30 }}>
+        <div className="eyebrow">Looking to the future</div>
+        <h3 style={{ marginTop: 10 }}>Nominate someone to look after this memorial</h3>
+        <p className="muted">
+          A memorial is meant to outlast any one of us. Nominate a trusted family member as a{' '}
+          <strong>backup</strong> — nothing changes today, but if you&rsquo;re ever unable to look
+          after the memorial, custody will move to them. You can also{' '}
+          <strong>transfer custody now</strong> if you&rsquo;d like someone else to take over.
+        </p>
+
+        {(m.successorUids || []).length > 0 && (
+          <div style={{ background: '#fffdf9', border: '1px solid var(--line)', borderRadius: 14, padding: '14px 18px', marginTop: 16 }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 750, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+              Currently nominated
+            </p>
+            <ul className="muted" style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 14 }}>
+              {(m.successorUids || []).map((uid: string, i: number) => (
+                <li key={uid}>{i === 0 ? 'Primary backup' : `Backup #${i + 1}`}: <code>{uid}</code></li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {pendingTransfers.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 750, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+              Pending invitations
+            </p>
+            {pendingTransfers.map((t) => {
+              const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/custody/accept/${t.token}`;
+              return (
+                <div key={t.id} style={{ marginTop: 10, padding: '12px 16px', border: '1px solid var(--line)', borderRadius: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div>
+                      <strong>{t.toEmail}</strong>
+                      <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>
+                        · {t.nominationType === 'primary' ? 'transfer of custody' : 'backup nomination'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="button secondary small"
+                        onClick={() => navigator.clipboard.writeText(link)}
+                      >
+                        Copy invitation link
+                      </button>
+                      <button className="button secondary small" onClick={() => cancelNomination(t.id)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                  <p className="muted" style={{ margin: '6px 0 0', fontSize: 12, wordBreak: 'break-all' }}>
+                    {link}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{ marginTop: 22 }}>
+          <label htmlFor="successorEmail">Email of the person you want to nominate</label>
+          <input
+            id="successorEmail"
+            type="email"
+            value={successorEmail}
+            onChange={(e) => setSuccessorEmail(e.target.value)}
+            placeholder="e.g. son@example.com"
+          />
+          <div style={{ display: 'flex', gap: 18, marginTop: 12, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 500 }}>
+              <input
+                type="radio"
+                name="successorType"
+                value="backup"
+                checked={successorType === 'backup'}
+                onChange={() => setSuccessorType('backup')}
+                style={{ width: 'auto' }}
+              />
+              <span>Nominate as backup (kind default)</span>
+            </label>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 500 }}>
+              <input
+                type="radio"
+                name="successorType"
+                value="primary"
+                checked={successorType === 'primary'}
+                onChange={() => setSuccessorType('primary')}
+                style={{ width: 'auto' }}
+              />
+              <span>Transfer custody to them now</span>
+            </label>
+          </div>
+
+          {nominationError && (
+            <p style={{ color: '#a94442', marginTop: 12, fontSize: 14 }}>{nominationError}</p>
+          )}
+
+          {nominationLink && (
+            <div style={{ marginTop: 16, padding: '14px 18px', background: '#e8f0ea', borderRadius: 12, border: '1px solid #a8bcae' }}>
+              <p style={{ margin: 0, fontSize: 14 }}>
+                <strong>Invitation ready.</strong> Send this link to the person you nominated —
+                once they sign in with the same email and accept, we&rsquo;ll do the rest.
+              </p>
+              <p style={{ margin: '8px 0', fontSize: 13, wordBreak: 'break-all' }}>{nominationLink}</p>
+              <button
+                className="button secondary small"
+                onClick={() => navigator.clipboard.writeText(nominationLink)}
+              >
+                Copy invitation link
+              </button>
+            </div>
+          )}
+
+          <button className="button" style={{ marginTop: 18 }} onClick={nominate} disabled={savingNomination}>
+            {savingNomination ? 'Preparing invitation…' : 'Send invitation'}
+          </button>
+        </div>
+      </div>
+
+      {(!m.epitaph || !m.story) && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 24,
+            background: 'linear-gradient(135deg, #fffdf9, #f6efe1)',
+            borderColor: '#e0d3b0',
+          }}
+        >
+          <div className="eyebrow">Finish setting up</div>
+          <h3 style={{ marginTop: 10 }}>
+            {isLegacy ? 'A few more words to make it yours' : `A few more words about ${firstName}`}
+          </h3>
+          <p className="muted">
+            {isLegacy
+              ? "Add a short line for beneath your name and the fuller story when you're ready — you can write as little or as much as feels right."
+              : `Add a short line for beneath the name and the fuller story when you're ready — you can write as little or as much as feels right.`}
+          </p>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+            <Link href={`/memorial/${m.id}/edit`} className="button">
+              {!m.epitaph && !m.story
+                ? isLegacy ? 'Add a line and your story' : 'Add a line and their story'
+                : !m.epitaph
+                  ? isLegacy ? 'Add a line beneath your name' : 'Add a line beneath the name'
+                  : 'Add the story'}
+            </Link>
+            <Link href={`/memorial/${m.id}/gallery`} className="button secondary">
+              Add photographs
             </Link>
           </div>
         </div>
@@ -249,10 +628,10 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
       {/* Existing management cards */}
       <div className="featureGrid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
         <div className="card">
-          <h3>Edit their story</h3>
+          <h3>{isLegacy ? 'Edit the details' : 'Edit their story'}</h3>
           <p className="muted">Name, dates, introduction, life story and privacy.</p>
           <Link href={`/memorial/${m.id}/edit`} className="button soft">
-            Edit memorial
+            Edit {pageWord}
           </Link>
         </div>
         <div className="card">
@@ -263,8 +642,12 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           </Link>
         </div>
         <div className="card">
-          <h3>Family memories</h3>
-          <p className="muted">Write your own memories &mdash; the family&rsquo;s voice on the memorial.</p>
+          <h3>{isLegacy ? 'Your own memories' : 'Family memories'}</h3>
+          <p className="muted">
+            {isLegacy
+              ? 'Write in your own voice — the memories and moments you want carried forward.'
+              : `Write your own memories — the family's voice on the memorial.`}
+          </p>
           <Link href={`/memorial/${m.id}/memories`} className="button soft">
             Write memories
           </Link>
@@ -277,7 +660,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             disabled={!isLive}
             onClick={() => navigator.clipboard.writeText(publicUrl)}
           >
-            {isLive ? 'Copy memorial link' : 'Publish first to share'}
+            {isLive ? `Copy ${pageWord} link` : 'Publish first to share'}
           </button>
         </div>
       </div>

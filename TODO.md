@@ -1,13 +1,16 @@
 # Status & next steps
 
-Last updated: 2026-09-17, branch `claude/ubuntu-machine-or-phone-ovt1xa`.
+Last updated: 2026-09-18, branch `claude/ubuntu-machine-or-phone-ovt1xa`.
 
 ## Where things stand
 
-- P0 requirements from REQUIREMENTS.md are implemented (memorial lifecycle, Go Live UX, Stripe payment, funeral director paid path, QR codes).
-- Brand assets wired into layout, manifest, favicons, OG tags.
-- Firestore rules updated and deployed to production project `<your-firebase-project-id>`.
-- Build passes locally; changes pushed but not yet verified on Cloudflare Pages.
+- P0–P7 from the full implementation spec are landed locally.
+  - P1 data model + roles, P2 plot QR (SVG + PNG), P3 custody transfer + succession routes,
+    P4 partner apps + admin console, P5 media quotas, P6 SEO metadata + JSON-LD + kindness copy,
+    P7 vitest suite + UAT checklist (`UAT.md`).
+- `npm run build` green (34 routes). `npm test` green (18 unit tests across `lib/age.ts`, `lib/ids.ts`).
+- Existing memorials `cathal-doherty-mugtl` and `mary-demo` preserved through the data-model
+  migration via idempotent lazy backfill in `lib/plot.ts`.
 - App works locally with the existing `.env.local`. New env vars needed before Stripe/Go-Live flow will function (see below).
 
 ## Required env vars before Go Live / payment works
@@ -56,14 +59,19 @@ https://dashboard.stripe.com/webhooks → Add endpoint → `https://liveonwith.m
 - Non-owner visitor to a draft's `/m/[slug]` should see "Memorial not found"
 - Owner should see the preview banner
 
-## Known gaps (P1 / P2 — not blocking launch)
+## Known gaps (not blocking launch)
 
-- On `/memorial/[id]/manage`, "Edit memorial" and "Open gallery" buttons are still placeholder buttons with no onClick.
 - No email verification, password reset, or account deletion flow.
-- No App Check / rate limiting on anonymous contribution submissions.
-- Firebase Storage rules deployment still pending (Storage isn't enabled in the project since we migrated to R2 — the `firebase.json` reference to storage rules can be removed, or Storage can be enabled if we ever want it back).
-- Cemetery mapping not implemented (P2 — data model is compatible for future work).
-- No integration tests for lifecycle transitions.
+- No App Check / rate limiting on anonymous contribution submissions (quota total-bytes cap
+  provides a coarse ceiling; single-file cap prevents obvious abuse).
+- Firebase Storage rules deployment still pending (Storage isn't enabled in the project since
+  we migrated to R2 — the `firebase.json` reference to storage rules can be removed, or Storage
+  can be enabled if we ever want it back).
+- No emulator-based `firestore.rules` regression suite yet — `UAT.md` scenarios 5, 6, 9, 10
+  cover the same ground manually. Adding `@firebase/rules-unit-testing` is future work.
+- Custody transfer invites are shown as shareable URLs on the manage page; there is no
+  outbound email service integration yet. The custodian copy-pastes the URL to the invitee.
+- Partner referral emails ditto.
 
 ## Deployment checklist
 

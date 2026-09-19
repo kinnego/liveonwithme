@@ -16,6 +16,7 @@ import {
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,7 +109,7 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
     if (editingId === id) setEditingId(null);
   }
 
-  if (!m) return <main className="shell">Loading memories…</main>;
+  if (!m) return <PageSkeleton variant="detail" label="Loading memories" />;
 
   return (
     <main className="shell">
@@ -136,7 +137,7 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
               <label>Whose memory is this?</label>
               <input
                 name="contributorName"
-                placeholder="e.g. Cathal Kinnegan"
+                placeholder="e.g. Mary O&rsquo;Donnell"
                 required
               />
             </div>

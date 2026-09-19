@@ -14,13 +14,12 @@ export default function Home() {
             Their story lives on.
           </h1>
           <p className="lead">
-            Create a beautiful, peaceful place for someone you love. Gather their photographs,
-            tell the stories that made them who they were, and invite family and friends to add
-            memories of their own.
+            A peaceful place for the stories that shouldn&rsquo;t be lost — a memorial for
+            someone you love, or a page in your own words for the people who will come after.
           </p>
           <div className="actions">
             <Link href="/create" className="button">
-              Create their memorial
+              Create a page
             </Link>
             <Link href="/m/mary-demo" className="button secondary">
               See an example

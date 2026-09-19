@@ -17,6 +17,7 @@ import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { resizeForMobile } from '@/lib/image';
 import PhotoFocusEditor from '@/components/PhotoFocusEditor';
+import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,13 +62,15 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
     return () => stop?.();
   }, [params, router]);
 
-  async function uploadToR2(file: File, path: string) {
+  async function uploadToR2(file: File, path: string, memorialId?: string) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('path', path);
+    if (memorialId) formData.append('memorialId', memorialId);
     const res = await fetch('/api/upload', { method: 'POST', body: formData });
-    if (!res.ok) throw new Error('Upload failed');
-    return await res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+    return data as { path: string; sizeBytes: number };
   }
 
   async function refreshMemorial() {
@@ -90,7 +93,7 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
         const optimised = await resizeForMobile(files[i]);
         setUploadProgress(`Uploading photo ${i + 1} of ${files.length}…`);
         const photoPath = `memorials/${m.id}/${crypto.randomUUID()}-${optimised.name}`;
-        await uploadToR2(optimised, photoPath);
+        const uploaded = await uploadToR2(optimised, photoPath, m.id);
         await addDoc(collection(db, 'contributions'), {
           memorialId: m.id,
           contributorName: 'Family',
@@ -100,6 +103,8 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
           caption: '',
           status: 'approved',
           source: 'family',
+          mediaType: 'photo',
+          sizeBytes: uploaded.sizeBytes,
           createdAt: serverTimestamp(),
         });
       }
@@ -149,30 +154,11 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
       if (current.length >= MAX_FEATURED) return;
       next = [...current, id];
     }
-    console.log('[favourite] uid=', auth.currentUser?.uid, 'ownerId=', m.ownerId, 'memorialId=', m.id);
-    console.log('[favourite] memorial fields:', {
-      status: m.status,
-      paymentStatus: m.paymentStatus,
-      salesChannel: m.salesChannel,
-      funeralDirectorId: m.funeralDirectorId,
-      referralId: m.referralId,
-      visibility: m.visibility,
-      hasStatus: 'status' in m,
-      hasPaymentStatus: 'paymentStatus' in m,
-      hasSalesChannel: 'salesChannel' in m,
-      hasFuneralDirectorId: 'funeralDirectorId' in m,
-      hasReferralId: 'referralId' in m,
+    await updateDoc(doc(db, 'memorials', m.id), {
+      featuredContributionIds: next,
+      updatedAt: serverTimestamp(),
     });
-    try {
-      await updateDoc(doc(db, 'memorials', m.id), {
-        featuredContributionIds: next,
-        updatedAt: serverTimestamp(),
-      });
-      await refreshMemorial();
-    } catch (err) {
-      console.error('[favourite] failed:', err);
-      throw err;
-    }
+    await refreshMemorial();
   }
 
   async function download(path: string, name: string) {
@@ -184,7 +170,7 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
     a.click();
   }
 
-  if (!m) return <main className="shell">Loading gallery…</main>;
+  if (!m) return <PageSkeleton variant="detail" label="Loading gallery" />;
 
   const featuredIds: string[] = m.featuredContributionIds || [];
   const featuredCount = featuredIds.length;
@@ -192,18 +178,27 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
 
   return (
     <main className="shell">
-      <div className="dashboardHead">
-        <div>
-          <div className="eyebrow">Photographs</div>
-          <h2 style={{ marginBottom: 0 }}>{m.fullName}</h2>
-          <p className="muted" style={{ marginTop: 8 }}>
-            Star up to {MAX_FEATURED} favourites — they appear in a highlighted strip on the
-            memorial. All published photographs also appear in the gallery below.
-          </p>
-        </div>
-        <Link href={`/memorial/${m.id}/manage`} className="button secondary">
-          Back to manage
-        </Link>
+      <Link
+        href={`/memorial/${m.id}/manage`}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          color: 'var(--sage)',
+          fontSize: 14,
+          textDecoration: 'none',
+          marginBottom: 18,
+        }}
+      >
+        ← Back to {m.fullName.split(' ')[0]}&rsquo;s page
+      </Link>
+      <div>
+        <div className="eyebrow">Photographs</div>
+        <h2 style={{ marginBottom: 0 }}>{m.fullName}</h2>
+        <p className="muted" style={{ marginTop: 8 }}>
+          Star up to {MAX_FEATURED} favourites — they appear in a highlighted strip on the
+          memorial. All published photographs also appear in the gallery below.
+        </p>
       </div>
 
       <div className="formCard" style={{ margin: '20px 0' }}>
