@@ -28,5 +28,8 @@
     "@vitest/coverage-v8": "^5.0.1",
     "typescript": "latest",
     "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "jose": "^5"
   }
 }
