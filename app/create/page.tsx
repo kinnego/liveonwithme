@@ -1,5 +1,5 @@
 'use client';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
@@ -14,6 +14,16 @@ import type { MemorialKind, Plot } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
+
+// useSearchParams() forces a Suspense boundary during production builds,
+// otherwise Next.js fails prerender with a CSR-bailout error.
+export default function Create() {
+  return (
+    <Suspense fallback={<PageSkeleton variant="form" label="Loading" />}>
+      <CreateInner />
+    </Suspense>
+  );
+}
 
 type Copy = {
   eyebrow: string;
@@ -44,7 +54,7 @@ const COPY: Record<MemorialKind, Copy> = {
   },
 };
 
-export default function Create() {
+function CreateInner() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [mode, setMode] = useState<MemorialKind | null>(null);
   const [saving, setSaving] = useState(false);
