@@ -38,10 +38,24 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    let stopOwned: any;
-    let stopNominated: any;
+    let stopOwned: (() => void) | undefined;
+    let stopNominated: (() => void) | undefined;
+    const teardownListeners = () => {
+      stopOwned?.();
+      stopNominated?.();
+      stopOwned = undefined;
+      stopNominated = undefined;
+    };
     const stopAuth = onAuthStateChanged(auth, (u) => {
-      if (!u) return router.push('/auth');
+      // Always tear down first: on signout the old listeners would re-evaluate
+      // with no auth and throw permission-denied; on user swap they'd leak.
+      teardownListeners();
+      if (!u) {
+        setOwned([]);
+        setNominated([]);
+        router.push('/auth');
+        return;
+      }
       stopOwned = onSnapshot(
         query(collection(db, 'memorials'), where('ownerId', '==', u.uid)),
         (s) => setOwned(s.docs.map((d) => ({ id: d.id, ...d.data() })))
@@ -53,8 +67,7 @@ export default function Dashboard() {
     });
     return () => {
       stopAuth();
-      stopOwned?.();
-      stopNominated?.();
+      teardownListeners();
     };
   }, [router]);
 
