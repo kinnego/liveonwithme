@@ -19,16 +19,20 @@ import { db } from '@/lib/firebase';
 type Result = {
   id: string;
   fullName: string;
+  nickname?: string;
   born?: string;
   died?: string;
   cemeteryName?: string;
+  address?: string;
 };
 
 function formatYears(born?: string, died?: string): string {
   const b = born?.slice(0, 4);
   const d = died?.slice(0, 4);
   if (b && d) return `${b} — ${d}`;
-  return b || d || '';
+  if (b) return `Born ${b}`;
+  if (d) return `Died ${d}`;
+  return '';
 }
 
 export default function MemorialNameSearch() {
@@ -68,9 +72,11 @@ export default function MemorialNameSearch() {
           return {
             id: d.id,
             fullName: data.fullName || '',
+            nickname: data.nickname || undefined,
             born: data.born,
             died: data.died,
             cemeteryName: data.cemetery?.name,
+            address: data.address || undefined,
           };
         });
         setResults(rows);
@@ -148,6 +154,7 @@ export default function MemorialNameSearch() {
           {status === 'ready' &&
             results.map((r) => {
               const years = formatYears(r.born, r.died);
+              const place = r.cemeteryName || r.address;
               return (
                 <Link
                   key={r.id}
@@ -161,10 +168,24 @@ export default function MemorialNameSearch() {
                   }}
                   onClick={() => setOpen(false)}
                 >
-                  <div style={{ fontWeight: 600 }}>{r.fullName}</div>
-                  <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-                    {[years, r.cemeteryName].filter(Boolean).join(' · ')}
+                  <div style={{ fontWeight: 600 }}>
+                    {r.fullName}
+                    {r.nickname && (
+                      <span className="muted" style={{ fontWeight: 400, marginLeft: 6 }}>
+                        ({r.nickname})
+                      </span>
+                    )}
                   </div>
+                  {years && (
+                    <div style={{ fontSize: 13, marginTop: 2, color: 'var(--ink, #333)' }}>
+                      {years}
+                    </div>
+                  )}
+                  {place && (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                      {place}
+                    </div>
+                  )}
                 </Link>
               );
             })}

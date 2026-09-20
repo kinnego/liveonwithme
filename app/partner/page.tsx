@@ -98,9 +98,10 @@ export default function PartnerDashboard() {
           <div className="eyebrow">Become a partner</div>
           <h2>Sell Live On With Me to the families you serve.</h2>
           <p className="muted">
-            Funeral directors, stonemasons, priests and community organisations can offer memorial pages
-            to the families in their care. You pay us <strong>€150 wholesale</strong> per memorial and
-            charge your customer separately at whatever price fits your business.
+            Funeral directors, stonemasons, priests and community organisations can
+            offer memorial pages to the families in their care. Once approved,
+            we&rsquo;ll share the wholesale terms with you directly and you charge your
+            customer separately at whatever price fits your business.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 24, flexWrap: 'wrap' }}>
             <Link href="/partner/apply" className="button">Apply to become a partner</Link>

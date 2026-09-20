@@ -4,3 +4,4 @@
 @media (prefers-reduced-motion:reduce){.sk{animation:none}}
 .skRow{display:flex;gap:12px;align-items:center}
 .skStack{display:flex;flex-direction:column;gap:10px}
+iframe#nl-badge-frame,iframe[title="Powered by Netlify"]{display:none!important}

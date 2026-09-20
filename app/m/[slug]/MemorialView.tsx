@@ -671,7 +671,122 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         )}
       </section>
 
-      {!isPreview && (
+      {!isPreview && memorial.id === 'demo' && (
+        <section id="share" className="section">
+          <div className="formCard">
+            <div className="eyebrow">See how contributing works</div>
+            <h2>Anyone can add a memory or a photograph — in about a minute.</h2>
+            <p className="muted">
+              On a real memorial, family and friends see a form like this. They write a
+              short memory, add a photograph if they have one, and send it. The family
+              reviews everything before anything appears publicly.
+            </p>
+
+            <ol
+              style={{
+                display: 'grid',
+                gap: 14,
+                margin: '26px 0 30px',
+                paddingLeft: 20,
+              }}
+            >
+              <li>
+                <strong>Write a short memory.</strong>{' '}
+                <span className="muted">
+                  A story, a small moment, something they used to say. No account needed.
+                </span>
+              </li>
+              <li>
+                <strong>Add a photograph.</strong>{' '}
+                <span className="muted">
+                  Straight from your phone. It&rsquo;s resized automatically.
+                </span>
+              </li>
+              <li>
+                <strong>Send it privately to the family.</strong>{' '}
+                <span className="muted">
+                  They can publish it to the memorial, or keep it just for themselves.
+                </span>
+              </li>
+            </ol>
+
+            <fieldset
+              disabled
+              aria-label="Sample contribution form — disabled for this demo"
+              style={{
+                border: '1px dashed var(--line)',
+                borderRadius: 14,
+                padding: '20px 22px',
+                background: '#fbfaf5',
+                opacity: 0.9,
+              }}
+            >
+              <label>Your name</label>
+              <input value="Anna Byrne" readOnly />
+
+              <div className="twoCol">
+                <div>
+                  <label>Email (optional)</label>
+                  <input value="anna@example.com" readOnly />
+                </div>
+                <div>
+                  <label>How did you know them?</label>
+                  <input value="Old friend" readOnly />
+                </div>
+              </div>
+
+              <label>Share a memory</label>
+              <textarea
+                readOnly
+                value="Mary used to save me a scone every Sunday after mass. Nobody made me feel more at home."
+              />
+
+              <label>Add a photograph</label>
+              <input type="text" value="beach-1998.jpg (2.1 MB)" readOnly />
+
+              <label>Photo caption (optional)</label>
+              <input value="At the beach in Kerry, 1998" readOnly />
+
+              <button
+                type="button"
+                className="button"
+                disabled
+                style={{ marginTop: 24, cursor: 'not-allowed' }}
+              >
+                Send to the family (disabled — demo)
+              </button>
+            </fieldset>
+
+            <div
+              style={{
+                marginTop: 24,
+                padding: '14px 18px',
+                background: '#fff6e5',
+                border: '1px solid #f0d9a4',
+                borderRadius: 12,
+                fontSize: 14,
+              }}
+              role="note"
+            >
+              <strong>This is a demonstration memorial.</strong> The form above is
+              disabled — nothing you type here will be sent. On a real memorial page,
+              this is exactly how a friend, neighbour or family member would share
+              something.
+            </div>
+
+            <div className="center" style={{ marginTop: 28 }}>
+              <Link href="/create" className="button">
+                Create a memorial like this
+              </Link>
+              <p className="muted" style={{ marginTop: 12, fontSize: 13 }}>
+                It takes about two minutes to set up.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {!isPreview && memorial.id !== 'demo' && (
         <section id="share" className="section">
           <div className="formCard">
             {sent ? (

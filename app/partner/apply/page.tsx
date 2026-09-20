@@ -104,9 +104,10 @@ export default function PartnerApply() {
         <div className="eyebrow">Partner application</div>
         <h2>Join the partner network.</h2>
         <p className="muted">
-          Live On With Me partners resell memorial pages to the families they serve. You pay us
-          <strong> €150 wholesale</strong> per memorial and charge your customer separately at whatever
-          price you choose. There is no commission or payout — the retail transaction is entirely yours.
+          Live On With Me partners offer memorial pages to the families they serve as
+          part of their own service. Once approved, you&rsquo;ll be able to set up
+          memorials on behalf of families and receive the wholesale terms we&rsquo;ll
+          share directly with you after we review your application.
         </p>
         <form onSubmit={submit}>
           <label htmlFor="partnerType">Your role</label>
