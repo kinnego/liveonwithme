@@ -18,7 +18,8 @@
     "qrcode": "^1.5.4",
     "react": "latest",
     "react-dom": "latest",
-    "stripe": "^22.6.2"
+    "stripe": "^22.6.2",
+    "yet-another-react-lightbox": "^3.32.2"
   },
   "devDependencies": {
     "@types/node": "latest",

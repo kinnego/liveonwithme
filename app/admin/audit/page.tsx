@@ -30,8 +30,18 @@ export default function AdminAudit() {
 
   useEffect(() => {
     if (!auth) return;
-    return onAuthStateChanged(auth, async (u) => {
-      if (!u) return router.push('/auth');
+    let stop: (() => void) | undefined;
+    const stopAuth = onAuthStateChanged(auth, async (u) => {
+      // Tear down first: on signout the query would re-evaluate under no auth
+      // and throw permission-denied; the previous inline `return () => stop()`
+      // from the async callback was also silently discarded, leaking listeners
+      // on unmount.
+      stop?.();
+      stop = undefined;
+      if (!u) {
+        router.push('/auth');
+        return;
+      }
       const snap = await getDoc(doc(db, 'users', u.uid));
       const prof = snap.exists() ? (snap.data() as UserProfile) : null;
       if (!isSuperAdmin(prof)) {
@@ -39,12 +49,15 @@ export default function AdminAudit() {
         return;
       }
       setAccess('ok');
-      const stop = onSnapshot(
+      stop = onSnapshot(
         query(collection(db, 'auditEvents'), orderBy('timestamp', 'desc'), limit(200)),
         (s) => setEvents(s.docs.map((d) => ({ id: d.id, ...(d.data() as any) })))
       );
-      return () => stop();
     });
+    return () => {
+      stopAuth();
+      stop?.();
+    };
   }, [router]);
 
   if (access === 'checking') return <PageSkeleton variant="detail" label="Checking access" />;

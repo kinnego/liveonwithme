@@ -43,6 +43,15 @@
       ]
     },
     {
+      "collectionGroup": "memorials",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "visibility", "order": "ASCENDING" },
+        { "fieldPath": "fullNameLower", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "plotMemberships",
       "queryScope": "COLLECTION",
       "fields": [

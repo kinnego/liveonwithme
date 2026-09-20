@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { isSuperAdmin } from '@/lib/roles';
+import { plotAdmins } from '@/lib/plot';
 import type {
   AuditEvent,
   Contribution,
@@ -411,7 +412,11 @@ export default function AdminMemorialInspector({
               <FieldRow label="Plot ID" value={plot.id} mono />
               <FieldRow label="Plot name" value={plot.name || '—'} />
               <FieldRow label="Plot short id" value={plot.shortId} mono />
-              <FieldRow label="Plot admin" value={plot.plotAdminUid} mono />
+              <FieldRow
+                label={plotAdmins(plot).length > 1 ? 'Plot admins' : 'Plot admin'}
+                value={plotAdmins(plot).join(', ') || '—'}
+                mono
+              />
               <Link
                 href={`/plot/${plot.id}`}
                 target="_blank"

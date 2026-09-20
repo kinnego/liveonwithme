@@ -41,8 +41,13 @@ export default function PartnerDashboard() {
       setAccess('not_signed_in');
       return;
     }
-    let stop: any;
+    let stop: (() => void) | undefined;
     const off = onAuthStateChanged(auth, async (u) => {
+      // Tear down first: the referrals query filters on partnerUid == u.uid,
+      // so on signout it would re-evaluate under no auth and throw
+      // permission-denied.
+      stop?.();
+      stop = undefined;
       if (!u) {
         setAccess('not_signed_in');
         router.push('/auth');

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import SiteNav from '@/components/SiteNav';
+import ScrollToTopOnNav from '@/components/ScrollToTopOnNav';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://liveonwith.me'),
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body suppressHydrationWarning>
+        <ScrollToTopOnNav />
         <header className="siteHeader">
           <Link className="brand" href="/">
             <Image

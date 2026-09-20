@@ -26,9 +26,37 @@ import {
 
 export interface CreatePlotInput {
   cemetery: Cemetery;
+  /** UID of the creating user — becomes the first (and initially only) admin. */
   plotAdminUid: string;
   createdByUid: string;
   name?: string;
+}
+
+// Returns the effective set of plot admins, handling both the new
+// plotAdminUids array and legacy single-admin docs.
+export function plotAdmins(
+  plot: Pick<Plot, 'plotAdminUids' | 'plotAdminUid'> | null | undefined,
+): string[] {
+  if (!plot) return [];
+  const arr = plot.plotAdminUids;
+  if (Array.isArray(arr) && arr.length > 0) return arr;
+  const single = plot.plotAdminUid;
+  return single ? [single] : [];
+}
+
+// True if `uid` is one of the plot admins OR one of the pre-approved
+// successors (successors are allowed to act as admins today; the succession
+// list is really "pre-authorised administrators").
+export function isPlotAdmin(
+  plot:
+    | Pick<Plot, 'plotAdminUids' | 'plotAdminUid' | 'plotAdminSuccessorUids'>
+    | null
+    | undefined,
+  uid: string,
+): boolean {
+  if (!plot || !uid) return false;
+  if (plotAdmins(plot).includes(uid)) return true;
+  return (plot.plotAdminSuccessorUids || []).includes(uid);
 }
 
 export async function createPlot(input: CreatePlotInput): Promise<Plot> {
@@ -38,7 +66,7 @@ export async function createPlot(input: CreatePlotInput): Promise<Plot> {
   const plot: Omit<Plot, 'id'> = {
     shortId: sId,
     cemetery: input.cemetery,
-    plotAdminUid: input.plotAdminUid,
+    plotAdminUids: [input.plotAdminUid],
     plotAdminSuccessorUids: [],
     createdByUid: input.createdByUid,
     createdAt: serverTimestamp(),
@@ -162,9 +190,7 @@ export async function attachMemorialToExistingPlot(input: {
   if (!db) throw new Error('Firestore not available');
   const plot = await readPlot(input.plotId);
   if (!plot) throw new Error('Plot not found');
-  const isAdmin =
-    plot.plotAdminUid === input.requestedByUid ||
-    plot.plotAdminSuccessorUids.includes(input.requestedByUid);
+  const isAdmin = isPlotAdmin(plot, input.requestedByUid);
   await requestPlotMembership({
     plotId: input.plotId,
     memorialId: input.memorialId,

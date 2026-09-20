@@ -92,6 +92,8 @@ export interface Memorial {
   // presentation
   slug: string;
   fullName: string;
+  /** Lowercased fullName — enables case-insensitive prefix search from the homepage. Missing on legacy docs. */
+  fullNameLower?: string;
   nickname?: string;
   shortName?: string;
   address?: string;
@@ -145,7 +147,9 @@ export interface Contribution {
 
 // ─── Plot ────────────────────────────────────────────────────────────────────
 // Physical grave (or memorial location) representation.
-// A Plot has one PlotAdministrator + optional successors.
+// A Plot has one or more co-administrators (flat set, all equal) plus a
+// separate ordered succession list that only kicks in if every current
+// admin is unable to act.
 // A Plot can host many Memorials (approved via PlotMembership).
 // QR codes always resolve to a Plot, never a Person or Memorial directly.
 
@@ -154,8 +158,14 @@ export interface Plot {
   shortId: string;              // 8-char human-safe token for /p/[shortId] QR URLs
   name?: string;                // optional plot label ("Plot 34, Row C")
   cemetery: Cemetery;
-  plotAdminUid: string;
-  plotAdminSuccessorUids: string[]; // ordered
+  // Flat set of co-admins — creator is always the first entry. Any admin
+  // can act on the plot; any admin can add or remove other admins. Older
+  // plot docs may still have `plotAdminUid` (singular) instead — read via
+  // the `plotAdmins()` helper in lib/plot.ts which handles both shapes.
+  plotAdminUids: string[];
+  /** @deprecated Legacy single-admin field. Kept optional for old docs. */
+  plotAdminUid?: string;
+  plotAdminSuccessorUids: string[]; // ordered, succession-only
   createdByUid: string;
   createdAt?: unknown;
   updatedAt?: unknown;

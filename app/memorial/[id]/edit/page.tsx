@@ -64,8 +64,10 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
 
     try {
       const fd = new FormData(e.currentTarget);
+      const nextFullName = String(fd.get('fullName'));
       const updates: Record<string, unknown> = {
-        fullName: String(fd.get('fullName')),
+        fullName: nextFullName,
+        fullNameLower: nextFullName.toLowerCase(),
         born,
         died,
         ageAtDeath: calculateAgeAtDeath(born, died),

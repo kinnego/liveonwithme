@@ -9,7 +9,7 @@ import { resizeForMobile } from '@/lib/image';
 import { createPerson } from '@/lib/person';
 import { slugify } from '@/lib/ids';
 import { writeAudit } from '@/lib/audit';
-import { attachMemorialToExistingPlot } from '@/lib/plot';
+import { attachMemorialToExistingPlot, isPlotAdmin } from '@/lib/plot';
 import type { MemorialKind, Plot } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
@@ -101,10 +101,7 @@ function CreateInner() {
           return;
         }
         const p = { id: snap.id, ...(snap.data() as any) } as Plot;
-        const canAdd =
-          p.plotAdminUid === user.uid ||
-          (p.plotAdminSuccessorUids || []).includes(user.uid);
-        if (!canAdd) {
+        if (!isPlotAdmin(p, user.uid)) {
           setPresetPlotError('Only the plot administrator can add memorials to this plot.');
           return;
         }
@@ -183,6 +180,7 @@ function CreateInner() {
         successorUids: [],
         slug,
         fullName,
+        fullNameLower: fullName.toLowerCase(),
         kind: mode,
         born,
         died,

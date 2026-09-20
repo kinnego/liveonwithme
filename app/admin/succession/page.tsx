@@ -33,8 +33,14 @@ export default function AdminSuccession() {
 
   useEffect(() => {
     if (!auth) return;
-    return onAuthStateChanged(auth, async (u) => {
-      if (!u) return router.push('/auth');
+    let stop: (() => void) | undefined;
+    const stopAuth = onAuthStateChanged(auth, async (u) => {
+      stop?.();
+      stop = undefined;
+      if (!u) {
+        router.push('/auth');
+        return;
+      }
       const snap = await getDoc(doc(db, 'users', u.uid));
       const prof = snap.exists() ? (snap.data() as UserProfile) : null;
       if (!isSuperAdmin(prof)) {
@@ -42,12 +48,15 @@ export default function AdminSuccession() {
         return;
       }
       setAccess('ok');
-      const stop = onSnapshot(
+      stop = onSnapshot(
         query(collection(db, 'successionRequests'), orderBy('createdAt', 'desc')),
         (s) => setRows(s.docs.map((d) => ({ id: d.id, ...(d.data() as any) })))
       );
-      return () => stop();
     });
+    return () => {
+      stopAuth();
+      stop?.();
+    };
   }, [router]);
 
   async function updateStatus(row: SuccessionRequest, status: SuccessionRequest['status']) {

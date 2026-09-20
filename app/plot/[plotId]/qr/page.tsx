@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import { auth, db } from '@/lib/firebase';
 import { isSuperAdmin } from '@/lib/roles';
+import { isPlotAdmin } from '@/lib/plot';
 import type { UserProfile } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
@@ -43,10 +44,7 @@ export default function PlotQr({
         }
         const p = { id: plotSnap.id, ...plotSnap.data() } as any;
         const profile = userSnap.exists() ? (userSnap.data() as UserProfile) : null;
-        const canView =
-          p.plotAdminUid === u.uid ||
-          (p.plotAdminSuccessorUids || []).includes(u.uid) ||
-          isSuperAdmin(profile);
+        const canView = isPlotAdmin(p, u.uid) || isSuperAdmin(profile);
         if (!canView) {
           setError('Only the plot administrator can generate QR codes for this plot.');
           setPlot(p);

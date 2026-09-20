@@ -27,13 +27,17 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
 
   useEffect(() => {
     if (!id || !auth) return;
-    return onAuthStateChanged(auth, async (u) => {
+    let stop: (() => void) | undefined;
+    const stopAuth = onAuthStateChanged(auth, async (u) => {
+      stop?.();
+      stop = undefined;
       if (!u) {
+        setUid('');
         router.push('/auth');
         return;
       }
       setUid(u.uid);
-      return onSnapshot(doc(db, 'referrals', id), (snap) => {
+      stop = onSnapshot(doc(db, 'referrals', id), (snap) => {
         if (!snap.exists()) {
           setError('This memorial link is no longer available.');
           return;
@@ -41,6 +45,10 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
         setR({ id: snap.id, ...snap.data() });
       });
     });
+    return () => {
+      stopAuth();
+      stop?.();
+    };
   }, [id, router]);
 
   // Auto-send invite once wholesale is paid and we haven't invited yet.

@@ -32,8 +32,14 @@ export default function AdminPartners() {
 
   useEffect(() => {
     if (!auth) return;
-    return onAuthStateChanged(auth, async (u) => {
-      if (!u) return router.push('/auth');
+    let stop: (() => void) | undefined;
+    const stopAuth = onAuthStateChanged(auth, async (u) => {
+      stop?.();
+      stop = undefined;
+      if (!u) {
+        router.push('/auth');
+        return;
+      }
       const snap = await getDoc(doc(db, 'users', u.uid));
       const prof = snap.exists() ? (snap.data() as UserProfile) : null;
       if (!isSuperAdmin(prof)) {
@@ -41,12 +47,15 @@ export default function AdminPartners() {
         return;
       }
       setAccess('ok');
-      const stop = onSnapshot(
+      stop = onSnapshot(
         query(collection(db, 'partnerApplications'), orderBy('createdAt', 'desc')),
         (s) => setApps(s.docs.map((d) => ({ id: d.id, ...(d.data() as any) })))
       );
-      return () => stop();
     });
+    return () => {
+      stopAuth();
+      stop?.();
+    };
   }, [router]);
 
   async function decide(app: PartnerApplication, decision: 'approved' | 'rejected' | 'suspended') {

@@ -95,12 +95,27 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const router = useRouter();
 
   useEffect(() => {
-    let stopContrib: any;
-    let stopTransfers: any;
-    let stopAll: any;
-    params.then(({ id }) =>
-      onAuthStateChanged(auth, async (u) => {
-        if (!u) return router.push('/auth');
+    let stopContrib: (() => void) | undefined;
+    let stopTransfers: (() => void) | undefined;
+    let stopAll: (() => void) | undefined;
+    let stopAuth: (() => void) | undefined;
+    const teardown = () => {
+      stopContrib?.();
+      stopTransfers?.();
+      stopAll?.();
+      stopContrib = undefined;
+      stopTransfers = undefined;
+      stopAll = undefined;
+    };
+    params.then(({ id }) => {
+      stopAuth = onAuthStateChanged(auth, async (u) => {
+        // Tear down first: on signout the queries would re-evaluate under no
+        // auth and throw permission-denied.
+        teardown();
+        if (!u) {
+          router.push('/auth');
+          return;
+        }
         const snap = await getDoc(doc(db, 'memorials', id));
         if (!snap.exists() || snap.data().ownerId !== u.uid) return router.push('/dashboard');
         const memData: any = { id: snap.id, ...snap.data() };
@@ -140,12 +155,11 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             .then(setIsSecondary)
             .catch(() => {});
         }
-      })
-    );
+      });
+    });
     return () => {
-      stopContrib?.();
-      stopTransfers?.();
-      stopAll?.();
+      stopAuth?.();
+      teardown();
     };
   }, [params, router]);
 

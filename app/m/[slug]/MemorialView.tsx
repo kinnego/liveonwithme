@@ -1,5 +1,5 @@
 'use client';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   collection,
@@ -15,6 +15,11 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { resizeForMobile } from '@/lib/image';
 import { PageSkeleton } from '@/components/Skeleton';
+import Lightbox from 'yet-another-react-lightbox';
+import Zoom from 'yet-another-react-lightbox/plugins/zoom';
+import Captions from 'yet-another-react-lightbox/plugins/captions';
+import 'yet-another-react-lightbox/styles.css';
+import 'yet-another-react-lightbox/plugins/captions.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -192,6 +197,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [user, setUser] = useState<User | null>(null);
   const [isPreview, setIsPreview] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(-1);
 
   useEffect(() => {
     if (!auth) return;
@@ -259,6 +265,49 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
       setLoadState('ready');
     });
   }, [params, user]);
+
+  // Single canonical list of images that can appear in the lightbox: hero
+  // first, then gallery photos, then any memory attachments not already in
+  // the gallery. Every clickable image resolves to an index in this array.
+  // Kept above early returns so hook order stays stable across renders.
+  const lightboxSlides = useMemo(() => {
+    const slides: {
+      key: string;
+      src: string;
+      alt: string;
+      title?: string;
+      description?: string;
+    }[] = [];
+    const seenIds = new Set<string>();
+    const displayName = memorial?.fullName || '';
+    if (hero) {
+      slides.push({
+        key: '__hero',
+        src: hero,
+        alt: displayName ? `Photograph of ${displayName}` : 'Hero photograph',
+        title: displayName || undefined,
+      });
+    }
+    const publicApprovedRows = approved.filter((x: any) => x.audience !== 'family_only');
+    const galleryRows = publicApprovedRows.filter((x: any) => x.photoPath && !x.memory);
+    const memoryRows = publicApprovedRows.filter((x: any) => x.memory && x.photoPath);
+    const pushPhoto = (row: any) => {
+      const url = photoUrls[row.id];
+      if (!url || seenIds.has(row.id)) return;
+      seenIds.add(row.id);
+      const attribution = [row.contributorName, row.relationship].filter(Boolean).join(', ');
+      slides.push({
+        key: row.id,
+        src: url,
+        alt: row.caption || `A memory of ${displayName}`,
+        title: row.caption || undefined,
+        description: attribution || undefined,
+      });
+    };
+    for (const row of galleryRows) pushPhoto(row);
+    for (const row of memoryRows) pushPhoto(row);
+    return slides;
+  }, [hero, approved, photoUrls, memorial?.fullName]);
 
   async function uploadToR2(file: File, path: string, memorialId?: string) {
     const formData = new FormData();
@@ -350,6 +399,11 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
   const publicApproved = approved.filter((x) => x.audience !== 'family_only');
   const photos = publicApproved.filter((x) => x.photoPath && !x.memory);
   const memories = publicApproved.filter((x) => x.memory);
+
+  const openLightboxByKey = (key: string) => {
+    const idx = lightboxSlides.findIndex((s) => s.key === key);
+    if (idx >= 0) setLightboxIndex(idx);
+  };
   const featuredIds: string[] = memorial.featuredContributionIds || [];
   const featuredPhotos = featuredIds
     .map((id) => photos.find((p) => p.id === id))
@@ -396,10 +450,24 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
 
       <section
         className="memorialHero"
+        role={hero ? 'button' : undefined}
+        tabIndex={hero ? 0 : undefined}
+        onClick={hero ? () => openLightboxByKey('__hero') : undefined}
+        onKeyDown={
+          hero
+            ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openLightboxByKey('__hero');
+                }
+              }
+            : undefined
+        }
         style={
           hero
             ? {
                 backgroundImage: `linear-gradient(rgba(22,30,27,.12),rgba(22,30,27,.68)),url(${hero})`,
+                cursor: 'pointer',
               }
             : {}
         }
@@ -467,14 +535,21 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
             className="favourites"
           >
             {featuredPhotos.map((x) => (
-              <div
+              <button
+                type="button"
                 key={x.id}
+                onClick={() => openLightboxByKey(x.id)}
+                aria-label={x.caption || `Open photograph of ${memorial.fullName}`}
                 style={{
                   aspectRatio: '3/4',
                   borderRadius: 20,
                   overflow: 'hidden',
                   boxShadow: 'var(--shadow)',
                   background: '#dde5df',
+                  padding: 0,
+                  border: 0,
+                  cursor: 'pointer',
+                  display: 'block',
                 }}
               >
                 {photoUrls[x.id] && (
@@ -489,7 +564,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
                     }}
                   />
                 )}
-              </div>
+              </button>
             ))}
           </div>
         </section>
@@ -501,7 +576,14 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         <div className={`gallery ${memorial.galleryDisplayMode === 'natural' ? 'natural' : ''}`}>
           {photos.length ? (
             photos.map((x) => (
-              <div className="photo" key={x.id}>
+              <button
+                type="button"
+                className="photo"
+                key={x.id}
+                onClick={() => openLightboxByKey(x.id)}
+                aria-label={x.caption || `Open photograph of ${memorial.fullName}`}
+                style={{ padding: 0, border: 0, cursor: 'pointer' }}
+              >
                 {photoUrls[x.id] && (
                   <img
                     src={photoUrls[x.id]}
@@ -511,7 +593,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
                     }}
                   />
                 )}
-              </div>
+              </button>
             ))
           ) : (
             <>
@@ -533,13 +615,22 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
           memories.map((x) => (
             <div key={x.id} style={{ marginBottom: 45 }}>
               {x.photoPath && photoUrls[x.id] && (
-                <div
+                <button
+                  type="button"
+                  onClick={() => openLightboxByKey(x.id)}
+                  aria-label={`Open photograph shared by ${x.contributorName}`}
                   style={{
                     maxWidth: 520,
                     margin: '0 auto 22px',
                     borderRadius: 20,
                     overflow: 'hidden',
                     boxShadow: 'var(--shadow)',
+                    padding: 0,
+                    border: 0,
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    display: 'block',
+                    width: '100%',
                   }}
                 >
                   <img
@@ -547,7 +638,7 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
                     alt={`A memory shared by ${x.contributorName}`}
                     style={{ width: '100%', height: 'auto', display: 'block' }}
                   />
-                </div>
+                </button>
               )}
               <div className="quote">&ldquo;{x.memory}&rdquo;</div>
               <p className="muted">
@@ -685,6 +776,23 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
           </div>
         </section>
       )}
+
+      <Lightbox
+        open={lightboxIndex >= 0}
+        close={() => setLightboxIndex(-1)}
+        index={Math.max(0, lightboxIndex)}
+        slides={lightboxSlides.map(({ src, alt, title, description }) => ({
+          src,
+          alt,
+          title,
+          description,
+        }))}
+        plugins={[Zoom, Captions]}
+        controller={{ closeOnBackdropClick: true }}
+        zoom={{ maxZoomPixelRatio: 3, scrollToZoom: true }}
+        carousel={{ finite: lightboxSlides.length <= 1 }}
+        styles={{ container: { backgroundColor: 'rgba(15, 22, 20, 0.94)' } }}
+      />
     </main>
   );
 }

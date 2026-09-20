@@ -28,10 +28,16 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
   const router = useRouter();
 
   useEffect(() => {
-    let stop: any;
-    params.then(({ id }) =>
-      onAuthStateChanged(auth, async (u) => {
-        if (!u) return router.push('/auth');
+    let stop: (() => void) | undefined;
+    let stopAuth: (() => void) | undefined;
+    params.then(({ id }) => {
+      stopAuth = onAuthStateChanged(auth, async (u) => {
+        stop?.();
+        stop = undefined;
+        if (!u) {
+          router.push('/auth');
+          return;
+        }
         const snap = await getDoc(doc(db, 'memorials', id));
         if (!snap.exists() || snap.data().ownerId !== u.uid) {
           return router.push('/dashboard');
@@ -45,9 +51,12 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
           ),
           (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() })))
         );
-      })
-    );
-    return () => stop?.();
+      });
+    });
+    return () => {
+      stopAuth?.();
+      stop?.();
+    };
   }, [params, router]);
 
   async function submit(e: FormEvent<HTMLFormElement>) {

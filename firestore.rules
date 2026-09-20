@@ -31,8 +31,14 @@ service cloud.firestore {
     }
 
     function plot(id) { return get(/databases/$(database)/documents/plots/$(id)).data; }
+    // Handle both the current plotAdminUids array and legacy single-admin
+    // docs that still carry plotAdminUid — either shape means "admin".
     function isPlotAdmin(pid) {
-      return signedIn() && plot(pid).plotAdminUid == request.auth.uid;
+      let p = plot(pid);
+      return signedIn() && (
+        request.auth.uid in p.get('plotAdminUids', []) ||
+        p.get('plotAdminUid', '') == request.auth.uid
+      );
     }
 
     // ─── public config (read-only from clients) ──────────────────────────────
@@ -118,7 +124,8 @@ service cloud.firestore {
     match /plots/{id} {
       // Any signed-in user can create a plot (they become the initial admin).
       allow create: if signedIn()
-        && request.resource.data.plotAdminUid == request.auth.uid
+        && request.resource.data.plotAdminUids is list
+        && request.auth.uid in request.resource.data.plotAdminUids
         && request.resource.data.createdByUid == request.auth.uid;
 
       // Plots are publicly readable (drives the /p/[shortId] QR resolution and
@@ -126,12 +133,17 @@ service cloud.firestore {
       // physically present in the world.
       allow get, list: if true;
 
-      // Only plot admin (or super admin) may edit; ownership transfer via
-      // successor acceptance is handled by server.
+      // Any existing admin may edit, including adding/removing co-admins, as
+      // long as the caller stays in the admin list after the edit (prevents
+      // accidental lockout — super admin can still recover). createdByUid is
+      // immutable.
       allow update: if signedIn()
         && (isPlotAdmin(id) || isSuperAdmin())
-        && request.resource.data.plotAdminUid == resource.data.plotAdminUid
-        && request.resource.data.createdByUid == resource.data.createdByUid;
+        && request.resource.data.createdByUid == resource.data.createdByUid
+        && (
+          isSuperAdmin() ||
+          request.auth.uid in request.resource.data.get('plotAdminUids', [])
+        );
       allow delete: if isSuperAdmin();
     }
 

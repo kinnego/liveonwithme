@@ -35,10 +35,18 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
   const router = useRouter();
 
   useEffect(() => {
-    let stop: any;
-    params.then(({ id }) =>
-      onAuthStateChanged(auth, async (u) => {
-        if (!u) return router.push('/auth');
+    let stop: (() => void) | undefined;
+    let stopAuth: (() => void) | undefined;
+    params.then(({ id }) => {
+      stopAuth = onAuthStateChanged(auth, async (u) => {
+        // Tear down first: on signout the query would re-evaluate under no
+        // auth and throw permission-denied.
+        stop?.();
+        stop = undefined;
+        if (!u) {
+          router.push('/auth');
+          return;
+        }
         const snap = await getDoc(doc(db, 'memorials', id));
         if (!snap.exists() || snap.data().ownerId !== u.uid) {
           return router.push('/dashboard');
@@ -57,9 +65,12 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
                 .filter((x: any) => x.photoPath)
             )
         );
-      })
-    );
-    return () => stop?.();
+      });
+    });
+    return () => {
+      stopAuth?.();
+      stop?.();
+    };
   }, [params, router]);
 
   async function uploadToR2(file: File, path: string, memorialId?: string) {

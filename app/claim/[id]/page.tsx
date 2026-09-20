@@ -69,6 +69,7 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
         successorUids: [],
         slug,
         fullName: referral.deceasedFullName,
+        fullNameLower: String(referral.deceasedFullName || '').toLowerCase(),
         nickname: referral.deceasedNickname || '',
         shortName: referral.deceasedShortName || '',
         address: referral.deceasedAddress || '',
