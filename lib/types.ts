@@ -53,6 +53,46 @@ export interface Cemetery {
   lng: number | null;
 }
 
+// A cemetery record added by a member of the public because Google Places
+// didn't list it (many small church graveyards and old burial grounds are
+// missing). We store our own copy so families can attach memorials to it.
+// The Firestore doc ID is a random Firestore ID; the placeId used on
+// Memorial.cemetery is that ID prefixed with `c-` so the two ID spaces don't
+// collide with Google's `ChIJ…` place IDs.
+export interface CustomCemetery {
+  id: string;
+  name: string;
+  /** Lowercased name for prefix search. */
+  nameLower: string;
+  address?: string;
+  lat: number;
+  lng: number;
+  // At least one of these is present. Signed-in submitters get createdByUid;
+  // anonymous submitters must supply an email so we can reach them if the
+  // listing needs correction. Email is never shown publicly.
+  createdByUid?: string;
+  createdByEmail?: string;
+  updatedByUid?: string;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+// A user-filed report against a community-added cemetery. Reports are private
+// (super-admin only) — the public page never shows them or their reason.
+export type CemeteryReportStatus = 'open' | 'dismissed' | 'actioned';
+
+export interface CemeteryReport {
+  id: string;
+  cemeteryId: string;
+  reason: string;
+  reporterEmail?: string;
+  reporterUid?: string;
+  status: CemeteryReportStatus;
+  createdAt?: unknown;
+  decidedAt?: unknown;
+  decidedByUid?: string;
+}
+
 export type ContributionSource = 'family' | 'visitor';
 export type ContributionAudience = 'public' | 'family_only';
 export type GalleryDisplayMode = 'square' | 'natural';

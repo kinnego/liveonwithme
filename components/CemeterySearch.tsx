@@ -1,83 +1,295 @@
 'use client';
+// Unified cemetery search — Google Places suggestions and community-added
+// cemeteries appear together in one dropdown so families never have to guess
+// which "side" to search. Small church graveyards and older burial grounds
+// often aren't on Google, so we always offer an "Add a cemetery" fallback.
+
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { loadGoogleMaps } from '@/lib/places';
+import { customPlaceIdOf, searchCustomCemeteries } from '@/lib/cemeteries';
+import type { CustomCemetery } from '@/lib/types';
+
+type GoogleSuggestion = {
+  placeId: string;
+  primary: string;
+  secondary?: string;
+};
 
 export default function CemeterySearch() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState<'idle' | 'ready' | 'no-key' | 'error'>('idle');
+  const [term, setTerm] = useState('');
+  const [googleResults, setGoogleResults] = useState<GoogleSuggestion[]>([]);
+  const [customResults, setCustomResults] = useState<CustomCemetery[]>([]);
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'searching' | 'ready' | 'no-key' | 'error'>('idle');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const googleRef = useRef<any>(null);
+  const sessionTokenRef = useRef<any>(null);
   const router = useRouter();
 
   useEffect(() => {
-    let element: any;
-    let handler: any;
     let cancelled = false;
-
     loadGoogleMaps()
       .then(async (google) => {
         if (cancelled) return;
         await google.maps.importLibrary('places');
-        if (cancelled || !containerRef.current) return;
-
-        const PlaceAutocompleteElement = google.maps.places?.PlaceAutocompleteElement;
-        if (!PlaceAutocompleteElement) {
-          throw new Error('PlaceAutocompleteElement unavailable — enable Places API (New)');
-        }
-
-        element = new PlaceAutocompleteElement({
-          includedRegionCodes: ['ie', 'gb'],
-          includedPrimaryTypes: ['cemetery'],
-        });
-        element.style.width = '100%';
-
-        handler = async (event: any) => {
-          const prediction = event.placePrediction;
-          if (!prediction) return;
-          const place = prediction.toPlace();
-          await place.fetchFields({ fields: ['id', 'displayName'] });
-          const id = place.id;
-          if (!id) return;
-          const q = place.displayName ? `?name=${encodeURIComponent(place.displayName)}` : '';
-          router.push(`/cemetery/${encodeURIComponent(id)}${q}`);
-        };
-
-        element.addEventListener('gmp-select', handler);
-        containerRef.current.replaceChildren(element);
-        setStatus('ready');
+        googleRef.current = google;
+        sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
       })
       .catch((err: Error) => {
         console.error('CemeterySearch load error:', err);
         if (err.message.includes('not configured')) setStatus('no-key');
         else setStatus('error');
       });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const q = term.trim();
+    if (q.length < 2) {
+      setGoogleResults([]);
+      setCustomResults([]);
+      setStatus('idle');
+      return;
+    }
+
+    let cancelled = false;
+    setStatus('searching');
+    const handle = setTimeout(async () => {
+      try {
+        const [googleData, customData] = await Promise.all([
+          fetchGoogleSuggestions(q),
+          searchCustomCemeteries(q, 5).catch(() => [] as CustomCemetery[]),
+        ]);
+        if (cancelled) return;
+        setGoogleResults(googleData);
+        setCustomResults(customData);
+        setStatus('ready');
+      } catch (err) {
+        if (cancelled) return;
+        console.error('CemeterySearch query error:', err);
+        setStatus('error');
+      }
+    }, 250);
 
     return () => {
       cancelled = true;
-      if (element && handler) element.removeEventListener('gmp-select', handler);
-      element?.remove();
+      clearTimeout(handle);
     };
-  }, [router]);
+  }, [term]);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!wrapperRef.current) return;
+      if (!wrapperRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  async function fetchGoogleSuggestions(q: string): Promise<GoogleSuggestion[]> {
+    const google = googleRef.current;
+    if (!google?.maps?.places?.AutocompleteSuggestion) return [];
+    // Google's primary-type tag for cemeteries is narrow — many church
+    // graveyards and historic burial grounds are tagged `church` or
+    // `place_of_worship` instead, so we broaden the filter.
+    const request = {
+      input: q,
+      includedRegionCodes: ['ie', 'gb'],
+      includedPrimaryTypes: ['cemetery', 'church', 'place_of_worship'],
+      sessionToken: sessionTokenRef.current,
+    };
+    const { suggestions } =
+      await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+    if (!Array.isArray(suggestions)) return [];
+    return suggestions
+      .map((s: any) => {
+        const p = s.placePrediction;
+        if (!p) return null;
+        return {
+          placeId: p.placeId,
+          primary: p.mainText?.text || p.text?.text || '',
+          secondary: p.secondaryText?.text || '',
+        };
+      })
+      .filter(Boolean) as GoogleSuggestion[];
+  }
+
+  function goToGooglePlace(s: GoogleSuggestion) {
+    setOpen(false);
+    const q = s.primary ? `?name=${encodeURIComponent(s.primary)}` : '';
+    router.push(`/cemetery/${encodeURIComponent(s.placeId)}${q}`);
+  }
+
+  function goToCustom(c: CustomCemetery) {
+    setOpen(false);
+    router.push(`/cemetery/${customPlaceIdOf(c.id)}`);
+  }
+
+  const showDropdown = open && term.trim().length >= 2 && status !== 'idle';
+  const hasAnyResults = googleResults.length > 0 || customResults.length > 0;
+  const addHref = `/cemetery/add${term.trim() ? `?name=${encodeURIComponent(term.trim())}` : ''}`;
 
   return (
-    <div>
-      <div ref={containerRef} style={{ display: status === 'ready' ? 'block' : 'none' }} />
-      {status !== 'ready' && (
-        <input
-          placeholder="Search a cemetery in Ireland or the UK…"
-          disabled
-          aria-label="Cemetery search — loading"
-        />
-      )}
+    <div ref={wrapperRef} style={{ position: 'relative' }}>
+      <input
+        type="search"
+        placeholder="Search a cemetery in Ireland or the UK…"
+        value={term}
+        onChange={(e) => {
+          setTerm(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        aria-label="Cemetery search"
+        autoComplete="off"
+      />
+      <div
+        style={{
+          marginTop: 8,
+          textAlign: 'left',
+          fontSize: 13,
+        }}
+      >
+        <Link
+          href="/cemetery/nearby"
+          style={{ color: 'var(--sage)', textDecoration: 'underline' }}
+        >
+          Find graveyards near me →
+        </Link>
+      </div>
       {status === 'no-key' && (
         <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
           Search isn&rsquo;t configured yet.
         </p>
       )}
-      {status === 'error' && (
+      {status === 'error' && !showDropdown && (
         <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
           Search couldn&rsquo;t load. Please refresh.
         </p>
       )}
+
+      {showDropdown && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            right: 0,
+            background: 'white',
+            border: '1px solid var(--line)',
+            borderRadius: 12,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+            zIndex: 30,
+            overflow: 'hidden',
+            textAlign: 'left',
+          }}
+        >
+          {status === 'searching' && (
+            <div className="muted" style={{ padding: '14px 16px', fontSize: 14 }}>
+              Searching…
+            </div>
+          )}
+
+          {status === 'ready' && googleResults.length > 0 && (
+            <div>
+              {googleResults.map((s) => (
+                <button
+                  key={s.placeId}
+                  type="button"
+                  onClick={() => goToGooglePlace(s)}
+                  style={rowStyle}
+                >
+                  <div style={{ fontWeight: 600 }}>{s.primary}</div>
+                  {s.secondary && (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                      {s.secondary}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {status === 'ready' && customResults.length > 0 && (
+            <div>
+              <div style={sectionHeaderStyle}>Community-added</div>
+              {customResults.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => goToCustom(c)}
+                  style={rowStyle}
+                >
+                  <div style={{ fontWeight: 600 }}>{c.name}</div>
+                  {c.address && (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                      {c.address}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {status === 'ready' && !hasAnyResults && (
+            <div className="muted" style={{ padding: '14px 16px', fontSize: 14 }}>
+              No matches for &ldquo;{term.trim()}&rdquo;.
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div className="muted" style={{ padding: '14px 16px', fontSize: 14 }}>
+              Search couldn&rsquo;t load. Please try again.
+            </div>
+          )}
+
+          <a
+            href={addHref}
+            onClick={() => setOpen(false)}
+            style={{
+              display: 'block',
+              padding: '12px 16px',
+              borderTop: '1px solid var(--line)',
+              background: '#f7f4ee',
+              color: 'var(--sage)',
+              fontWeight: 600,
+              fontSize: 14,
+              textDecoration: 'none',
+            }}
+          >
+            + Add a cemetery not listed above
+          </a>
+        </div>
+      )}
     </div>
   );
 }
+
+const rowStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  padding: '12px 16px',
+  borderTop: '1px solid var(--line)',
+  background: 'white',
+  border: 'none',
+  borderBottom: 'none',
+  textAlign: 'left',
+  cursor: 'pointer',
+  color: 'inherit',
+  font: 'inherit',
+};
+
+const sectionHeaderStyle: React.CSSProperties = {
+  padding: '10px 16px 4px',
+  fontSize: 11,
+  textTransform: 'uppercase',
+  letterSpacing: '0.14em',
+  fontWeight: 800,
+  color: 'var(--sage)',
+  background: '#fbf8f2',
+  borderTop: '1px solid var(--line)',
+};

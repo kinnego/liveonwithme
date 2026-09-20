@@ -329,6 +329,62 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ─── cemeteries (community-added) ────────────────────────────────────────
+    // Members of the public can add cemeteries that Google Places doesn't list.
+    // Auto-published (no admin queue) so families can use them immediately.
+    // Signed-in adds are tagged with createdByUid; anonymous adds must supply
+    // createdByEmail so we have some way to reach the submitter if the
+    // listing needs correction. Attribution and location are immutable —
+    // only signed-in users can update the name.
+    match /cemeteries/{id} {
+      allow get, list: if true;
+
+      allow create: if
+        request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.nameLower is string
+        && request.resource.data.lat is number
+        && request.resource.data.lng is number
+        && (
+          (
+            signedIn()
+            && request.resource.data.get('createdByUid', '') == request.auth.uid
+          )
+          || (
+            request.resource.data.get('createdByEmail', '') is string
+            && request.resource.data.get('createdByEmail', '').size() > 0
+          )
+        );
+
+      allow update: if signedIn()
+        && request.resource.data.get('createdByUid', '') == resource.data.get('createdByUid', '')
+        && request.resource.data.get('createdByEmail', '') == resource.data.get('createdByEmail', '')
+        && request.resource.data.lat == resource.data.lat
+        && request.resource.data.lng == resource.data.lng
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.nameLower is string;
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // ─── cemetery reports ────────────────────────────────────────────────────
+    // Any visitor (signed-in or not) can file a report against a community
+    // cemetery listing. Only super admin can read or resolve them so we never
+    // expose reporter emails or reasons publicly.
+    match /cemeteryReports/{id} {
+      allow create: if
+        request.resource.data.cemeteryId is string
+        && request.resource.data.cemeteryId.size() > 0
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() > 0
+        && request.resource.data.status == 'open';
+
+      allow get, list: if isSuperAdmin();
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
     // ─── users ───────────────────────────────────────────────────────────────
     match /users/{uid} {
       allow create: if isSelf(uid)
