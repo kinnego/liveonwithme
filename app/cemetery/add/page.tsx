@@ -176,7 +176,7 @@ function AddCemeteryInner() {
         <p className="muted">
           Many small church graveyards and older burial grounds aren&rsquo;t on
           Google&rsquo;s map. Add the location here and it will appear in search
-          straight away — for you and for every other family looking for it.
+          straight away, for you and for every other family looking for it.
         </p>
 
         <form onSubmit={submit}>

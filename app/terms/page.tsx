@@ -7,7 +7,7 @@ export default function TermsPage() {
         <div className="eyebrow">Fair-use terms</div>
         <h2>Room for a lifetime of memories, not a data warehouse.</h2>
         <p className="muted">
-          A Live On With Me memorial is meant to feel like a beautiful digital family album — the photos,
+          A Live On With Me memorial is meant to feel like a beautiful digital family album: the photos,
           voices and stories that a family never wants to lose. Our pricing works because most memorials
           settle into a size that is generous, but not unlimited.
         </p>
@@ -31,7 +31,7 @@ export default function TermsPage() {
         <p className="muted">
           Every memorial has a generous default allowance for photos, video minutes and total storage.
           If a family reaches that limit, we&rsquo;ll get in touch to talk about how much room is really
-          needed — we&rsquo;d rather have a conversation than fail an upload silently.
+          needed. We&rsquo;d rather have a conversation than fail an upload silently.
         </p>
 
         <p className="muted" style={{ marginTop: 30, fontSize: 13 }}>

@@ -7,7 +7,7 @@ import ScrollToTopOnNav from '@/components/ScrollToTopOnNav';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://liveonwith.me'),
-  title: 'LiveOnWith.me — A life remembered with love',
+  title: 'LiveOnWith.me · A life remembered with love',
   description:
     'A peaceful place to remember someone you love, share their story and gather treasured memories.',
   manifest: '/manifest.webmanifest',
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     apple: '/brand/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'LiveOnWith.me — A life remembered with love',
+    title: 'LiveOnWith.me · A life remembered with love',
     description:
       'A peaceful place to remember someone you love, share their story and gather treasured memories.',
     images: ['/brand/live-on-with-me-logo-512.png'],
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'LiveOnWith.me — A life remembered with love',
+    title: 'LiveOnWith.me · A life remembered with love',
     description:
       'A peaceful place to remember someone you love, share their story and gather treasured memories.',
     images: ['/brand/live-on-with-me-logo-512.png'],

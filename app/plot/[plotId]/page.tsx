@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { adminDb } from '@/lib/firebase-admin';
+import { walkingDirectionsUrl } from '@/lib/plot';
 import type { Memorial, Plot } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -111,6 +112,26 @@ export default async function PlotPage({
           )}
         </div>
       </div>
+
+      {typeof plot.lat === 'number' && typeof plot.lng === 'number' && (
+        <div
+          className="card"
+          style={{ marginBottom: 16, background: '#f7f4ee', borderColor: '#e0d8c8' }}
+        >
+          <a
+            href={walkingDirectionsUrl({ lat: plot.lat, lng: plot.lng })}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="button"
+            style={{ textDecoration: 'none' }}
+          >
+            Walking directions to the grave →
+          </a>
+          <p className="muted" style={{ fontSize: 13, margin: '10px 0 0' }}>
+            Opens in your maps app. Follow it to the headstone.
+          </p>
+        </div>
+      )}
 
       {plot.cemetery.placeId && (
         <div className="card" style={{ marginBottom: 24 }}>

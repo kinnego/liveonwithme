@@ -151,14 +151,14 @@ export default function PlotQr({
         <div style={{ textAlign: 'left', marginTop: 40, background: '#fffdf9', border: '1px solid var(--line)', borderRadius: 14, padding: '18px 22px' }}>
           <h3 style={{ marginTop: 0 }}>For stonemasons</h3>
           <p className="muted" style={{ marginBottom: 8 }}>
-            The SVG is pure vector — it can be scaled to any size without losing sharpness,
+            The SVG is pure vector, so it can be scaled to any size without losing sharpness,
             which makes it suitable for direct etching. A few gentle suggestions:
           </p>
           <ul className="muted" style={{ marginTop: 0, paddingLeft: 22 }}>
             <li>Etch at 40&nbsp;mm × 40&nbsp;mm or larger for reliable scanning.</li>
-            <li>Keep the quiet border (white space) around the pattern — it&rsquo;s the frame the scanner relies on.</li>
+            <li>Keep the quiet border (white space) around the pattern. It&rsquo;s the frame the scanner relies on.</li>
             <li>The QR is generated with the highest error-correction setting, so minor weathering or scratching won&rsquo;t stop it working.</li>
-            <li>Test with a phone before finishing — it should scan from about half a metre away.</li>
+            <li>Test with a phone before finishing. It should scan from about half a metre away.</li>
           </ul>
         </div>
 

@@ -22,6 +22,7 @@ import { readQuotas, readPricing } from '@/lib/config';
 import { isSecondaryOnPlot } from '@/lib/pricing';
 import { DEFAULT_PRICING, DEFAULT_QUOTAS, MediaQuotasConfig, PricingConfig } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
+import PlotLocationEditor from '@/components/PlotLocationEditor';
 
 function humanBytes(n: number): string {
   if (!n || n < 1024) return `${Math.max(0, n || 0)} B`;
@@ -357,7 +358,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             </p>
           ) : isLegacy ? (
             <p className="muted">
-              Take your time — nothing here goes anywhere until you&rsquo;re ready. Publishing
+              Take your time. Nothing here goes anywhere until you&rsquo;re ready. Publishing
               makes the page reachable at its link (you still choose who can see it). A one-time
               fee of <strong>€{priceEur}</strong> covers hosting for life, so it&rsquo;s here for
               whenever it&rsquo;s needed.
@@ -410,7 +411,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           </h3>
           <p className="muted">
             {isLegacy
-              ? `Your page is live at the link below. Share it with whoever you'd like — or just keep the link somewhere safe for when it's needed.`
+              ? `Your page is live at the link below. Share it with whoever you'd like, or just keep the link somewhere safe for when it's needed.`
               : `This memorial is live and accessible via the link below. Share it with family and friends.`}
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
@@ -432,7 +433,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             <>
               <p className="muted">
                 This memorial is linked to a plot. The QR code sits with the plot, so anyone who
-                scans it sees everyone remembered at that resting place — a beautiful way to
+                scans it sees everyone remembered at that resting place. A beautiful way to
                 honour a family grave.
               </p>
               <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
@@ -450,7 +451,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                 </Link>
               </div>
               <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>
-                Additional names on this plot use the reduced rate — the QR is already engraved
+                Additional names on this plot use the reduced rate. The QR is already engraved
                 on the stone, so nothing physical needs to change.
               </p>
             </>
@@ -459,7 +460,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
               <p className="muted">
                 Create the plot for {m.fullName.split(' ')[0]}&rsquo;s resting place and we&rsquo;ll
                 generate an etchable QR code the stonemason can add to the headstone. The QR links
-                to a page listing everyone remembered at that plot — so future family members can
+                to a page listing everyone remembered at that plot, so future family members can
                 be added over time without ever changing the code on the stone.
               </p>
               {plotError && (
@@ -483,6 +484,15 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         </div>
       )}
 
+      {isLive && m.plotId && m.cemetery && auth.currentUser && (
+        <PlotLocationEditor
+          plotId={m.plotId}
+          cemetery={m.cemetery}
+          actorUid={auth.currentUser.uid}
+          actorEmail={auth.currentUser.email || undefined}
+        />
+      )}
+
       {isLive && quotas.totalBytesPerMemorial > 0 && (
         <div className="card" style={{ marginBottom: 30, display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 260px' }}>
@@ -503,7 +513,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           {usageBytes / quotas.totalBytesPerMemorial > 0.85 && (
             <p className="muted" style={{ margin: 0, fontSize: 13, flex: '1 1 260px' }}>
               You&rsquo;re nearing the allowance. Email <a href="mailto:hello@freastar.com">hello@freastar.com</a> and
-              we&rsquo;ll happily raise it — no upload will ever fail silently.
+              we&rsquo;ll happily raise it. No upload will ever fail silently.
             </p>
           )}
         </div>
@@ -514,7 +524,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         <h3 style={{ marginTop: 10 }}>Nominate someone to look after this memorial</h3>
         <p className="muted">
           A memorial is meant to outlast any one of us. Nominate a trusted family member as a{' '}
-          <strong>backup</strong> — nothing changes today, but if you&rsquo;re ever unable to look
+          <strong>backup</strong>. Nothing changes today, but if you&rsquo;re ever unable to look
           after the memorial, custody will move to them. You can also{' '}
           <strong>transfer custody now</strong> if you&rsquo;d like someone else to take over.
         </p>
@@ -610,8 +620,8 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           {nominationLink && (
             <div style={{ marginTop: 16, padding: '14px 18px', background: '#e8f0ea', borderRadius: 12, border: '1px solid #a8bcae' }}>
               <p style={{ margin: 0, fontSize: 14 }}>
-                <strong>Invitation ready.</strong> Send this link to the person you nominated —
-                once they sign in with the same email and accept, we&rsquo;ll do the rest.
+                <strong>Invitation ready.</strong> Send this link to the person you nominated.
+                Once they sign in with the same email and accept, we&rsquo;ll do the rest.
               </p>
               <p style={{ margin: '8px 0', fontSize: 13, wordBreak: 'break-all' }}>{nominationLink}</p>
               <button
@@ -644,8 +654,8 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           </h3>
           <p className="muted">
             {isLegacy
-              ? "Add a short line for beneath your name and the fuller story when you're ready — you can write as little or as much as feels right."
-              : `Add a short line for beneath the name and the fuller story when you're ready — you can write as little or as much as feels right.`}
+              ? "Add a short line for beneath your name and the fuller story when you're ready. Write as little or as much as feels right."
+              : `Add a short line for beneath the name and the fuller story when you're ready. Write as little or as much as feels right.`}
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
             <Link href={`/memorial/${m.id}/edit`} className="button">
@@ -682,8 +692,8 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           <h3>{isLegacy ? 'Your own memories' : 'Family memories'}</h3>
           <p className="muted">
             {isLegacy
-              ? 'Write in your own voice — the memories and moments you want carried forward.'
-              : `Write your own memories — the family's voice on the memorial.`}
+              ? 'Write in your own voice. The memories and moments you want carried forward.'
+              : `Write your own memories. The family's voice on the memorial.`}
           </p>
           <Link href={`/memorial/${m.id}/memories`} className="button soft">
             Write memories
@@ -744,7 +754,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                     <p>{c.memory || c.caption || 'Photograph submitted'}</p>
                     {isPrivate && (
                       <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                        The sender asked that this stays with the family only — it won&rsquo;t appear
+                        The sender asked that this stays with the family only. It won&rsquo;t appear
                         on the memorial.
                       </p>
                     )}

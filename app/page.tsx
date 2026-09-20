@@ -15,7 +15,7 @@ export default function Home() {
             Their story lives on.
           </h1>
           <p className="lead">
-            A peaceful place for the stories that shouldn&rsquo;t be lost — a memorial for
+            A peaceful place for the stories that shouldn&rsquo;t be lost. A memorial for
             someone you love, or a page in your own words for the people who will come after.
           </p>
           <div className="actions">
@@ -33,7 +33,7 @@ export default function Home() {
         <div className="heroMark">
           <Image
             src="/brand/live-on-with-me-logo-1024.png"
-            alt="Live on With Me — memories live forever"
+            alt="Live on With Me. Memories live forever."
             width={520}
             height={520}
             priority
@@ -105,7 +105,7 @@ export default function Home() {
             <div className="iconCircle">✦</div>
             <h3>Memories from everyone</h3>
             <p className="muted">
-              Collect stories you may never have heard — from school friends, neighbours,
+              Collect stories you may never have heard. From school friends, neighbours,
               colleagues and family.
             </p>
           </div>
@@ -140,7 +140,7 @@ export default function Home() {
           </h2>
           <p className="lead" style={{ margin: '0 auto 26px', maxWidth: 620 }}>
             Partner with us and give the families you serve a peaceful digital
-            keepsake — set up in minutes and cared for by them for a lifetime.
+            keepsake, set up in minutes and cared for by them for a lifetime.
             You focus on the family; we handle the technology.
           </p>
           <Link href="/partner/apply" className="button">

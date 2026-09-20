@@ -117,7 +117,7 @@ export default function Dashboard() {
           <div className="eyebrow">Looked after by others</div>
           <h3 style={{ marginTop: 6 }}>You&rsquo;re a backup for these memorials</h3>
           <p className="muted" style={{ marginBottom: 20 }}>
-            You don&rsquo;t need to do anything today — this is just so you know they&rsquo;ll come
+            You don&rsquo;t need to do anything today. This is just so you know they&rsquo;ll come
             to you if the current custodian is ever unable to look after them.
           </p>
           <div className="featureGrid">

@@ -207,7 +207,7 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
         <div className="eyebrow">Photographs</div>
         <h2 style={{ marginBottom: 0 }}>{m.fullName}</h2>
         <p className="muted" style={{ marginTop: 8 }}>
-          Star up to {MAX_FEATURED} favourites — they appear in a highlighted strip on the
+          Star up to {MAX_FEATURED} favourites. They appear in a highlighted strip on the
           memorial. All published photographs also appear in the gallery below.
         </p>
       </div>
@@ -215,7 +215,7 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
       <div className="formCard" style={{ margin: '20px 0' }}>
         <h3 style={{ marginTop: 0 }}>Add photographs</h3>
         <p className="muted" style={{ marginTop: 0 }}>
-          Upload one or many at a time — we&rsquo;ll gently resize each so it looks crisp on a
+          Upload one or many at a time. We&rsquo;ll gently resize each so it looks crisp on a
           phone and loads quickly for everyone.
         </p>
         <form onSubmit={onUpload}>

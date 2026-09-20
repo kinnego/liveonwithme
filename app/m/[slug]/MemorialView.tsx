@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
+import { walkingDirectionsUrl } from '@/lib/plot';
 import { resizeForMobile } from '@/lib/image';
 import { PageSkeleton } from '@/components/Skeleton';
 import Lightbox from 'yet-another-react-lightbox';
@@ -190,6 +191,7 @@ type LoadState = 'loading' | 'not_found' | 'draft_no_access' | 'ready';
 
 export default function Memorial({ params }: { params: Promise<{ slug: string }> }) {
   const [memorial, setMemorial] = useState<any>();
+  const [plotCoords, setPlotCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [hero, setHero] = useState('');
   const [approved, setApproved] = useState<any[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
@@ -237,6 +239,23 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
 
       setMemorial(data);
       setIsPreview(!isLive && isOwner);
+
+      // If the memorial is linked to a plot with an exact pin, fetch it so
+      // we can offer walking directions straight to the grave. Plots are
+      // publicly readable.
+      if (data.plotId) {
+        getDoc(doc(db, 'plots', data.plotId))
+          .then((ps) => {
+            if (!ps.exists()) return;
+            const pd = ps.data() as any;
+            if (typeof pd.lat === 'number' && typeof pd.lng === 'number') {
+              setPlotCoords({ lat: pd.lat, lng: pd.lng });
+            }
+          })
+          .catch(() => {
+            // Non-fatal: page still renders, we just don't show directions.
+          });
+      }
 
       if (data.heroPhotoPath) {
         setHero(`${R2_PUBLIC_URL}/${data.heroPhotoPath}`);
@@ -496,6 +515,22 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
               ) : (
                 cemetery.name
               )}
+            </p>
+          )}
+          {plotCoords && (
+            <p style={{ marginTop: 8, fontSize: 14, opacity: 0.9 }}>
+              <a
+                href={walkingDirectionsUrl(plotCoords)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: 'inherit',
+                  textDecoration: 'underline',
+                  fontWeight: 600,
+                }}
+              >
+                Directions to the grave →
+              </a>
             </p>
           )}
         </div>

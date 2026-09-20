@@ -117,7 +117,7 @@ export default function PartnerDashboard() {
       <main className="shell">
         <div className="formCard">
           <div className="eyebrow">Application received</div>
-          <h2>Thanks — we&rsquo;ll be in touch.</h2>
+          <h2>Thanks. We&rsquo;ll be in touch.</h2>
           <p className="muted">
             Your partner application is with our team. We&rsquo;ll email you at{' '}
             <strong>{profile?.email}</strong> once it&rsquo;s approved. Most decisions take a working day.
@@ -157,7 +157,7 @@ export default function PartnerDashboard() {
       <div className="card" style={{ marginBottom: 30, background: '#fffdf9' }}>
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
           You pay <strong>€150</strong> to Live On With Me per memorial. You bill your customer separately at
-          whatever price you choose — we don&rsquo;t take a percentage. There are no commissions or payouts back to you.
+          whatever price you choose. We don&rsquo;t take a percentage. There are no commissions or payouts back to you.
         </p>
       </div>
 

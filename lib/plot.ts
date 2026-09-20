@@ -156,6 +156,26 @@ export async function requestPlotMembership(input: {
   };
 }
 
+// Google Maps deep link that opens turn-by-turn walking directions to the
+// grave. Works on desktop and both iOS/Android — the maps app takes over
+// once the visitor is signed into it.
+export function walkingDirectionsUrl(coords: { lat: number; lng: number }): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}&travelmode=walking`;
+}
+
+// Sets or updates the exact grave coordinates on a plot. Firestore rules
+// require the caller to be a plot admin. Pass `null` for both to clear.
+export async function updatePlotLocation(
+  plotId: string,
+  coords: { lat: number; lng: number } | null,
+): Promise<void> {
+  if (!db) throw new Error('Firestore not available');
+  const payload = coords
+    ? { lat: coords.lat, lng: coords.lng, updatedAt: serverTimestamp() }
+    : { lat: null, lng: null, updatedAt: serverTimestamp() };
+  await updateDoc(doc(db, 'plots', plotId), payload);
+}
+
 // Ensures a memorial with a `cemetery` set has a Plot. Idempotent: no-op if
 // the memorial already has a plotId or has no cemetery.
 export async function ensurePlotForMemorial(m: Memorial): Promise<string | null> {

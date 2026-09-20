@@ -105,7 +105,7 @@ export default function NewPartnerCustomer() {
         <p className="muted">
           These details create the initial page. You pay <strong>€150</strong> today and we email
           the family a private link to take it over, add photographs and stories, and go live.
-          You bill your customer separately at whatever price fits your business — Live On With Me
+          You bill your customer separately at whatever price fits your business. Live On With Me
           never touches that transaction.
         </p>
         <form onSubmit={submit}>
@@ -157,7 +157,7 @@ export default function NewPartnerCustomer() {
           {error && <p style={{ color: '#a94442', marginTop: 14, fontSize: 14 }}>{error}</p>}
 
           <button disabled={saving} className="button" style={{ width: '100%', marginTop: 26 }}>
-            {saving ? 'Setting up payment…' : 'Continue — pay €150 to send invite'}
+            {saving ? 'Setting up payment…' : 'Continue: pay €150 to send invite'}
           </button>
           <p className="muted" style={{ fontSize: 13, marginTop: 14, textAlign: 'center' }}>
             Payment is taken securely by Stripe. The family will only be invited after payment succeeds.

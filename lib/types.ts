@@ -198,6 +198,12 @@ export interface Plot {
   shortId: string;              // 8-char human-safe token for /p/[shortId] QR URLs
   name?: string;                // optional plot label ("Plot 34, Row C")
   cemetery: Cemetery;
+  // Precise grave coordinates within the cemetery. When set, the public plot
+  // page and memorial page surface a "walking directions to the grave" link
+  // that opens in the visitor's maps app. Optional — the cemetery-level
+  // coordinates already get people to the gate.
+  lat?: number;
+  lng?: number;
   // Flat set of co-admins — creator is always the first entry. Any admin
   // can act on the plot; any admin can add or remove other admins. Older
   // plot docs may still have `plotAdminUid` (singular) instead — read via

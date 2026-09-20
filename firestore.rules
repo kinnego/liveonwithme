@@ -135,14 +135,17 @@ service cloud.firestore {
 
       // Any existing admin may edit, including adding/removing co-admins, as
       // long as the caller stays in the admin list after the edit (prevents
-      // accidental lockout — super admin can still recover). createdByUid is
-      // immutable.
+      // accidental lockout; super admin can still recover). createdByUid is
+      // immutable. Uses .get() throughout so legacy plots (missing
+      // plotAdminUids array or createdByUid) don't get accidentally locked
+      // out of ordinary field updates like grave-location pin edits.
       allow update: if signedIn()
         && (isPlotAdmin(id) || isSuperAdmin())
-        && request.resource.data.createdByUid == resource.data.createdByUid
+        && request.resource.data.get('createdByUid', '') == resource.data.get('createdByUid', '')
         && (
           isSuperAdmin() ||
-          request.auth.uid in request.resource.data.get('plotAdminUids', [])
+          request.auth.uid in request.resource.data.get('plotAdminUids', []) ||
+          request.resource.data.get('plotAdminUid', '') == request.auth.uid
         );
       allow delete: if isSuperAdmin();
     }

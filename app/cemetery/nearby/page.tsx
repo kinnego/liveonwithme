@@ -171,7 +171,7 @@ export default function NearbyCemeteriesPage() {
           <h3 style={{ marginTop: 0 }}>Nothing within {Math.round(SEARCH_RADIUS_METERS / 1000)} km</h3>
           <p className="muted">
             If you&rsquo;re standing in a graveyard right now that isn&rsquo;t
-            listed, you can add it — it takes about a minute.
+            listed, you can add it. It takes about a minute.
           </p>
           <Link href="/cemetery/add" className="button">
             Add this cemetery
@@ -268,7 +268,10 @@ async function fetchGoogleNearby(coords: {
       center: coords,
       radius: SEARCH_RADIUS_METERS,
     },
-    includedPrimaryTypes: ['cemetery', 'church', 'place_of_worship'],
+    // Nearby Search's primary-type allowlist doesn't include `place_of_worship`
+    // (it's a category alias, not a searchable primary type). `church` covers
+    // most Irish/UK churchyards; add other faiths here if we broaden geo.
+    includedPrimaryTypes: ['cemetery', 'church'],
     maxResultCount: 20,
     rankPreference: 'DISTANCE',
   });

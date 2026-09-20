@@ -81,7 +81,7 @@ export default function CemeteryPage({
         console.error('Cemetery query failed:', err);
         setError(
           err?.code === 'failed-precondition'
-            ? 'Search is warming up — please try again in a moment.'
+            ? 'Search is warming up. Please try again in a moment.'
             : 'Something went wrong loading this cemetery.'
         );
         setMemorials([]);
@@ -374,7 +374,7 @@ function ReportBlock({
   if (done) {
     return (
       <p className="muted" style={{ fontSize: 13, marginBottom: 20 }}>
-        Thank you — a member of our team will review this listing.
+        Thank you. A member of our team will review this listing.
       </p>
     );
   }
@@ -421,7 +421,7 @@ function ReportBlock({
             placeholder="you@example.com"
           />
           <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-            Not shown publicly — only used to reach you if we need details.
+            Not shown publicly. Only used to reach you if we need details.
           </p>
         </>
       )}

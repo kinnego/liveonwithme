@@ -125,7 +125,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
       <div className="formCard">
         <div className="eyebrow">Edit {pageWord}</div>
         <h2>{m.fullName}</h2>
-        <p className="muted">Change anything — it saves back to this {pageWord}.</p>
+        <p className="muted">Change anything. It saves back to this {pageWord}.</p>
 
         <form onSubmit={submit}>
           <label htmlFor="fullName">{nameLabel}</label>
@@ -155,7 +155,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
                     fontSize: 13,
                   }}
                 >
-                  If the time has come, add a date of passing — this page becomes a memorial.
+                  If the time has come, add a date of passing. This page becomes a memorial.
                 </button>
               </p>
             </>

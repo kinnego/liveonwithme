@@ -3,8 +3,12 @@
 // cemeteries appear together in one dropdown so families never have to guess
 // which "side" to search. Small church graveyards and older burial grounds
 // often aren't on Google, so we always offer an "Add a cemetery" fallback.
+//
+// Search runs on submit (Enter or the search button), not per keystroke.
+// Google Places autocomplete is metered — firing it on every debounced
+// keystroke was multiplying our bill for very little UX gain.
 
-import { useEffect, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { loadGoogleMaps } from '@/lib/places';
@@ -19,6 +23,7 @@ type GoogleSuggestion = {
 
 export default function CemeterySearch() {
   const [term, setTerm] = useState('');
+  const [submittedTerm, setSubmittedTerm] = useState('');
   const [googleResults, setGoogleResults] = useState<GoogleSuggestion[]>([]);
   const [customResults, setCustomResults] = useState<CustomCemetery[]>([]);
   const [open, setOpen] = useState(false);
@@ -48,40 +53,6 @@ export default function CemeterySearch() {
   }, []);
 
   useEffect(() => {
-    const q = term.trim();
-    if (q.length < 2) {
-      setGoogleResults([]);
-      setCustomResults([]);
-      setStatus('idle');
-      return;
-    }
-
-    let cancelled = false;
-    setStatus('searching');
-    const handle = setTimeout(async () => {
-      try {
-        const [googleData, customData] = await Promise.all([
-          fetchGoogleSuggestions(q),
-          searchCustomCemeteries(q, 5).catch(() => [] as CustomCemetery[]),
-        ]);
-        if (cancelled) return;
-        setGoogleResults(googleData);
-        setCustomResults(customData);
-        setStatus('ready');
-      } catch (err) {
-        if (cancelled) return;
-        console.error('CemeterySearch query error:', err);
-        setStatus('error');
-      }
-    }, 250);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(handle);
-    };
-  }, [term]);
-
-  useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (!wrapperRef.current) return;
       if (!wrapperRef.current.contains(e.target as Node)) setOpen(false);
@@ -106,16 +77,48 @@ export default function CemeterySearch() {
       await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
     if (!Array.isArray(suggestions)) return [];
     return suggestions
-      .map((s: any) => {
+      .map((s: any): GoogleSuggestion | null => {
         const p = s.placePrediction;
         if (!p) return null;
-        return {
-          placeId: p.placeId,
-          primary: p.mainText?.text || p.text?.text || '',
-          secondary: p.secondaryText?.text || '',
-        };
+        const primary = p.mainText?.text || p.text?.text || '';
+        let secondary = p.secondaryText?.text || '';
+        // Free fallback: many rural churches come back with secondaryText
+        // undefined, but text.text is the full display string ("St Mary's
+        // Church, Ballycasey, Co. Clare, Ireland"). Strip the primary prefix
+        // and use the tail — costs nothing extra beyond the autocomplete call.
+        if (!secondary && p.text?.text && p.text.text !== primary) {
+          secondary = p.text.text.startsWith(`${primary}, `)
+            ? p.text.text.slice(primary.length + 2)
+            : p.text.text;
+        }
+        return { placeId: p.placeId, primary, secondary };
       })
       .filter(Boolean) as GoogleSuggestion[];
+  }
+
+  async function runSearch(q: string) {
+    setSubmittedTerm(q);
+    setStatus('searching');
+    setOpen(true);
+    try {
+      const [googleData, customData] = await Promise.all([
+        fetchGoogleSuggestions(q),
+        searchCustomCemeteries(q, 5).catch(() => [] as CustomCemetery[]),
+      ]);
+      setGoogleResults(googleData);
+      setCustomResults(customData);
+      setStatus('ready');
+    } catch (err) {
+      console.error('CemeterySearch query error:', err);
+      setStatus('error');
+    }
+  }
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const q = term.trim();
+    if (q.length < 2) return;
+    runSearch(q);
   }
 
   function goToGooglePlace(s: GoogleSuggestion) {
@@ -129,46 +132,99 @@ export default function CemeterySearch() {
     router.push(`/cemetery/${customPlaceIdOf(c.id)}`);
   }
 
-  const showDropdown = open && term.trim().length >= 2 && status !== 'idle';
+  // Only show the dropdown once a search has been submitted, and only while
+  // the user hasn't edited the term since. Editing after a search hides the
+  // dropdown to signal that the visible results are stale.
+  const showDropdown =
+    open &&
+    submittedTerm.length >= 2 &&
+    term.trim() === submittedTerm &&
+    status !== 'idle';
   const hasAnyResults = googleResults.length > 0 || customResults.length > 0;
   const addHref = `/cemetery/add${term.trim() ? `?name=${encodeURIComponent(term.trim())}` : ''}`;
+  const canSubmit = term.trim().length >= 2 && status !== 'no-key';
 
   return (
     <div ref={wrapperRef} style={{ position: 'relative' }}>
-      <input
-        type="search"
-        placeholder="Search a cemetery in Ireland or the UK…"
-        value={term}
-        onChange={(e) => {
-          setTerm(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        aria-label="Cemetery search"
-        autoComplete="off"
-      />
+      <form onSubmit={onSubmit} style={{ display: 'flex', gap: 8 }}>
+        <input
+          type="search"
+          placeholder="Search a cemetery in Ireland or the UK…"
+          value={term}
+          onChange={(e) => {
+            setTerm(e.target.value);
+          }}
+          onFocus={() => {
+            if (submittedTerm && term.trim() === submittedTerm) setOpen(true);
+          }}
+          aria-label="Cemetery search"
+          autoComplete="off"
+          style={{ flex: 1 }}
+        />
+        <button
+          type="submit"
+          className="button"
+          disabled={!canSubmit}
+          style={{ padding: '0 20px' }}
+        >
+          Search
+        </button>
+      </form>
       <div
         style={{
-          marginTop: 8,
-          textAlign: 'left',
-          fontSize: 13,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          margin: '14px 0 0',
         }}
       >
-        <Link
-          href="/cemetery/nearby"
-          style={{ color: 'var(--sage)', textDecoration: 'underline' }}
+        <span
+          aria-hidden="true"
+          style={{ flex: 1, height: 1, background: 'var(--line)' }}
+        />
+        <span
+          className="muted"
+          style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.14em' }}
         >
-          Find graveyards near me →
-        </Link>
+          or
+        </span>
+        <span
+          aria-hidden="true"
+          style={{ flex: 1, height: 1, background: 'var(--line)' }}
+        />
       </div>
+      <Link
+        href="/cemetery/nearby"
+        className="button secondary"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          width: '100%',
+          marginTop: 12,
+          textDecoration: 'none',
+        }}
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 22s-8-7.58-8-13a8 8 0 1 1 16 0c0 5.42-8 13-8 13z" />
+          <circle cx="12" cy="9" r="3" />
+        </svg>
+        Find graveyards near me
+      </Link>
       {status === 'no-key' && (
         <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
           Search isn&rsquo;t configured yet.
-        </p>
-      )}
-      {status === 'error' && !showDropdown && (
-        <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-          Search couldn&rsquo;t load. Please refresh.
         </p>
       )}
 
@@ -237,7 +293,7 @@ export default function CemeterySearch() {
 
           {status === 'ready' && !hasAnyResults && (
             <div className="muted" style={{ padding: '14px 16px', fontSize: 14 }}>
-              No matches for &ldquo;{term.trim()}&rdquo;.
+              No matches for &ldquo;{submittedTerm}&rdquo;.
             </div>
           )}
 
