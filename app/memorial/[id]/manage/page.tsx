@@ -23,6 +23,7 @@ import { isSecondaryOnPlot } from '@/lib/pricing';
 import { DEFAULT_PRICING, DEFAULT_QUOTAS, MediaQuotasConfig, PricingConfig } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 import PlotLocationEditor from '@/components/PlotLocationEditor';
+import SongEditor from '@/components/SongEditor';
 
 function humanBytes(n: number): string {
   if (!n || n < 1024) return `${Math.max(0, n || 0)} B`;
@@ -492,6 +493,13 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           actorEmail={auth.currentUser.email || undefined}
         />
       )}
+
+      <SongEditor
+        memorialId={m.id}
+        currentSongUrl={m.songUrl}
+        currentSongLabel={m.songLabel}
+      />
+
 
       {isLive && quotas.totalBytesPerMemorial > 0 && (
         <div className="card" style={{ marginBottom: 30, display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>

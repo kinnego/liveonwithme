@@ -4,3 +4,6 @@ node_modules/
 *.tsbuildinfo
 .claude/
 next-env.d.ts
+
+# Local Netlify folder
+.netlify

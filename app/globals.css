@@ -5,3 +5,8 @@
 .skRow{display:flex;gap:12px;align-items:center}
 .skStack{display:flex;flex-direction:column;gap:10px}
 iframe#nl-badge-frame,iframe[title="Powered by Netlify"]{display:none!important}
+.songPill{display:inline-flex;align-items:center;gap:8px;margin-top:16px;padding:8px 16px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.55);color:white;font-size:14px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);transition:background .15s ease}
+.songPill:hover{background:rgba(255,255,255,.24)}
+.songBar{position:fixed;right:20px;bottom:20px;z-index:60;display:inline-flex;align-items:center;gap:12px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:10px 16px;box-shadow:var(--shadow);font-size:14px;font-weight:550}
+.songStop{background:none;border:0;padding:0 2px;color:var(--sage);font-weight:700;cursor:pointer;text-decoration:underline;font-size:13px}
+@media(max-width:800px){.songBar{right:12px;bottom:12px;padding:9px 14px;font-size:13px}}

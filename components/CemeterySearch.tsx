@@ -4,9 +4,10 @@
 // which "side" to search. Small church graveyards and older burial grounds
 // often aren't on Google, so we always offer an "Add a cemetery" fallback.
 //
-// Search runs on submit (Enter or the search button), not per keystroke.
-// Google Places autocomplete is metered — firing it on every debounced
-// keystroke was multiplying our bill for very little UX gain.
+// Live autocomplete kicks in after MIN_CHARS characters, debounced by
+// DEBOUNCE_MS. Google Places autocomplete is metered — starting at 3 chars
+// avoids firing a request for every single-letter typed. Enter still
+// triggers an immediate search (skipping the debounce).
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -21,9 +22,12 @@ type GoogleSuggestion = {
   secondary?: string;
 };
 
+const MIN_CHARS = 3;
+const DEBOUNCE_MS = 250;
+
 export default function CemeterySearch() {
   const [term, setTerm] = useState('');
-  const [submittedTerm, setSubmittedTerm] = useState('');
+  const [resultsForTerm, setResultsForTerm] = useState('');
   const [googleResults, setGoogleResults] = useState<GoogleSuggestion[]>([]);
   const [customResults, setCustomResults] = useState<CustomCemetery[]>([]);
   const [open, setOpen] = useState(false);
@@ -31,6 +35,7 @@ export default function CemeterySearch() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const googleRef = useRef<any>(null);
   const sessionTokenRef = useRef<any>(null);
+  const requestSeqRef = useRef(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -97,7 +102,9 @@ export default function CemeterySearch() {
   }
 
   async function runSearch(q: string) {
-    setSubmittedTerm(q);
+    // Ignore results from a request that's been superseded by newer typing.
+    // Without this a slow older request can overwrite a fresh one.
+    const seq = ++requestSeqRef.current;
     setStatus('searching');
     setOpen(true);
     try {
@@ -105,20 +112,42 @@ export default function CemeterySearch() {
         fetchGoogleSuggestions(q),
         searchCustomCemeteries(q, 5).catch(() => [] as CustomCemetery[]),
       ]);
+      if (seq !== requestSeqRef.current) return;
       setGoogleResults(googleData);
       setCustomResults(customData);
+      setResultsForTerm(q);
       setStatus('ready');
     } catch (err) {
+      if (seq !== requestSeqRef.current) return;
       console.error('CemeterySearch query error:', err);
       setStatus('error');
     }
   }
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  useEffect(() => {
     const q = term.trim();
-    if (q.length < 2) return;
-    runSearch(q);
+    if (q.length < MIN_CHARS) {
+      requestSeqRef.current++;
+      setGoogleResults([]);
+      setCustomResults([]);
+      setResultsForTerm('');
+      setStatus('idle');
+      setOpen(false);
+      return;
+    }
+    const t = setTimeout(() => runSearch(q), DEBOUNCE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [term]);
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
+    // With live autocomplete, Enter's job is to pick the top suggestion so
+    // keyboard users don't have to tab into the list. Prefer Google
+    // suggestions over community-added ones (Google's ranking is usually
+    // better for well-known places).
+    e.preventDefault();
+    if (googleResults[0]) return goToGooglePlace(googleResults[0]);
+    if (customResults[0]) return goToCustom(customResults[0]);
   }
 
   function goToGooglePlace(s: GoogleSuggestion) {
@@ -132,21 +161,17 @@ export default function CemeterySearch() {
     router.push(`/cemetery/${customPlaceIdOf(c.id)}`);
   }
 
-  // Only show the dropdown once a search has been submitted, and only while
-  // the user hasn't edited the term since. Editing after a search hides the
-  // dropdown to signal that the visible results are stale.
+  // Dropdown is visible whenever there's enough typed to have triggered a
+  // search. The "searching" state shows a spinner-ish line so users get
+  // feedback while the debounced request is in flight.
   const showDropdown =
-    open &&
-    submittedTerm.length >= 2 &&
-    term.trim() === submittedTerm &&
-    status !== 'idle';
+    open && term.trim().length >= MIN_CHARS && status !== 'idle' && status !== 'no-key';
   const hasAnyResults = googleResults.length > 0 || customResults.length > 0;
   const addHref = `/cemetery/add${term.trim() ? `?name=${encodeURIComponent(term.trim())}` : ''}`;
-  const canSubmit = term.trim().length >= 2 && status !== 'no-key';
 
   return (
     <div ref={wrapperRef} style={{ position: 'relative' }}>
-      <form onSubmit={onSubmit} style={{ display: 'flex', gap: 8 }}>
+      <form onSubmit={onSubmit}>
         <input
           type="search"
           placeholder="Search a cemetery in Ireland or the UK…"
@@ -155,20 +180,12 @@ export default function CemeterySearch() {
             setTerm(e.target.value);
           }}
           onFocus={() => {
-            if (submittedTerm && term.trim() === submittedTerm) setOpen(true);
+            if (term.trim().length >= MIN_CHARS) setOpen(true);
           }}
           aria-label="Cemetery search"
           autoComplete="off"
-          style={{ flex: 1 }}
+          style={{ width: '100%' }}
         />
-        <button
-          type="submit"
-          className="button"
-          disabled={!canSubmit}
-          style={{ padding: '0 20px' }}
-        >
-          Search
-        </button>
       </form>
       <div
         style={{
@@ -293,7 +310,7 @@ export default function CemeterySearch() {
 
           {status === 'ready' && !hasAnyResults && (
             <div className="muted" style={{ padding: '14px 16px', fontSize: 14 }}>
-              No matches for &ldquo;{submittedTerm}&rdquo;.
+              No matches for &ldquo;{resultsForTerm}&rdquo;.
             </div>
           )}
 

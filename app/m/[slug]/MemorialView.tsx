@@ -14,8 +14,10 @@ import {
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { walkingDirectionsUrl } from '@/lib/plot';
+import { parseYoutubeVideoId, DEFAULT_SONG_LABEL } from '@/lib/song';
 import { resizeForMobile } from '@/lib/image';
 import { PageSkeleton } from '@/components/Skeleton';
+import SongPlayer from '@/components/SongPlayer';
 import Lightbox from 'yet-another-react-lightbox';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 import Captions from 'yet-another-react-lightbox/plugins/captions';
@@ -28,15 +30,11 @@ const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
 const demoPhotoUrls: Record<string, string> = {
   'demo-hero': '/demo/liveonwithme_lifestyle_01.jpg',
-  'demo-1': '/demo/liveonwithme_lifestyle_09.jpg',
-  'demo-2': '/demo/liveonwithme_lifestyle_02.jpg',
-  'demo-3': '/demo/liveonwithme_lifestyle_04.jpg',
-  'demo-4': '/demo/liveonwithme_lifestyle_07.jpg',
-  'demo-5': '/demo/liveonwithme_lifestyle_08.jpg',
-  'demo-6': '/demo/liveonwithme_lifestyle_06.jpg',
-  'demo-7': '/demo/liveonwithme_lifestyle_03.jpg',
-  'demo-8': '/demo/liveonwithme_lifestyle_11.jpg',
-  'demo-9': '/demo/liveonwithme_lifestyle_12.jpg',
+  'demo-1': '/demo/liveonwithme_lifestyle_02.jpg',
+  'demo-2': '/demo/liveonwithme_lifestyle_04.jpg',
+  'demo-3': '/demo/liveonwithme_lifestyle_07.jpg',
+  'demo-4': '/demo/liveonwithme_lifestyle_08.jpg',
+  'demo-5': '/demo/liveonwithme_lifestyle_11.jpg',
   'demo-mem-photo-1': '/demo/liveonwithme_lifestyle_05.jpg',
   'demo-mem-photo-3': '/demo/liveonwithme_lifestyle_10.jpg',
 };
@@ -45,16 +43,6 @@ const demoContributions = [
   {
     id: 'demo-1',
     photoPath: 'demo-1',
-    caption: 'A quiet evening by the sea',
-    contributorName: 'Aoife',
-    relationship: 'Daughter',
-    audience: 'public',
-    focalX: 0.55,
-    focalY: 0.4,
-  },
-  {
-    id: 'demo-2',
-    photoPath: 'demo-2',
     caption: 'The garden she loved',
     contributorName: 'Kieran',
     relationship: 'Son',
@@ -63,8 +51,8 @@ const demoContributions = [
     focalY: 0.4,
   },
   {
-    id: 'demo-3',
-    photoPath: 'demo-3',
+    id: 'demo-2',
+    photoPath: 'demo-2',
     caption: 'Tea in the afternoon, always',
     contributorName: 'Nora',
     relationship: 'Neighbour',
@@ -73,58 +61,34 @@ const demoContributions = [
     focalY: 0.4,
   },
   {
-    id: 'demo-4',
-    photoPath: 'demo-4',
-    caption: 'One of her Sunday walks along the coast',
+    id: 'demo-3',
+    photoPath: 'demo-3',
+    caption: 'Sunday walks along the coast',
     contributorName: 'Michael',
     relationship: 'Nephew',
     audience: 'public',
   },
   {
-    id: 'demo-5',
-    photoPath: 'demo-5',
+    id: 'demo-4',
+    photoPath: 'demo-4',
     caption: 'On the bench at Killiney Hill',
     contributorName: 'Aoife',
     relationship: 'Daughter',
     audience: 'public',
   },
   {
-    id: 'demo-6',
-    photoPath: 'demo-6',
-    caption: 'A supper that ran late',
+    id: 'demo-5',
+    photoPath: 'demo-5',
+    caption: 'Rusty at her feet, as usual',
     contributorName: 'Kieran',
     relationship: 'Son',
-    audience: 'public',
-  },
-  {
-    id: 'demo-7',
-    photoPath: 'demo-7',
-    caption: 'With Rusty at the shore',
-    contributorName: 'Aoife',
-    relationship: 'Daughter',
-    audience: 'public',
-  },
-  {
-    id: 'demo-8',
-    photoPath: 'demo-8',
-    caption: 'Her old boy Rusty',
-    contributorName: 'Kieran',
-    relationship: 'Son',
-    audience: 'public',
-  },
-  {
-    id: 'demo-9',
-    photoPath: 'demo-9',
-    caption: 'A quiet evening at the end of the garden',
-    contributorName: 'Sinéad',
-    relationship: 'Neighbour',
     audience: 'public',
   },
   {
     id: 'demo-mem-1',
     photoPath: 'demo-mem-photo-1',
     memory:
-      "The best thing about her was that you always left her house feeling better than when you arrived. Every visit ended with something for the road — a scone, a story, or the last of the biscuits she'd swear she wasn't eating.",
+      "You always left her house feeling better than when you arrived. Every visit ended with something for the road — a scone, a story, or the last of the biscuits she'd swear she wasn't eating.",
     contributorName: 'Nora',
     relationship: 'Neighbour',
     audience: 'public',
@@ -141,7 +105,7 @@ const demoContributions = [
     id: 'demo-mem-3',
     photoPath: 'demo-mem-photo-3',
     memory:
-      "She sang along to the radio while she peeled potatoes. Off-key, always the wrong lyrics, and completely unbothered by either. It was one of the happiest sounds in the world.",
+      "She sang along to the radio while she peeled potatoes. Off-key, always the wrong lyrics, and unbothered by either.",
     contributorName: 'Kieran',
     relationship: 'Son',
     audience: 'public',
@@ -149,7 +113,7 @@ const demoContributions = [
   {
     id: 'demo-mem-4',
     memory:
-      "I was new to the road and she brought over a shepherd's pie on my second day. I've never forgotten it. She had a way of making you feel like you were already family.",
+      "I was new to the road and she brought over a shepherd's pie on my second day. She had a way of making you feel like you were already family.",
     contributorName: 'Sinéad',
     relationship: 'Neighbour',
     audience: 'public',
@@ -171,6 +135,7 @@ She loved her family fiercely, adored the sea, grew tomatoes with mixed success,
 Mary spent forty-two years as a primary-school teacher in Dún Laoghaire. Generations of children learned to read on her lap. Long after they'd grown, she'd still meet them in town and ask how they were getting on — and remember every answer.
 
 This is a place for all the pieces of Mary that live on in the people who knew her.`,
+  songUrl: 'https://www.youtube.com/watch?v=uxBKsKCXyVc',
   heroPhotoUrl: demoPhotoUrls['demo-hero'],
   heroPhotoPath: '',
   slug: 'mary-demo',
@@ -502,6 +467,16 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
           <p style={{ fontFamily: 'Georgia,serif', fontSize: 22, fontStyle: 'italic' }}>
             {memorial.epitaph}
           </p>
+          {(() => {
+            const videoId = memorial.songUrl ? parseYoutubeVideoId(memorial.songUrl) : null;
+            if (!videoId) return null;
+            const label = (memorial.songLabel || '').trim() || DEFAULT_SONG_LABEL;
+            return (
+              <div onClick={(e) => e.stopPropagation()}>
+                <SongPlayer videoId={videoId} label={label} />
+              </div>
+            );
+          })()}
           {cemetery?.name && (
             <p style={{ marginTop: 12, fontSize: 15, opacity: 0.9 }}>
               Resting at{' '}

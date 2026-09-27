@@ -147,6 +147,14 @@ export interface Memorial {
   heroPhotoPath?: string;
   epitaph?: string;
   story?: string;
+  // Optional YouTube URL for the deceased's favourite song. Visitors see a
+  // subtle button in the hero — browsers block autoplay by default and we
+  // don't want to force music on grieving readers anyway.
+  songUrl?: string;
+  // Custom label for the play button. Defaults to DEFAULT_SONG_LABEL from
+  // lib/song.ts. Kept as a raw string so custodians can write in whatever
+  // voice fits — "Hear Dad's whistle", "Play our first dance", etc.
+  songLabel?: string;
   visibility: MemorialVisibility;
 
   // lifecycle
