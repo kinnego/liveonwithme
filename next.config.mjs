@@ -4,7 +4,9 @@ const nextConfig = {
   // firebase-admin loads gRPC + native bindings that must not be bundled by
   // the server-components bundler. It is on Next.js's default auto-external
   // list, but some deploy targets (Netlify's Next.js runtime) need it stated
-  // explicitly. Left here defensively.
-  serverExternalPackages: ['firebase-admin'],
+  // explicitly. @google-cloud/firestore is loaded dynamically by firebase-admin
+  // and must be external too, otherwise Netlify's page-data collector fails
+  // with "Cannot find module '@google-cloud/firestore'".
+  serverExternalPackages: ['firebase-admin', '@google-cloud/firestore'],
 };
 export default nextConfig;
