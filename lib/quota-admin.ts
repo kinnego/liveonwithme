@@ -29,7 +29,7 @@ export async function summariseMemorialUsage(memorialId: string): Promise<UsageS
     if (typeof m.heroPhotoSize === 'number') totalBytes += m.heroPhotoSize;
   }
 
-  contribSnap.forEach((d) => {
+  contribSnap.forEach((d: FirebaseFirestore.QueryDocumentSnapshot) => {
     const c = d.data();
     if (typeof c.sizeBytes === 'number') totalBytes += c.sizeBytes;
     if (c.mediaType === 'video') videoCount++;

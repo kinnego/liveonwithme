@@ -47,7 +47,9 @@ async function loadPlotMemorials(plotId: string): Promise<Memorial[]> {
     .where('status', '==', 'approved')
     .get();
 
-  const memorialIds = mems.docs.map((d) => d.data().memorialId as string).filter(Boolean);
+  const memorialIds = mems.docs
+    .map((d: FirebaseFirestore.QueryDocumentSnapshot) => d.data().memorialId as string)
+    .filter(Boolean);
   if (memorialIds.length === 0) return [];
 
   const results: Memorial[] = [];
