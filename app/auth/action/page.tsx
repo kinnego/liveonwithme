@@ -115,7 +115,26 @@ function AuthActionInner() {
     }
   }
 
-  if (mode && mode !== 'resetPassword') {
+  if (!mode) {
+    return (
+      <main className="shell">
+        <div className="formCard">
+          <div className="eyebrow">LiveOnWith.me</div>
+          <h2>Nothing to do here</h2>
+          <p className="muted">
+            This page opens the reset link from a &ldquo;forgot your password&rdquo; email.
+            If you were trying to reset your password, request a fresh link from the sign-in
+            page.
+          </p>
+          <Link href="/auth" className="button" style={{ marginTop: 20 }}>
+            Back to sign in
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (mode !== 'resetPassword') {
     return (
       <main className="shell">
         <div className="formCard">
