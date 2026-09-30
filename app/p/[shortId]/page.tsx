@@ -43,6 +43,7 @@ export default async function ShortPlot({
     redirect(`/plot/${snap.docs[0].id}`);
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
+    console.error('[/p/[shortId]] lookup failed', err);
     return (
       <main className="shell">
         <div className="formCard center">

@@ -18,6 +18,10 @@ import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
 
+// QRs get etched into stone or printed onto cards — they must always encode
+// the production URL, never the dev origin they happened to be generated on.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://liveonwith.me';
+
 export default function PlotQr({
   params,
 }: {
@@ -51,7 +55,7 @@ export default function PlotQr({
           return;
         }
         setPlot(p);
-        const target = `${window.location.origin}/p/${p.shortId}`;
+        const target = `${SITE_URL}/p/${p.shortId}`;
         const [png, svg] = await Promise.all([
           QRCode.toDataURL(target, {
             width: 1024,
@@ -112,7 +116,7 @@ export default function PlotQr({
     return <PageSkeleton variant="detail" label="Preparing your QR code" />;
   }
 
-  const shortUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/p/${plot.shortId}`;
+  const shortUrl = `${SITE_URL}/p/${plot.shortId}`;
 
   return (
     <main className="shell">
