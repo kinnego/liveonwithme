@@ -69,7 +69,6 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
         url: `${window.location.origin}/claim/${r.id}`,
         handleCodeInApp: true,
       });
-      window.localStorage.setItem('emailForSignIn', r.bereavedEmail);
       await updateDoc(doc(db, 'referrals', r.id), {
         updatedAt: serverTimestamp(),
       });
