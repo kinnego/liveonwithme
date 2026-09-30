@@ -3,7 +3,6 @@ import { FormEvent, useEffect, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithPopup,
 } from 'firebase/auth';
@@ -104,8 +103,16 @@ export default function AuthPage() {
         await ensureUserProfile(cred.user.uid, cred.user.email, cred.user.displayName);
         router.push(nextPath() || '/dashboard');
       } else if (mode === 'reset') {
-        await sendPasswordResetEmail(auth, email);
-        setNotice(`Password reset email sent to ${email}. Check your inbox.`);
+        await fetch('/api/auth/request-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        // Always show the same message so we don't reveal whether an account
+        // exists for that email — the server behaves the same way regardless.
+        setNotice(
+          `If an account exists for ${email}, we've sent a reset link. Check your inbox — it can take a minute to arrive.`
+        );
       }
     } catch (err: any) {
       setError(friendlyError(err.code, err.message));

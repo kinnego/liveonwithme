@@ -388,6 +388,13 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ─── password reset tokens (server-only) ─────────────────────────────────
+    // Written and read exclusively via the Admin SDK from our API routes.
+    // Never accessible from any client SDK.
+    match /passwordResetTokens/{token} {
+      allow read, write: if false;
+    }
+
     // ─── users ───────────────────────────────────────────────────────────────
     match /users/{uid} {
       allow create: if isSelf(uid)

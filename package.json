@@ -12,6 +12,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1126.0",
     "@google-cloud/firestore": "^9.3.0",
+    "@sendgrid/mail": "^8.1.6",
     "firebase": "latest",
     "firebase-admin": "^14.4.0",
     "lucide-react": "latest",

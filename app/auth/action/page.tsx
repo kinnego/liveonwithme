@@ -1,17 +1,12 @@
 'use client';
-// In-app handler for Firebase Auth email actions (currently password reset).
-// Firebase Console → Authentication → Templates → Password reset → "customize
-// action URL" must point at https://<site>/auth/action for emails to land
-// here instead of the default liveonwithme.firebaseapp.com/__/auth/action page.
+// Handles password-reset links emailed by our own /api/auth/request-reset flow.
+// The link carries a first-party token in ?token=, verified server-side by
+// /api/auth/confirm-reset. Firebase's oobCode flow is no longer used here.
 
-import { FormEvent, Suspense, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  confirmPasswordReset,
-  signInWithEmailAndPassword,
-  verifyPasswordResetCode,
-} from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { PageSkeleton } from '@/components/Skeleton';
 
@@ -25,55 +20,17 @@ export default function AuthAction() {
   );
 }
 
-function friendlyError(code?: string, fallback?: string): string {
-  const map: Record<string, string> = {
-    'auth/expired-action-code': 'This link has expired. Please request a new one.',
-    'auth/invalid-action-code':
-      'This link is invalid or has already been used. Please request a new one.',
-    'auth/user-disabled': 'This account has been disabled. Contact support.',
-    'auth/user-not-found': 'We couldn\'t find that account any more.',
-    'auth/weak-password': 'Please use a password of at least 6 characters.',
-    'auth/network-request-failed': 'Network error. Please check your connection.',
-  };
-  return (code && map[code]) || fallback || 'Something went wrong. Please try again.';
-}
-
 function AuthActionInner() {
   const params = useSearchParams();
   const router = useRouter();
   const mode = params?.get('mode') || '';
-  const oobCode = params?.get('oobCode') || '';
-  // Firebase appends continueUrl when ActionCodeSettings.url is passed at
-  // send-time. Only honour same-origin paths — never redirect off-site.
+  const token = params?.get('token') || '';
+  // Same-origin continueUrl support kept for parity with the previous flow.
   const continueUrl = params?.get('continueUrl') || '';
 
-  const [verifying, setVerifying] = useState(true);
-  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (mode !== 'resetPassword') {
-      setVerifying(false);
-      return;
-    }
-    if (!oobCode) {
-      setError('This link is missing its verification code. Please request a new one.');
-      setVerifying(false);
-      return;
-    }
-    (async () => {
-      try {
-        const addr = await verifyPasswordResetCode(auth, oobCode);
-        setEmail(addr);
-      } catch (err: any) {
-        setError(friendlyError(err?.code, err?.message));
-      } finally {
-        setVerifying(false);
-      }
-    })();
-  }, [mode, oobCode]);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -92,12 +49,21 @@ function AuthActionInner() {
     }
     setSubmitting(true);
     try {
-      await confirmPasswordReset(auth, oobCode, password);
+      const res = await fetch('/api/auth/confirm-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Could not update your password.');
+        setSubmitting(false);
+        return;
+      }
       // Try to sign the user straight in so they land on the dashboard without
-      // a second password entry. If sign-in fails (e.g. race with a session
-      // still holding an old token), fall back to the auth page.
+      // a second password entry. If sign-in fails, fall back to /auth.
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        await signInWithEmailAndPassword(auth, data.email, password);
         setNotice('Password updated. Redirecting…');
         const safeNext =
           continueUrl && continueUrl.startsWith('/') && !continueUrl.startsWith('//')
@@ -109,8 +75,7 @@ function AuthActionInner() {
         router.push('/auth');
       }
     } catch (err: any) {
-      setError(friendlyError(err?.code, err?.message));
-    } finally {
+      setError('Something went wrong. Please try again.');
       setSubmitting(false);
     }
   }
@@ -152,8 +117,22 @@ function AuthActionInner() {
     );
   }
 
-  if (verifying) {
-    return <PageSkeleton variant="form" label="Checking your reset link" />;
+  if (!token) {
+    return (
+      <main className="shell">
+        <div className="formCard">
+          <div className="eyebrow">LiveOnWith.me</div>
+          <h2>This link is missing something</h2>
+          <p className="muted">
+            The reset link didn&rsquo;t include a verification token. Please request a
+            fresh link from the sign-in page.
+          </p>
+          <Link href="/auth" className="button" style={{ marginTop: 20 }}>
+            Back to sign in
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -161,59 +140,44 @@ function AuthActionInner() {
       <div className="formCard">
         <div className="eyebrow">LiveOnWith.me</div>
         <h2>Choose a new password</h2>
-        {email ? (
-          <p className="muted">
-            For <strong>{email}</strong>. Enter a new password below.
-          </p>
-        ) : (
-          <p className="muted">
-            Enter a new password below. You&rsquo;ll be signed in once it&rsquo;s set.
-          </p>
-        )}
+        <p className="muted">
+          Enter a new password below. You&rsquo;ll be signed in once it&rsquo;s set.
+        </p>
 
-        {error && !email ? (
-          <>
-            <p style={{ color: '#a94442', marginTop: 18, fontSize: 14 }}>{error}</p>
-            <Link href="/auth" className="button secondary" style={{ marginTop: 20 }}>
-              Back to sign in
-            </Link>
-          </>
-        ) : (
-          <form onSubmit={submit}>
-            <label>New password</label>
-            <input
-              name="password"
-              type="password"
-              minLength={6}
-              required
-              autoComplete="new-password"
-            />
+        <form onSubmit={submit}>
+          <label>New password</label>
+          <input
+            name="password"
+            type="password"
+            minLength={6}
+            required
+            autoComplete="new-password"
+          />
 
-            <label style={{ marginTop: 18 }}>Confirm new password</label>
-            <input
-              name="confirm"
-              type="password"
-              minLength={6}
-              required
-              autoComplete="new-password"
-            />
+          <label style={{ marginTop: 18 }}>Confirm new password</label>
+          <input
+            name="confirm"
+            type="password"
+            minLength={6}
+            required
+            autoComplete="new-password"
+          />
 
-            {error && (
-              <p style={{ color: '#a94442', marginTop: 14, fontSize: 14 }}>{error}</p>
-            )}
-            {notice && (
-              <p style={{ color: '#2f5b48', marginTop: 14, fontSize: 14 }}>{notice}</p>
-            )}
+          {error && (
+            <p style={{ color: '#a94442', marginTop: 14, fontSize: 14 }}>{error}</p>
+          )}
+          {notice && (
+            <p style={{ color: '#2f5b48', marginTop: 14, fontSize: 14 }}>{notice}</p>
+          )}
 
-            <button
-              className="button"
-              style={{ width: '100%', marginTop: 24 }}
-              disabled={submitting}
-            >
-              {submitting ? 'Updating…' : 'Update password'}
-            </button>
-          </form>
-        )}
+          <button
+            className="button"
+            style={{ width: '100%', marginTop: 24 }}
+            disabled={submitting}
+          >
+            {submitting ? 'Updating…' : 'Update password'}
+          </button>
+        </form>
       </div>
     </main>
   );
