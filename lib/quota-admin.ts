@@ -4,6 +4,7 @@
 // running counter document.
 
 import { adminDb } from './firebase-admin';
+import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 export interface UsageSummary {
   totalBytes: number;
@@ -29,7 +30,7 @@ export async function summariseMemorialUsage(memorialId: string): Promise<UsageS
     if (typeof m.heroPhotoSize === 'number') totalBytes += m.heroPhotoSize;
   }
 
-  contribSnap.forEach((d: FirebaseFirestore.QueryDocumentSnapshot) => {
+  contribSnap.forEach((d: QueryDocumentSnapshot) => {
     const c = d.data();
     if (typeof c.sizeBytes === 'number') totalBytes += c.sizeBytes;
     if (c.mediaType === 'video') videoCount++;

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { adminDb } from '@/lib/firebase-admin';
+import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { walkingDirectionsUrl } from '@/lib/plot';
 import type { Memorial, Plot } from '@/lib/types';
 
@@ -48,7 +49,7 @@ async function loadPlotMemorials(plotId: string): Promise<Memorial[]> {
     .get();
 
   const memorialIds = mems.docs
-    .map((d: FirebaseFirestore.QueryDocumentSnapshot) => d.data().memorialId as string)
+    .map((d: QueryDocumentSnapshot) => d.data().memorialId as string)
     .filter(Boolean);
   if (memorialIds.length === 0) return [];
 
