@@ -49,6 +49,10 @@ export default async function ShortPlot({
         <div className="formCard center">
           <h2>Something went wrong looking that up.</h2>
           <p className="muted">Please try again in a moment.</p>
+          <pre style={{ marginTop: 20, padding: 12, background: '#f5f5f5', fontSize: 12, textAlign: 'left', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {String(err?.message || err)}
+            {err?.stack ? `\n\n${err.stack}` : ''}
+          </pre>
         </div>
       </main>
     );
