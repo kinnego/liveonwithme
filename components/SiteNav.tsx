@@ -51,7 +51,7 @@ export default function SiteNav() {
 
   return (
     <nav>
-      <Link href="/dashboard">Dashboard</Link>
+      <Link href="/dashboard">My memorials</Link>
       {showPartner && <Link href="/partner">Partner</Link>}
       {showAdmin && <Link href="/admin">Admin</Link>}
       <button

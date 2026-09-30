@@ -1,6 +1,12 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
-import { isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
+import {
+  EmailAuthProvider,
+  isSignInWithEmailLink,
+  linkWithCredential,
+  signInWithEmailLink,
+  updatePassword,
+} from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -11,11 +17,15 @@ import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
 
+type Phase = 'checking' | 'claiming' | 'setPassword' | 'error';
+
 export default function Claim({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState('');
   const [needsEmail, setNeedsEmail] = useState(false);
-  const [status, setStatus] = useState<'checking' | 'claiming' | 'error'>('checking');
+  const [status, setStatus] = useState<Phase>('checking');
   const [error, setError] = useState('');
+  const [pendingMemorialSlug, setPendingMemorialSlug] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -108,10 +118,51 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
         details: { referralId, partnerUid: referral.partnerUid || referral.funeralDirectorUid || null },
       });
 
-      router.push(`/memorial/${slug}/manage`);
+      setPendingMemorialSlug(slug);
+      setStatus('setPassword');
     } catch (err: any) {
       setError(err.message);
       setStatus('error');
+    }
+  }
+
+  async function submitPassword(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!auth.currentUser) return;
+    const fd = new FormData(e.currentTarget);
+    const password = String(fd.get('password') || '');
+    const confirm = String(fd.get('confirm') || '');
+    if (password.length < 6) {
+      setError('Please use a password of at least 6 characters.');
+      return;
+    }
+    if (password !== confirm) {
+      setError('The two passwords don\'t match.');
+      return;
+    }
+    setError('');
+    setPasswordSaving(true);
+    try {
+      // The claim session was created via email-link (passwordless), so the
+      // account has no password provider yet. linkWithCredential attaches one;
+      // if for some reason a password already exists (retry, race), fall back
+      // to updatePassword.
+      const email = auth.currentUser.email;
+      if (!email) throw new Error('No email on this account.');
+      try {
+        const cred = EmailAuthProvider.credential(email, password);
+        await linkWithCredential(auth.currentUser, cred);
+      } catch (err: any) {
+        if (err?.code === 'auth/provider-already-linked' || err?.code === 'auth/credential-already-in-use') {
+          await updatePassword(auth.currentUser, password);
+        } else {
+          throw err;
+        }
+      }
+      router.push(`/memorial/${pendingMemorialSlug}/manage`);
+    } catch (err: any) {
+      setError(err.message || 'Could not save your password.');
+      setPasswordSaving(false);
     }
   }
 
@@ -174,6 +225,52 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
             <input id="email" name="email" type="email" required />
             <button className="button" style={{ width: '100%', marginTop: 24 }}>
               Continue
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+
+  if (status === 'setPassword')
+    return (
+      <main className="shell">
+        <div className="formCard">
+          <div className="eyebrow">One last step</div>
+          <h2>Choose a password</h2>
+          <p className="muted">
+            You&rsquo;ll need this to sign back in later and keep looking after the memorial.
+            {auth.currentUser?.email && (
+              <> Your email is <strong>{auth.currentUser.email}</strong>.</>
+            )}
+          </p>
+          <form onSubmit={submitPassword}>
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              minLength={6}
+              required
+              autoComplete="new-password"
+            />
+            <label htmlFor="confirm" style={{ marginTop: 18 }}>Confirm password</label>
+            <input
+              id="confirm"
+              name="confirm"
+              type="password"
+              minLength={6}
+              required
+              autoComplete="new-password"
+            />
+            {error && (
+              <p style={{ color: '#a94442', marginTop: 14, fontSize: 14 }}>{error}</p>
+            )}
+            <button
+              className="button"
+              style={{ width: '100%', marginTop: 24 }}
+              disabled={passwordSaving}
+            >
+              {passwordSaving ? 'Saving…' : 'Save & continue to the memorial'}
             </button>
           </form>
         </div>
