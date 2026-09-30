@@ -1,19 +1,64 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import type { Metadata } from 'next';
 import CemeterySearch from '@/components/CemeterySearch';
 import MemorialNameSearch from '@/components/MemorialNameSearch';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
+
+export const metadata: Metadata = {
+  title: 'Digital memorials that honour a life — LiveOnWith.me',
+  description:
+    'Create a beautiful online memorial for someone you love. Share their story, gather memories from family and friends, and link it to their grave with a discreet QR code. Family-controlled, private, and hosted for a lifetime.',
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: 'Digital memorials that honour a life — LiveOnWith.me',
+    description:
+      'Create a beautiful online memorial for someone you love. Share their story, gather memories, and connect it to their resting place.',
+    url: '/',
+    type: 'website',
+  },
+};
+
 export default function Home() {
+  const websiteLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'LiveOnWith.me',
+    url: SITE_URL,
+    inLanguage: 'en',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${SITE_URL}/?q={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  };
+  const organizationLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'LiveOnWith.me',
+    legalName: 'Freastar Ltd',
+    url: SITE_URL,
+    logo: `${SITE_URL}/brand/live-on-with-me-logo-512.png`,
+    email: 'hello@freastar.com',
+    sameAs: [],
+  };
   return (
     <main>
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
+      />
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }}
+      />
       <section className="hero">
         <div>
           <div className="eyebrow">A place for their story</div>
-          <h1>
-            Love doesn&rsquo;t end.
-            <br />
-            Their story lives on.
-          </h1>
+          <h1>Love doesn&rsquo;t end. Their story lives on.</h1>
           <p className="lead">
             A peaceful place for the stories that shouldn&rsquo;t be lost. A memorial for
             someone you love, or a page in your own words for the people who will come after.
@@ -27,7 +72,11 @@ export default function Home() {
             </Link>
           </div>
           <p className="muted" style={{ marginTop: 18, fontSize: 14 }}>
-            Family-controlled · Contributions approved before publishing · No public like counts
+            <span style={{ whiteSpace: 'nowrap' }}>Family-controlled</span>
+            {' · '}
+            <span style={{ whiteSpace: 'nowrap' }}>Contributions approved before publishing</span>
+            {' · '}
+            <span style={{ whiteSpace: 'nowrap' }}>No public like counts</span>
           </p>
         </div>
         <div className="heroMark">

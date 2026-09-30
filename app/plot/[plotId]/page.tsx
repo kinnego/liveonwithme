@@ -12,7 +12,7 @@ import type { Memorial, Plot } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://liveonwith.me';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
 
 export async function generateMetadata({
   params,

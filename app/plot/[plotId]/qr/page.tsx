@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
 
 // QRs get etched into stone or printed onto cards — they must always encode
 // the production URL, never the dev origin they happened to be generated on.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://liveonwith.me';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
 
 export default function PlotQr({
   params,

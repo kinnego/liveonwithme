@@ -1,15 +1,43 @@
 import './globals.css';
 import Link from 'next/link';
 import Image from 'next/image';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import SiteNav from '@/components/SiteNav';
 import ScrollToTopOnNav from '@/components/ScrollToTopOnNav';
 
+const DEFAULT_TITLE = 'LiveOnWith.me · A life remembered with love';
+const DEFAULT_DESCRIPTION =
+  'A peaceful digital memorial to remember someone you love. Share their story, gather photos and memories, and find cemetery locations — private, family-controlled, forever.';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#faf7f0',
+};
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://liveonwith.me'),
-  title: 'LiveOnWith.me · A life remembered with love',
-  description:
-    'A peaceful place to remember someone you love, share their story and gather treasured memories.',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me'),
+  title: {
+    default: DEFAULT_TITLE,
+    template: '%s · LiveOnWith.me',
+  },
+  description: DEFAULT_DESCRIPTION,
+  keywords: [
+    'digital memorial',
+    'online memorial',
+    'memorial page',
+    'obituary',
+    'remember a loved one',
+    'cemetery',
+    'grave marker',
+    'QR code headstone',
+    'funeral',
+    'condolences',
+    'in memoriam',
+    'legacy page',
+  ],
+  applicationName: 'LiveOnWith.me',
+  authors: [{ name: 'Freastar' }],
   manifest: '/manifest.webmanifest',
   icons: {
     icon: [
@@ -22,19 +50,26 @@ export const metadata: Metadata = {
     ],
     apple: '/brand/apple-touch-icon.png',
   },
+  alternates: { canonical: '/' },
   openGraph: {
-    title: 'LiveOnWith.me · A life remembered with love',
-    description:
-      'A peaceful place to remember someone you love, share their story and gather treasured memories.',
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    url: '/',
+    siteName: 'LiveOnWith.me',
     images: ['/brand/live-on-with-me-logo-512.png'],
     type: 'website',
+    locale: 'en_IE',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'LiveOnWith.me · A life remembered with love',
-    description:
-      'A peaceful place to remember someone you love, share their story and gather treasured memories.',
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
     images: ['/brand/live-on-with-me-logo-512.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
   },
 };
 

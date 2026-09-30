@@ -7,7 +7,7 @@ import { adminDb } from '@/lib/firebase-admin';
 import MemorialView from './MemorialView';
 
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '';
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://liveonwith.me';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
 
 async function loadMemorial(slug: string) {
   if (slug === 'mary-demo') {
