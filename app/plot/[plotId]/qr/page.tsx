@@ -11,9 +11,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import { auth, db } from '@/lib/firebase';
-import { isSuperAdmin } from '@/lib/roles';
-import { isPlotAdmin } from '@/lib/plot';
-import type { UserProfile } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -38,19 +35,20 @@ export default function PlotQr({
       if (!auth) return;
       return onAuthStateChanged(auth, async (u) => {
         if (!u) return router.push('/auth');
-        const [plotSnap, userSnap] = await Promise.all([
-          getDoc(doc(db, 'plots', plotId)),
-          getDoc(doc(db, 'users', u.uid)),
-        ]);
+        const plotSnap = await getDoc(doc(db, 'plots', plotId));
         if (!plotSnap.exists()) {
           setError('That plot could not be found.');
           return;
         }
         const p = { id: plotSnap.id, ...plotSnap.data() } as any;
-        const profile = userSnap.exists() ? (userSnap.data() as UserProfile) : null;
-        const canView = isPlotAdmin(p, u.uid) || isSuperAdmin(profile);
-        if (!canView) {
-          setError('Only the plot administrator can generate QR codes for this plot.');
+        const token = await u.getIdToken();
+        const accessRes = await fetch(
+          `/api/plot/access?plotId=${encodeURIComponent(plotId)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const access = accessRes.ok ? await accessRes.json() : { canManage: false };
+        if (!access.canManage) {
+          setError('Only the plot administrator or a referring partner can generate QR codes for this plot.');
           setPlot(p);
           return;
         }
@@ -145,7 +143,7 @@ export default function PlotQr({
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 24, flexWrap: 'wrap' }}>
           <button className="button" onClick={downloadSvg}>
-            Download SVG (for stonemason)
+            Download SVG (for your engraver)
           </button>
           <button className="button secondary" onClick={downloadPng}>
             Download PNG (for print)
@@ -153,10 +151,11 @@ export default function PlotQr({
         </div>
 
         <div style={{ textAlign: 'left', marginTop: 40, background: '#fffdf9', border: '1px solid var(--line)', borderRadius: 14, padding: '18px 22px' }}>
-          <h3 style={{ marginTop: 0 }}>For stonemasons</h3>
+          <h3 style={{ marginTop: 0 }}>For your engraver</h3>
           <p className="muted" style={{ marginBottom: 8 }}>
-            The SVG is pure vector, so it can be scaled to any size without losing sharpness,
-            which makes it suitable for direct etching. A few gentle suggestions:
+            A few gentle suggestions for whoever does the engraving (e.g. a stonemason or laser
+            engraver). The SVG is pure vector, so it can be scaled to any size without losing
+            sharpness, which makes it suitable for direct etching:
           </p>
           <ul className="muted" style={{ marginTop: 0, paddingLeft: 22 }}>
             <li>Etch at 40&nbsp;mm × 40&nbsp;mm or larger for reliable scanning.</li>
@@ -166,7 +165,10 @@ export default function PlotQr({
           </ul>
         </div>
 
-        <div style={{ marginTop: 30 }}>
+        <div style={{ marginTop: 30, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Link href={`/plot/${plot.id}/plaque`} className="button soft">
+            Full oval plaque
+          </Link>
           <Link href={`/plot/${plot.id}`} className="button soft">
             View plot page
           </Link>

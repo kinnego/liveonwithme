@@ -16,6 +16,7 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
   const [error, setError] = useState('');
   const [inviteState, setInviteState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [paying, setPaying] = useState(false);
+  const [plotId, setPlotId] = useState<string | null>(null);
   const router = useRouter();
   const search = useSearchParams();
   const justPaid = search.get('paid') === '1';
@@ -59,6 +60,36 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
     if (inviteState !== 'idle') return;
     if (justPaid) sendInvite();
   }, [r, uid, inviteState, justPaid]);
+
+  // Once the family has claimed and attached the memorial to a plot, surface
+  // a direct link into the plaque / QR designer. Partners can't read the
+  // memorial doc client-side, so the plotId is fetched via a small server
+  // endpoint that scopes the lookup to referrals they own.
+  useEffect(() => {
+    if (!r || !uid || r.partnerUid !== uid) return;
+    if (r.status !== 'claimed' || !r.memorialId) {
+      setPlotId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!auth?.currentUser) return;
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/api/partner/referral-plot?referralId=${encodeURIComponent(r.id)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setPlotId(data.plotId || null);
+      } catch {
+        /* best-effort — the link just won't show */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [r, uid]);
 
   async function sendInvite() {
     if (!r || !auth?.currentUser) return;
@@ -150,6 +181,25 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
             </button>
           )}
         </div>
+
+        {claimed && plotId && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <h3 style={{ marginTop: 0 }}>Headstone artwork</h3>
+            <p className="muted" style={{ marginTop: 0 }}>
+              The family&rsquo;s plot is set up. If you&rsquo;re handling the engraving, you can
+              design and download the plaque and QR here — any changes are logged against your
+              account.
+            </p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+              <Link href={`/plot/${plotId}/plaque`} className="button secondary small">
+                Design plaque
+              </Link>
+              <Link href={`/plot/${plotId}/qr`} className="button secondary small">
+                QR code
+              </Link>
+            </div>
+          </div>
+        )}
 
         {paid && (
           <div className="card" style={{ marginTop: 20 }}>

@@ -438,8 +438,11 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                 honour a family grave.
               </p>
               <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-                <Link href={`/plot/${m.plotId}/qr`} className="button">
-                  Get QR code (SVG + PNG)
+                <Link href={`/plot/${m.plotId}/plaque`} className="button">
+                  Get oval plaque (logo + QR)
+                </Link>
+                <Link href={`/plot/${m.plotId}/qr`} className="button secondary">
+                  QR code only
                 </Link>
                 <Link href={`/plot/${m.plotId}`} className="button secondary">
                   View plot page
@@ -460,7 +463,8 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             <>
               <p className="muted">
                 Create the plot for {m.fullName.split(' ')[0]}&rsquo;s resting place and we&rsquo;ll
-                generate an etchable QR code the stonemason can add to the headstone. The QR links
+                generate an etchable QR code your engraver (e.g. stonemason or laser engraver) can
+                add to the headstone. The QR links
                 to a page listing everyone remembered at that plot, so future family members can
                 be added over time without ever changing the code on the stone.
               </p>

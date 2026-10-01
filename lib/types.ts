@@ -201,6 +201,22 @@ export interface Contribution {
 // A Plot can host many Memorials (approved via PlotMembership).
 // QR codes always resolve to a Plot, never a Person or Memorial directly.
 
+export type PlaqueShape = 'oval' | 'round' | 'square';
+
+export interface PlaqueDesign {
+  shape: PlaqueShape;
+  // R2 object key for a user-supplied mark. When unset, the LiveOnWith.me
+  // mark is used. Kept at the plot level because a plot's plaque represents
+  // the whole family grave, not any single memorial.
+  customMarkPath?: string | null;
+  bottomText?: string | null;
+  // Whether to engrave an outline around the whole plaque (ellipse / circle /
+  // rounded square). Defaults to true. Some stonemasons prefer to engrave the
+  // mark + QR directly onto the stone with no visible frame.
+  showBorder?: boolean;
+  updatedAt?: unknown;
+}
+
 export interface Plot {
   id: string;
   shortId: string;              // 8-char human-safe token for /p/[shortId] QR URLs
@@ -220,6 +236,7 @@ export interface Plot {
   /** @deprecated Legacy single-admin field. Kept optional for old docs. */
   plotAdminUid?: string;
   plotAdminSuccessorUids: string[]; // ordered, succession-only
+  plaqueDesign?: PlaqueDesign;
   createdByUid: string;
   createdAt?: unknown;
   updatedAt?: unknown;

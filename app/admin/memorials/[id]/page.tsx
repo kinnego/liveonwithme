@@ -417,14 +417,21 @@ export default function AdminMemorialInspector({
                 value={plotAdmins(plot).join(', ') || '—'}
                 mono
               />
-              <Link
-                href={`/plot/${plot.id}`}
-                target="_blank"
-                rel="noopener"
-                style={{ color: 'var(--sage)', fontSize: 14 }}
-              >
-                Open plot page ↗
-              </Link>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+                <Link href={`/plot/${plot.id}`} target="_blank" rel="noopener" className="button secondary small">
+                  Open plot page ↗
+                </Link>
+                <Link href={`/plot/${plot.id}/plaque`} target="_blank" rel="noopener" className="button secondary small">
+                  Design plaque ↗
+                </Link>
+                <Link href={`/plot/${plot.id}/qr`} target="_blank" rel="noopener" className="button secondary small">
+                  QR code ↗
+                </Link>
+              </div>
+              <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+                Opens the same tools the custodian uses. Changes you make (shape, custom mark,
+                bottom text) are logged against your account in the audit trail.
+              </p>
             </div>
           )}
         </div>
