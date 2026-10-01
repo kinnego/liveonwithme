@@ -77,5 +77,16 @@ export async function sendPasswordResetEmail(to: string, token: string) {
     subject,
     text,
     html,
+    // Password reset is transactional + security-sensitive. Disable tracking
+    // so links aren't rewritten through sendgrid.net (which tanks inbox rate
+    // for new senders) and no 1x1 pixel is injected.
+    trackingSettings: {
+      clickTracking: { enable: false, enableText: false },
+      openTracking: { enable: false },
+      subscriptionTracking: { enable: false },
+    },
+    mailSettings: {
+      bypassListManagement: { enable: true },
+    },
   });
 }
