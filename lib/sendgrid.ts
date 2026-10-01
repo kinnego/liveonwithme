@@ -21,6 +21,39 @@ function siteUrl() {
   return process.env.SITE_URL || 'https://www.liveonwith.me';
 }
 
+function wrapEmail(innerHtml: string): string {
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f7f4ee;font-family:Georgia,'Times New Roman',serif;color:#25312d;">
+    <div style="max-width:560px;margin:0 auto;padding:40px 24px;">
+      <div style="text-align:center;font-family:Georgia,serif;font-size:22px;letter-spacing:0.02em;margin-bottom:32px;color:#25312d;">
+        LiveOnWith.me
+      </div>
+      <div style="background:#fffdf9;border:1px solid #e8e1d7;border-radius:22px;padding:36px 32px;">
+        ${innerHtml}
+      </div>
+      <div style="text-align:center;font-family:Inter,system-ui,sans-serif;font-size:12px;color:#6d7772;margin-top:24px;">
+        LiveOnWith.me — a quiet place to remember and be remembered.
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+const TRANSACTIONAL_SETTINGS = {
+  // Password reset and claim invites are transactional + security-sensitive.
+  // Disable tracking so links aren't rewritten through sendgrid.net (which
+  // tanks inbox rate for new senders) and no 1x1 pixel is injected.
+  trackingSettings: {
+    clickTracking: { enable: false, enableText: false },
+    openTracking: { enable: false },
+    subscriptionTracking: { enable: false },
+  },
+  mailSettings: {
+    bypassListManagement: { enable: true },
+  },
+} as const;
+
 export async function sendPasswordResetEmail(to: string, token: string) {
   const link = `${siteUrl()}/auth/action?mode=resetPassword&token=${encodeURIComponent(token)}`;
 
@@ -37,14 +70,7 @@ export async function sendPasswordResetEmail(to: string, token: string) {
     '— LiveOnWith.me',
   ].join('\n');
 
-  const html = `<!doctype html>
-<html>
-  <body style="margin:0;padding:0;background:#f7f4ee;font-family:Georgia,'Times New Roman',serif;color:#25312d;">
-    <div style="max-width:560px;margin:0 auto;padding:40px 24px;">
-      <div style="text-align:center;font-family:Georgia,serif;font-size:22px;letter-spacing:0.02em;margin-bottom:32px;color:#25312d;">
-        LiveOnWith.me
-      </div>
-      <div style="background:#fffdf9;border:1px solid #e8e1d7;border-radius:22px;padding:36px 32px;">
+  const html = wrapEmail(`
         <h1 style="font-family:Georgia,serif;font-weight:500;font-size:28px;line-height:1.2;margin:0 0 18px;color:#25312d;">
           Reset your password
         </h1>
@@ -63,13 +89,7 @@ export async function sendPasswordResetEmail(to: string, token: string) {
         <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
           If you didn't ask for this, you can safely ignore this email — your password won't change.
         </p>
-      </div>
-      <div style="text-align:center;font-family:Inter,system-ui,sans-serif;font-size:12px;color:#6d7772;margin-top:24px;">
-        LiveOnWith.me — a quiet place to remember and be remembered.
-      </div>
-    </div>
-  </body>
-</html>`;
+  `);
 
   await client().send({
     to,
@@ -77,16 +97,72 @@ export async function sendPasswordResetEmail(to: string, token: string) {
     subject,
     text,
     html,
-    // Password reset is transactional + security-sensitive. Disable tracking
-    // so links aren't rewritten through sendgrid.net (which tanks inbox rate
-    // for new senders) and no 1x1 pixel is injected.
-    trackingSettings: {
-      clickTracking: { enable: false, enableText: false },
-      openTracking: { enable: false },
-      subscriptionTracking: { enable: false },
-    },
-    mailSettings: {
-      bypassListManagement: { enable: true },
-    },
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+function firstName(fullName?: string): string {
+  if (!fullName) return '';
+  return fullName.trim().split(/\s+/)[0] || '';
+}
+
+export async function sendClaimInvite(
+  to: string,
+  token: string,
+  referralId: string,
+  deceasedFullName: string,
+  bereavedName?: string
+) {
+  const link = `${siteUrl()}/claim/${encodeURIComponent(referralId)}?token=${encodeURIComponent(token)}`;
+  const hello = firstName(bereavedName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+
+  const subject = `A memorial for ${deceasedFullName} is ready for you`;
+
+  const text = [
+    greeting,
+    '',
+    `A memorial page for ${deceasedFullName} has been set up for you on LiveOnWith.me — a quiet place to gather photos, stories and messages from the people who loved them.`,
+    '',
+    'You are the custodian of the page. Open the private link below to take it over, choose what to share, and go live when you are ready.',
+    '',
+    link,
+    '',
+    "The link is private to you. If you weren't expecting this email, you can safely ignore it.",
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:28px;line-height:1.2;margin:0 0 18px;color:#25312d;">
+          A memorial for ${deceasedFullName}
+        </h1>
+        <p style="font-family:Inter,system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 22px;">
+          ${greeting} a memorial page for <strong>${deceasedFullName}</strong> has been set up for you on LiveOnWith.me — a quiet place to gather photos, stories and messages from the people who loved them.
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 22px;">
+          You are the custodian of the page. Open the private link below to take it over, choose what to share, and go live when you are ready.
+        </p>
+        <p style="text-align:center;margin:32px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open your memorial
+          </a>
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
+          If the button doesn't work, copy and paste this into your browser:<br>
+          <span style="word-break:break-all;color:#688076;">${link}</span>
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
+          The link is private to you. If you weren't expecting this email, you can safely ignore it.
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
   });
 }

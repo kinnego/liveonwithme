@@ -1,10 +1,10 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   EmailAuthProvider,
-  isSignInWithEmailLink,
   linkWithCredential,
-  signInWithEmailLink,
+  signInWithCustomToken,
   updatePassword,
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
@@ -17,16 +17,17 @@ import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
 
-type Phase = 'checking' | 'claiming' | 'setPassword' | 'error';
+type Phase = 'verifying' | 'claiming' | 'setPassword' | 'error';
 
 export default function Claim({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState('');
-  const [needsEmail, setNeedsEmail] = useState(false);
-  const [status, setStatus] = useState<Phase>('checking');
+  const [status, setStatus] = useState<Phase>('verifying');
   const [error, setError] = useState('');
   const [pendingMemorialSlug, setPendingMemorialSlug] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams?.get('token') || '';
 
   useEffect(() => {
     params.then((p) => setId(p.id));
@@ -143,10 +144,6 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
     setError('');
     setPasswordSaving(true);
     try {
-      // The claim session was created via email-link (passwordless), so the
-      // account has no password provider yet. linkWithCredential attaches one;
-      // if for some reason a password already exists (retry, race), fall back
-      // to updatePassword.
       const email = auth.currentUser.email;
       if (!email) throw new Error('No email on this account.');
       try {
@@ -166,42 +163,37 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
     }
   }
 
-  async function completeSignIn(email: string, referralId: string) {
-    try {
-      await signInWithEmailLink(auth, email, window.location.href);
-      window.localStorage.removeItem('emailForSignIn');
-      await finishClaim(referralId);
-    } catch (err: any) {
-      setError(err.message);
-      setStatus('error');
-    }
-  }
-
   useEffect(() => {
     if (!id) return;
-    if (!isSignInWithEmailLink(auth, window.location.href)) {
+    if (!token) {
       setError(
-        "This invite link isn't valid or has expired. Please contact the person who sent it to you for a new invite."
+        "This invite link is missing its verification token. Please contact the person who sent it to you for a new invite."
       );
       setStatus('error');
       return;
     }
-    const stored = window.localStorage.getItem('emailForSignIn');
-    if (stored) {
-      completeSignIn(stored, id);
-    } else {
-      setNeedsEmail(true);
-      setStatus('checking');
-    }
-  }, [id]);
-
-  async function submitEmail(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const email = String(fd.get('email')).trim().toLowerCase();
-    setNeedsEmail(false);
-    await completeSignIn(email, id);
-  }
+    (async () => {
+      try {
+        const res = await fetch('/api/claim/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "This invite link isn't valid or has expired.");
+          setStatus('error');
+          return;
+        }
+        await signInWithCustomToken(auth, data.customToken);
+        await finishClaim(data.referralId || id);
+      } catch (err: any) {
+        setError(err.message || 'Something went wrong.');
+        setStatus('error');
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, token]);
 
   if (status === 'error')
     return (
@@ -209,24 +201,6 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
         <div className="card">
           <h3>We couldn&rsquo;t open this invite</h3>
           <p className="muted">{error}</p>
-        </div>
-      </main>
-    );
-
-  if (needsEmail)
-    return (
-      <main className="shell">
-        <div className="formCard">
-          <div className="eyebrow">Confirm it&rsquo;s you</div>
-          <h2>Confirm your email</h2>
-          <p className="muted">Enter the email address the invite was sent to.</p>
-          <form onSubmit={submitEmail}>
-            <label htmlFor="email">Email</label>
-            <input id="email" name="email" type="email" required />
-            <button className="button" style={{ width: '100%', marginTop: 24 }}>
-              Continue
-            </button>
-          </form>
         </div>
       </main>
     );

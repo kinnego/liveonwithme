@@ -395,6 +395,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ─── claim tokens (server-only) ──────────────────────────────────────────
+    // One-time tokens that let a bereaved family member take over a partner-
+    // created memorial. Written by /api/partner/send-invite, read + consumed
+    // by /api/claim/verify. Not touched by any client SDK.
+    match /claimTokens/{token} {
+      allow read, write: if false;
+    }
+
     // ─── users ───────────────────────────────────────────────────────────────
     match /users/{uid} {
       allow create: if isSelf(uid)

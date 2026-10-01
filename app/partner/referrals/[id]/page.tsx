@@ -1,11 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { onAuthStateChanged, sendSignInLinkToEmail } from 'firebase/auth';
-import { doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { writeAudit } from '@/lib/audit';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -62,23 +61,17 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
   }, [r, uid, inviteState, justPaid]);
 
   async function sendInvite() {
-    if (!r || !auth) return;
+    if (!r || !auth?.currentUser) return;
     setInviteState('sending');
     try {
-      await sendSignInLinkToEmail(auth, r.bereavedEmail, {
-        url: `${window.location.origin}/claim/${r.id}`,
-        handleCodeInApp: true,
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/partner/send-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ referralId: r.id }),
       });
-      await updateDoc(doc(db, 'referrals', r.id), {
-        updatedAt: serverTimestamp(),
-      });
-      await writeAudit({
-        entityType: 'referral',
-        entityId: r.id,
-        action: 'invite_sent',
-        actorUid: uid,
-        details: { bereavedEmail: r.bereavedEmail },
-      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not send invite');
       setInviteState('sent');
     } catch (err: any) {
       setError(err.message);
