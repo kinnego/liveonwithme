@@ -1,6 +1,53 @@
 # Status & next steps
 
-Last updated: 2026-09-18, branch `claude/ubuntu-machine-or-phone-ovt1xa`.
+Last updated: 2026-10-01 (overnight auto-mode), branch `claude/ubuntu-machine-or-phone-ovt1xa`.
+
+## 2026-10-01 overnight handoff
+
+### Shipped (code only — needs config + deploy to go live)
+
+- **All transactional emails now go through SendGrid.** Password reset (`/api/auth/request-reset`, `/api/auth/confirm-reset`) and partner → family invites (`/api/partner/send-invite`, `/api/claim/verify`) use first-party tokens stored in Firestore (`passwordResetTokens`, `claimTokens`) with Admin SDK password updates and custom-token sign-in. No more Firebase email templates in the loop.
+- **Partner invite reliability fix.** Firebase's email-link flow had a race where a partner clicking their own test invite would silently consume the oobCode. Our tokens aren't tied to the opener's localStorage, so that whole class of bug is gone.
+- **Email-already-registered UX.** `/auth` register mode disables submit and offers a one-click switch to sign-in when the email already has an account. `/partner/new` shows a muted inline note that the invite will attach to the existing account. New endpoint: `/api/user/exists`.
+- **Tracking off on transactional emails.** SendGrid's click-tracking and open-pixel are disabled on password-reset + claim-invite sends to improve deliverability (links don't go through `click.sendgrid.net`, no 1×1 pixel).
+
+### Required before this actually works in production
+
+1. **Netlify env vars** (already have `SENDGRID_API_KEY` + `SENDGRID_FROM_EMAIL`, but confirm):
+   - `SENDGRID_API_KEY`
+   - `SENDGRID_FROM_EMAIL=noreply@liveonwith.me`
+   - `SITE_URL=https://www.liveonwith.me` (optional, defaults to that)
+2. **Deploy Firestore rules** separately — not Netlify:
+   ```
+   firebase deploy --only firestore:rules
+   ```
+   New rules deny all client access to `passwordResetTokens` and `claimTokens` (server-only).
+3. **Netlify production deploy** to pick up the latest commits.
+
+### Smoke tests after deploy
+
+1. `/auth` → "Forgot password?" → enter your registered email → check inbox (not spam, hopefully) → click link → set new password → should land on `/dashboard` already signed in.
+2. `/partner/new` → create a referral with a bereaved email → pay wholesale (test mode fine) → return to referral page → auto-send fires → bereaved inbox gets the branded "A memorial for X" email → click link → should land at claim page → user is created server-side → set password → land on manage page.
+3. `/auth` register tab → type a known-registered email → "Sign in instead" link appears, submit disabled.
+
+### Known limitations / unchanged
+
+- **Hotmail/Outlook still routes to junk** on first send (new-sender reputation). Marks "Not spam" + volume over time fix this. Gmail inboxes fine already.
+- **Custody transfer email invites** at `/memorial/[id]/manage` are still shown as copy-paste URLs — not integrated with SendGrid. ~1h of similar work to migrate when there's a reason. Flagged for later.
+- **No rate limiting on `/api/user/exists`.** Firebase itself leaks the same info on submit via `auth/email-already-in-use`, so this isn't a new enumeration vector, but if abuse appears, add a simple IP throttle.
+
+### Branch state
+
+Branch `claude/ubuntu-machine-or-phone-ovt1xa` is 4 commits ahead of main. Commits in order:
+- `00a5636` Disable click/open tracking on password reset emails
+- `7aaf557` Move partner invite emails to SendGrid with custom claim tokens
+- `3226304` Flag already-registered emails on signup and partner-invite forms
+
+Build green locally. No tests yet for the new API routes — add if time.
+
+---
+
+## Older notes (pre-2026-10-01)
 
 ## Where things stand
 
