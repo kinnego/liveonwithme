@@ -29,21 +29,21 @@ export async function POST(req: NextRequest) {
     const db = adminDb();
     const now = Date.now();
 
-    // Anti-spam: if an unconsumed, unexpired token was minted for this uid in
-    // the last minute, don't send another. Silent skip — same 200 response.
+    // Anti-spam: if any token was minted for this uid in the last minute,
+    // skip. Done with a single-field query (auto-indexed) + in-memory check
+    // so we don't need a composite Firestore index.
     const recent = await db
       .collection('passwordResetTokens')
       .where('uid', '==', uid)
-      .where('consumed', '==', false)
-      .orderBy('createdAt', 'desc')
-      .limit(1)
+      .limit(5)
       .get();
 
-    if (!recent.empty) {
-      const created = recent.docs[0].data().createdAt?.toMillis?.() ?? 0;
-      if (now - created < RESEND_COOLDOWN_MS) {
-        return NextResponse.json({ ok: true });
-      }
+    const cooldownHit = recent.docs.some((d) => {
+      const created = d.data().createdAt?.toMillis?.() ?? 0;
+      return now - created < RESEND_COOLDOWN_MS;
+    });
+    if (cooldownHit) {
+      return NextResponse.json({ ok: true });
     }
 
     const token = randomBytes(32).toString('base64url');
