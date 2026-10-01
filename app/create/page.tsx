@@ -10,7 +10,8 @@ import { createPerson } from '@/lib/person';
 import { slugify } from '@/lib/ids';
 import { writeAudit } from '@/lib/audit';
 import { attachMemorialToExistingPlot, isPlotAdmin } from '@/lib/plot';
-import type { MemorialKind, Plot } from '@/lib/types';
+import { isApprovedPartner } from '@/lib/roles';
+import type { MemorialKind, Plot, UserProfile } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -57,6 +58,11 @@ const COPY: Record<MemorialKind, Copy> = {
 function CreateInner() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [mode, setMode] = useState<MemorialKind | null>(null);
+  // null = not yet known; false = signed-out or confirmed non-partner.
+  // We hide the mode picker from approved partners because their flow is
+  // always setting up a page for a family they're helping — a personal
+  // legacy page doesn't fit that context and tends to confuse the picker.
+  const [isPartner, setIsPartner] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
@@ -76,6 +82,26 @@ function CreateInner() {
   }, []);
 
   useEffect(() => {
+    if (!user) {
+      setIsPartner(user === null ? false : null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        const prof = snap.exists() ? (snap.data() as UserProfile) : null;
+        if (!cancelled) setIsPartner(isApprovedPartner(prof));
+      } catch {
+        if (!cancelled) setIsPartner(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
     if (!user) return;
     try {
       const raw = window.localStorage.getItem('createDraft');
@@ -90,6 +116,12 @@ function CreateInner() {
     // legacy (pre-death) page isn't a physical resting place.
     if (presetPlotId) setMode('memorial');
   }, [presetPlotId]);
+
+  useEffect(() => {
+    // Partners never see the picker — they're setting up pages for families
+    // they're helping, not writing a legacy page for themselves.
+    if (isPartner) setMode('memorial');
+  }, [isPartner]);
 
   useEffect(() => {
     if (!user || !presetPlotId || !db) return;
@@ -251,6 +283,12 @@ function CreateInner() {
 
   // Waiting for auth state to resolve.
   if (user === undefined) {
+    return <PageSkeleton variant="default" label="Loading" />;
+  }
+
+  // Wait for partner status before showing the picker, so a partner never
+  // sees a flash of the "legacy page" option before it gets hidden.
+  if (user && isPartner === null && !mode) {
     return <PageSkeleton variant="default" label="Loading" />;
   }
 
@@ -427,7 +465,7 @@ function CreateInner() {
           </div>
         )}
 
-        {!attachingToPlot && (
+        {!attachingToPlot && !isPartner && (
           <p style={{ fontSize: 13, marginTop: -6 }}>
             <button
               type="button"

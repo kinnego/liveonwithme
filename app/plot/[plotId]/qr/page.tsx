@@ -3,6 +3,11 @@
 // onto the headstone at any size) and a 1024px PNG (for printing on a card or
 // laminated marker in the meantime). URL is /p/[shortId] so the payload is as
 // short as possible — better for high-contrast etching.
+//
+// A photo of the first live memorial on this plot is dropped into the centre
+// of the code (mono + contrast so faces read against the surrounding black
+// modules). Level-H error correction tolerates the knockout. If no memorial
+// has a hero yet, the site mark takes its place as inline artwork.
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -12,12 +17,46 @@ import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import { auth, db } from '@/lib/firebase';
 import { PageSkeleton } from '@/components/Skeleton';
+import { qrWithCenteredImage, sameOriginUrlToDataUrl } from '@/lib/qr';
 
 export const dynamic = 'force-dynamic';
 
 // QRs get etched into stone or printed onto cards — they must always encode
 // the production URL, never the dev origin they happened to be generated on.
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
+const SITE_LOGO_PATH = '/brand/live-on-with-me-logo-512.png';
+
+async function svgToPng(svg: string, size: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        return reject(new Error('No canvas context'));
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+      ctx.drawImage(img, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      try {
+        resolve(canvas.toDataURL('image/png'));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = (e) => {
+      URL.revokeObjectURL(url);
+      reject(e);
+    };
+    img.src = url;
+  });
+}
 
 export default function PlotQr({
   params,
@@ -53,23 +92,58 @@ export default function PlotQr({
           return;
         }
         setPlot(p);
+
         const target = `${SITE_URL}/p/${p.shortId}`;
-        const [png, svg] = await Promise.all([
-          QRCode.toDataURL(target, {
-            width: 1024,
-            margin: 2,
-            color: { dark: '#000000', light: '#ffffff' },
-            errorCorrectionLevel: 'H',
-          }),
+        const [rawQr, heroRes, logoDataUrl] = await Promise.all([
           QRCode.toString(target, {
             type: 'svg',
             margin: 2,
             color: { dark: '#000000', light: '#ffffff' },
             errorCorrectionLevel: 'H',
           }),
+          fetch(
+            `/api/plot/memorial-hero-photo?plotId=${encodeURIComponent(plotId)}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          )
+            .then((r) => (r.ok ? r.json() : { dataUrl: null }))
+            .catch(() => ({ dataUrl: null })),
+          sameOriginUrlToDataUrl(SITE_LOGO_PATH).catch(() => ''),
         ]);
-        setPngUrl(png);
-        setSvgText(svg);
+
+        const heroDataUrl: string | null = heroRes?.dataUrl || null;
+        const decorated = heroDataUrl
+          ? qrWithCenteredImage({
+              qrSvg: rawQr,
+              imageDataUrl: heroDataUrl,
+              photoShape: 'circle',
+              applyMonoFilter: true,
+              idPrefix: 'plotHero',
+            })
+          : logoDataUrl
+            ? qrWithCenteredImage({
+                qrSvg: rawQr,
+                imageDataUrl: logoDataUrl,
+                photoShape: 'circle',
+                applyMonoFilter: false,
+                idPrefix: 'plotLogo',
+              })
+            : rawQr;
+
+        setSvgText(decorated);
+        try {
+          const png = await svgToPng(decorated, 1024);
+          setPngUrl(png);
+        } catch {
+          // PNG rasterisation shouldn't fail with same-origin data URLs, but if
+          // it does we fall back to a plain PNG so the page still works.
+          const png = await QRCode.toDataURL(target, {
+            width: 1024,
+            margin: 2,
+            color: { dark: '#000000', light: '#ffffff' },
+            errorCorrectionLevel: 'H',
+          });
+          setPngUrl(png);
+        }
       });
     });
   }, [params, router]);
@@ -110,7 +184,7 @@ export default function PlotQr({
     );
   }
 
-  if (!plot || !pngUrl) {
+  if (!plot || !svgText) {
     return <PageSkeleton variant="detail" label="Preparing your QR code" />;
   }
 
@@ -125,18 +199,25 @@ export default function PlotQr({
           This QR code links to <strong>every memorial</strong> associated with this plot.
           Anyone who scans it will land on a page listing everyone remembered here.
         </p>
-        <div style={{ margin: '30px auto', maxWidth: 340 }}>
-          <img
-            src={pngUrl}
-            alt={`QR code for plot ${plot.shortId}`}
-            style={{
-              width: '100%',
-              borderRadius: 16,
-              border: '1px solid var(--line)',
-              background: 'white',
-            }}
-          />
-        </div>
+        <div
+          style={{
+            margin: '30px auto',
+            maxWidth: 340,
+            borderRadius: 16,
+            border: '1px solid var(--line)',
+            background: 'white',
+            padding: 16,
+          }}
+          // The decorated SVG contains inline <defs> whose ids are suffixed with
+          // a random string per render, so they will not collide if we ever
+          // display more than one at once.
+          dangerouslySetInnerHTML={{
+            __html: svgText.replace(
+              /<svg([^>]*)>/,
+              '<svg$1 style="display:block;width:100%;height:auto;">',
+            ),
+          }}
+        />
         <p className="muted" style={{ fontSize: 13, wordBreak: 'break-all' }}>
           {shortUrl}
         </p>
@@ -145,7 +226,7 @@ export default function PlotQr({
           <button className="button" onClick={downloadSvg}>
             Download SVG (for your engraver)
           </button>
-          <button className="button secondary" onClick={downloadPng}>
+          <button className="button secondary" onClick={downloadPng} disabled={!pngUrl}>
             Download PNG (for print)
           </button>
         </div>

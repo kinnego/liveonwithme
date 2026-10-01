@@ -132,7 +132,7 @@ export default function PartnerApply() {
           </div>
 
           <label htmlFor="website">Website (optional)</label>
-          <input id="website" name="website" type="url" placeholder="https://" />
+          <input id="website" name="website" type="text" placeholder="yourbusiness.com" />
 
           <label htmlFor="notes">Anything else we should know?</label>
           <textarea id="notes" name="notes" placeholder="How many families do you typically serve? Any specific needs?" />

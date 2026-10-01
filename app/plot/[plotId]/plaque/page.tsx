@@ -15,6 +15,9 @@ import { auth, db } from '@/lib/firebase';
 import type { PlaqueShape } from '@/lib/types';
 import { buildPlaqueSvg, DEFAULT_PLAQUE_SHAPE, MAX_BOTTOM_TEXT_LEN, plaqueDimensions } from '@/lib/plaque';
 import { PageSkeleton } from '@/components/Skeleton';
+import { qrWithCenteredImage } from '@/lib/qr';
+
+const SITE_LOGO_PATH = '/brand/live-on-with-me-logo-512.png';
 
 export const dynamic = 'force-dynamic';
 
@@ -138,13 +141,44 @@ export default function PlotPlaque({
           didLoadRef.current = true;
 
           const target = `${SITE_URL}/p/${p.shortId}`;
-          const qr = await QRCode.toString(target, {
-            type: 'svg',
-            margin: 0,
-            color: { dark: '#000000', light: '#ffffff' },
-            errorCorrectionLevel: 'H',
-          });
-          setQrSvg(qr);
+          const [rawQr, heroRes, logoDataUrl] = await Promise.all([
+            QRCode.toString(target, {
+              type: 'svg',
+              margin: 0,
+              color: { dark: '#000000', light: '#ffffff' },
+              errorCorrectionLevel: 'H',
+            }),
+            fetch(
+              `/api/plot/memorial-hero-photo?plotId=${encodeURIComponent(p.id)}`,
+              { headers: { Authorization: `Bearer ${token}` } },
+            )
+              .then((r) => (r.ok ? r.json() : { dataUrl: null }))
+              .catch(() => ({ dataUrl: null })),
+            sameOriginUrlToDataUrl(SITE_LOGO_PATH).catch(() => ''),
+          ]);
+          const heroDataUrl: string | null = heroRes?.dataUrl || null;
+          // Drop the hero (mono + contrast) into the centre of the QR so the
+          // engraved code carries a face at a glance. If no memorial on the
+          // plot has a hero yet, fall back to the site mark untreated — a
+          // calm neutral until the family uploads a photo.
+          const decoratedQr = heroDataUrl
+            ? qrWithCenteredImage({
+                qrSvg: rawQr,
+                imageDataUrl: heroDataUrl,
+                photoShape: 'circle',
+                applyMonoFilter: true,
+                idPrefix: 'plotPlaqueHero',
+              })
+            : logoDataUrl
+              ? qrWithCenteredImage({
+                  qrSvg: rawQr,
+                  imageDataUrl: logoDataUrl,
+                  photoShape: 'circle',
+                  applyMonoFilter: false,
+                  idPrefix: 'plotPlaqueLogo',
+                })
+              : rawQr;
+          setQrSvg(decoratedQr);
         } catch (err: any) {
           setError(err.message || 'Something went wrong preparing the plaque.');
         }
@@ -461,7 +495,7 @@ export default function PlotPlaque({
             type="text"
             value={bottomText}
             onChange={(e) => setBottomText(e.target.value)}
-            placeholder="e.g. The Doherty Family"
+            placeholder="e.g. The Rooney Family"
             maxLength={MAX_BOTTOM_TEXT_LEN}
           />
           <p className="muted" style={{ fontSize: 12, marginTop: 6, textAlign: 'right' }}>

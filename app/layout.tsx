@@ -4,6 +4,7 @@ import Image from 'next/image';
 import type { Metadata, Viewport } from 'next';
 import SiteNav from '@/components/SiteNav';
 import ScrollToTopOnNav from '@/components/ScrollToTopOnNav';
+import PrivacyBanner from '@/components/PrivacyBanner';
 
 const DEFAULT_TITLE = 'LiveOnWith.me · A life remembered with love';
 const DEFAULT_DESCRIPTION =
@@ -114,13 +115,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/terms" style={{ color: 'var(--muted)' }}>
                 Fair-use terms
               </Link>
+              <Link href="/privacy" style={{ color: 'var(--muted)' }}>
+                Privacy
+              </Link>
               <a href="mailto:hello@freastar.com" style={{ color: 'var(--muted)' }}>
                 hello@freastar.com
               </a>
             </div>
-            <div>Made for remembering, gently and privately. · Powered by Freastar</div>
+            <div>
+              Made for remembering, gently and privately. · Powered by{' '}
+              <a
+                href="https://www.freastar.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+              >
+                Freastar
+              </a>
+            </div>
           </div>
         </footer>
+        <PrivacyBanner />
       </body>
     </html>
   );

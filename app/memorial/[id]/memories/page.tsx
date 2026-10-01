@@ -1,5 +1,5 @@
 'use client';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   addDoc,
@@ -20,12 +20,30 @@ import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
 
+const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+
+async function uploadToR2(file: File, path: string, memorialId: string) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('path', path);
+  formData.append('memorialId', memorialId);
+  const res = await fetch('/api/upload', { method: 'POST', body: formData });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Upload failed');
+  return data as { path: string; sizeBytes: number };
+}
+
 export default function Memories({ params }: { params: Promise<{ id: string }> }) {
   const [m, setM] = useState<any>();
   const [items, setItems] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState('');
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  const editingId = editingItem?.id ?? null;
+  const editingHasAudio = Boolean(editingItem?.audioPath);
 
   useEffect(() => {
     let stop: (() => void) | undefined;
@@ -63,10 +81,13 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
     e.preventDefault();
     if (!m) return;
     setSaving(true);
+    setUploadError('');
     const fd = new FormData(e.currentTarget);
     const contributorName = String(fd.get('contributorName') || '').trim();
     const relationship = String(fd.get('relationship') || '').trim();
     const memory = String(fd.get('memory') || '').trim();
+    const audioFile = fd.get('audio') as File | null;
+    const removeAudio = fd.get('removeAudio') === 'on';
 
     if (!memory || !contributorName) {
       setSaving(false);
@@ -74,15 +95,33 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
     }
 
     try {
+      let newAudioPath: string | null = null;
+      let newAudioMimeType: string | null = null;
+      if (audioFile && audioFile.size > 0) {
+        const safeName = audioFile.name.replace(/[^\w.-]+/g, '_');
+        const path = `contributions/${m.id}/${crypto.randomUUID()}-${safeName}`;
+        const uploaded = await uploadToR2(audioFile, path, m.id);
+        newAudioPath = uploaded.path;
+        newAudioMimeType = audioFile.type || 'audio/mpeg';
+      }
+
       if (editingId) {
-        await updateDoc(doc(db, 'contributions', editingId), {
+        const update: Record<string, unknown> = {
           contributorName,
           relationship,
           memory,
-        });
-        setEditingId(null);
+        };
+        if (newAudioPath) {
+          update.audioPath = newAudioPath;
+          update.audioMimeType = newAudioMimeType;
+        } else if (removeAudio) {
+          update.audioPath = '';
+          update.audioMimeType = '';
+        }
+        await updateDoc(doc(db, 'contributions', editingId), update);
+        setEditingItem(null);
       } else {
-        await addDoc(collection(db, 'contributions'), {
+        const docData: Record<string, unknown> = {
           memorialId: m.id,
           contributorName,
           relationship,
@@ -92,22 +131,31 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
           status: 'approved',
           source: 'family',
           createdAt: serverTimestamp(),
-        });
+        };
+        if (newAudioPath) {
+          docData.audioPath = newAudioPath;
+          docData.audioMimeType = newAudioMimeType;
+        }
+        await addDoc(collection(db, 'contributions'), docData);
       }
       (e.target as HTMLFormElement).reset();
+    } catch (err: any) {
+      setUploadError(err?.message || 'Something went wrong saving the memory.');
     } finally {
       setSaving(false);
     }
   }
 
   function startEdit(item: any) {
-    setEditingId(item.id);
+    setEditingItem(item);
+    setUploadError('');
     setTimeout(() => {
       const form = document.getElementById('memory-form') as HTMLFormElement | null;
       if (!form) return;
       (form.elements.namedItem('contributorName') as HTMLInputElement).value = item.contributorName;
       (form.elements.namedItem('relationship') as HTMLInputElement).value = item.relationship || '';
       (form.elements.namedItem('memory') as HTMLTextAreaElement).value = item.memory;
+      if (audioInputRef.current) audioInputRef.current.value = '';
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
   }
@@ -115,7 +163,7 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
   async function remove(id: string) {
     if (!confirm('Delete this memory?')) return;
     await deleteDoc(doc(db, 'contributions', id));
-    if (editingId === id) setEditingId(null);
+    if (editingId === id) setEditingItem(null);
   }
 
   if (!m) return <PageSkeleton variant="detail" label="Loading memories" />;
@@ -161,6 +209,38 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
             required
             placeholder="A story, a small moment, something they used to say…"
           />
+
+          <label style={{ marginTop: 18 }}>
+            {editingHasAudio ? 'Replace the voice note (optional)' : 'Add a voice note (optional)'}
+          </label>
+          <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
+            Upload a short recording — a voicemail they left, a message you want remembered, a
+            birthday song. MP3, M4A or similar; up to 50&nbsp;MB.
+          </p>
+          <input
+            ref={audioInputRef}
+            name="audio"
+            type="file"
+            accept="audio/*"
+          />
+
+          {editingHasAudio && R2_PUBLIC_URL && (
+            <div style={{ marginTop: 12 }}>
+              <p className="muted" style={{ margin: '0 0 6px', fontSize: 13 }}>
+                Current voice note:
+              </p>
+              <audio controls src={`${R2_PUBLIC_URL}/${editingItem.audioPath}`} style={{ width: '100%' }} />
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, fontSize: 14 }}>
+                <input name="removeAudio" type="checkbox" style={{ width: 'auto' }} />
+                Remove the current voice note on save
+              </label>
+            </div>
+          )}
+
+          {uploadError && (
+            <p style={{ color: '#a94442', marginTop: 14, fontSize: 14 }}>{uploadError}</p>
+          )}
+
           <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
             <button className="button" disabled={saving}>
               {saving ? 'Saving…' : editingId ? 'Save changes' : 'Add memory'}
@@ -170,7 +250,8 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
                 type="button"
                 className="button secondary"
                 onClick={() => {
-                  setEditingId(null);
+                  setEditingItem(null);
+                  setUploadError('');
                   (document.getElementById('memory-form') as HTMLFormElement)?.reset();
                 }}
               >
@@ -191,6 +272,13 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
             <div className="quote" style={{ fontSize: 22, margin: '0 0 12px' }}>
               &ldquo;{item.memory}&rdquo;
             </div>
+            {item.audioPath && R2_PUBLIC_URL && (
+              <audio
+                controls
+                src={`${R2_PUBLIC_URL}/${item.audioPath}`}
+                style={{ width: '100%', marginBottom: 12 }}
+              />
+            )}
             <p className="muted" style={{ margin: 0 }}>
               — {item.contributorName}
               {item.relationship ? `, ${item.relationship}` : ''}

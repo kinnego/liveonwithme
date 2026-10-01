@@ -233,7 +233,9 @@ export default function AdminConfig() {
               onChange={(e) => setQuotas({ ...quotas, totalBytesPerMemorial: Number(e.target.value) })}
             />
             <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              {Math.round(quotas.totalBytesPerMemorial / (1024 * 1024 * 1024) * 100) / 100} GB
+              {quotas.totalBytesPerMemorial >= 1024 * 1024 * 1024
+                ? `${Math.round((quotas.totalBytesPerMemorial / (1024 * 1024 * 1024)) * 100) / 100} GB`
+                : `${Math.round(quotas.totalBytesPerMemorial / (1024 * 1024))} MB`}
             </p>
           </div>
           <div>

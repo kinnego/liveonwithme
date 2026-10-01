@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
-import CemeterySearch from '@/components/CemeterySearch';
-import MemorialNameSearch from '@/components/MemorialNameSearch';
+import UnifiedSearch from '@/components/UnifiedSearch';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
 
@@ -101,25 +100,8 @@ export default function Home() {
         <p className="lead" style={{ margin: '0 auto 30px' }}>
           Search by their name, or by the cemetery where they are resting.
         </p>
-        <div style={{ maxWidth: 520, margin: '0 auto', display: 'grid', gap: 14 }}>
-          <div>
-            <label
-              className="muted"
-              style={{ fontSize: 13, display: 'block', marginBottom: 6, textAlign: 'left' }}
-            >
-              By name
-            </label>
-            <MemorialNameSearch />
-          </div>
-          <div>
-            <label
-              className="muted"
-              style={{ fontSize: 13, display: 'block', marginBottom: 6, textAlign: 'left' }}
-            >
-              By cemetery
-            </label>
-            <CemeterySearch />
-          </div>
+        <div style={{ maxWidth: 520, margin: '0 auto' }}>
+          <UnifiedSearch />
         </div>
         <p className="muted" style={{ marginTop: 14, fontSize: 13 }}>
           Only memorials families have chosen to make public will appear.

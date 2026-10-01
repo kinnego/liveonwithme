@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { adminDb } from '@/lib/firebase-admin';
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { walkingDirectionsUrl } from '@/lib/plot';
@@ -75,6 +75,14 @@ export default async function PlotPage({
   if (!plot) return notFound();
 
   const memorials = await loadPlotMemorials(plotId);
+
+  // When a plot holds a single person, land scanners on that memorial directly
+  // — the plot listing exists to disambiguate; a one-person plot has nothing
+  // to disambiguate. Once a second memorial joins, both share the plot page.
+  if (memorials.length === 1) {
+    const only = memorials[0];
+    redirect(`/m/${only.slug || only.id}`);
+  }
 
   const jsonLd = {
     '@context': 'https://schema.org',

@@ -489,6 +489,23 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         </div>
       )}
 
+      {isLive && (
+        <div className="card" style={{ marginBottom: 30 }}>
+          <div className="eyebrow">Memorial plaque</div>
+          <h3 style={{ marginTop: 10 }}>A keepsake plaque for {m.fullName.split(' ')[0]}</h3>
+          <p className="muted">
+            Design a plaque that links straight to {m.fullName.split(' ')[0]}&rsquo;s page — lovely
+            for a mantelpiece, a prayer card, or a wake remembrance. If you&rsquo;ve set a hero
+            photo it can go in the centre of the QR; otherwise the LiveOnWith.me mark steps in.
+          </p>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+            <Link href={`/memorial/${m.id}/plaque`} className="button">
+              Design the plaque
+            </Link>
+          </div>
+        </div>
+      )}
+
       {isLive && m.plotId && m.cemetery && auth.currentUser && (
         <PlotLocationEditor
           plotId={m.plotId}

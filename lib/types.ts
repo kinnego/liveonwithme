@@ -183,6 +183,8 @@ export interface Contribution {
   memory?: string;
   photoUrl?: string;
   photoPath?: string;
+  audioPath?: string;
+  audioMimeType?: string;
   caption?: string;
   status: 'pending' | 'approved' | 'rejected';
   source?: ContributionSource;
@@ -202,6 +204,9 @@ export interface Contribution {
 // QR codes always resolve to a Plot, never a Person or Memorial directly.
 
 export type PlaqueShape = 'oval' | 'round' | 'square';
+// Orientation only applies to the oval — portrait is the traditional
+// headstone shape; landscape is useful for shop-window demo cards.
+export type PlaqueOrientation = 'portrait' | 'landscape';
 
 export interface PlaqueDesign {
   shape: PlaqueShape;
@@ -451,8 +456,8 @@ export const DEFAULT_QUOTAS: MediaQuotasConfig = {
   videosPerMemorial: 3,
   videoDurationSecondsMax: 90,
   audioMinutesPerMemorial: 15,
-  totalBytesPerMemorial: 2 * 1024 * 1024 * 1024, // 2 GB
-  singleFileBytesMax: 100 * 1024 * 1024,          // 100 MB
+  totalBytesPerMemorial: 300 * 1024 * 1024,       // 300 MB — plenty for a lifetime of photos and a handful of voice notes
+  singleFileBytesMax: 50 * 1024 * 1024,           // 50 MB
 };
 
 // ─── Pricing config ──────────────────────────────────────────────────────────

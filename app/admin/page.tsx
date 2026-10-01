@@ -72,6 +72,10 @@ export default function AdminHome() {
           <h3>Audit log</h3>
           <p className="muted">Recent state changes across the platform.</p>
         </Link>
+        <Link href="/demo-qr" className="card" style={{ display: 'block' }}>
+          <h3>Demo QR</h3>
+          <p className="muted">Printable card linking to the sample memorial. Shared with partners.</p>
+        </Link>
       </div>
     </main>
   );

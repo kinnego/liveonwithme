@@ -161,6 +161,20 @@ export default function PartnerDashboard() {
         </p>
       </div>
 
+      <div
+        className="card"
+        style={{ marginBottom: 30, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}
+      >
+        <div style={{ flex: '1 1 240px' }}>
+          <h3 style={{ margin: 0 }}>Demo QR for your shop</h3>
+          <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
+            A printable card with a QR that opens a sample memorial — handy for the counter when
+            you&rsquo;re talking families through what it looks like.
+          </p>
+        </div>
+        <Link href="/demo-qr" className="button secondary">Get the demo QR</Link>
+      </div>
+
       {items.length === 0 ? (
         <div className="card">
           <h3>No memorials set up yet</h3>
