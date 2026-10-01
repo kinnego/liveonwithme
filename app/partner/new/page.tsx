@@ -20,7 +20,34 @@ export default function NewPartnerCustomer() {
   const [ok, setOk] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [bereavedEmail, setBereavedEmail] = useState('');
+  const [emailExists, setEmailExists] = useState(false);
   const router = useRouter();
+
+  // Debounced existence check — informational only, we never block submit.
+  // If the family already has an account, the claim flow reuses it; if not,
+  // it provisions one. Both work.
+  useEffect(() => {
+    const trimmed = bereavedEmail.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes('@') || trimmed.length < 5) {
+      setEmailExists(false);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/user/exists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: trimmed }),
+        });
+        const data = await res.json();
+        setEmailExists(!!data.exists);
+      } catch {
+        setEmailExists(false);
+      }
+    }, 450);
+    return () => clearTimeout(t);
+  }, [bereavedEmail]);
 
   useEffect(() => {
     if (!auth) return;
@@ -118,7 +145,19 @@ export default function NewPartnerCustomer() {
           <div className="twoCol">
             <div>
               <label htmlFor="bereavedEmail">Email</label>
-              <input id="bereavedEmail" name="bereavedEmail" type="email" required />
+              <input
+                id="bereavedEmail"
+                name="bereavedEmail"
+                type="email"
+                required
+                value={bereavedEmail}
+                onChange={(e) => setBereavedEmail(e.target.value)}
+              />
+              {emailExists && (
+                <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+                  This person already has a LiveOnWith.me account — the invite will attach to it.
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="bereavedPhone">Phone</label>

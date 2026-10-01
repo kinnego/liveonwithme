@@ -65,7 +65,33 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [emailExists, setEmailExists] = useState(false);
   const router = useRouter();
+
+  // Debounced check against /api/user/exists. Only surfaces in register mode;
+  // we use the result to disable submit and offer a one-click switch to login.
+  useEffect(() => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes('@') || trimmed.length < 5) {
+      setEmailExists(false);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/user/exists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: trimmed }),
+        });
+        const data = await res.json();
+        setEmailExists(!!data.exists);
+      } catch {
+        setEmailExists(false);
+      }
+    }, 450);
+    return () => clearTimeout(t);
+  }, [email]);
 
   // Visitors arriving from a "start something" route almost certainly don't
   // have an account yet — default to register so we're not asking them for a
@@ -228,7 +254,30 @@ export default function AuthPage() {
 
         <form method="post" action="?" onSubmit={submitEmail}>
           <label>Email</label>
-          <input name="email" type="email" required autoComplete="email" />
+          <input
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          {mode === 'register' && emailExists && (
+            <div style={{ marginTop: 8, fontSize: 14, color: '#8b6f30', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span>An account with that email already exists.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setError('');
+                  setNotice('');
+                }}
+                style={{ background: 'none', border: 0, padding: 0, color: 'var(--sage)', cursor: 'pointer', textDecoration: 'underline', fontSize: 14 }}
+              >
+                Sign in instead
+              </button>
+            </div>
+          )}
 
           {mode !== 'reset' && (
             <>
@@ -276,7 +325,7 @@ export default function AuthPage() {
           <button
             className="button"
             style={{ width: '100%', marginTop: 24 }}
-            disabled={loading}
+            disabled={loading || (mode === 'register' && emailExists)}
           >
             {loading ? 'Working…' : primaryLabel}
           </button>
