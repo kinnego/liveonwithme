@@ -5,6 +5,7 @@ import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  updateProfile,
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -67,6 +68,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [emailExists, setEmailExists] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   // Debounced check against /api/user/exists. Only surfaces in register mode;
@@ -118,11 +120,18 @@ export default function AuthPage() {
     const fd = new FormData(e.currentTarget);
     const email = String(fd.get('email')).trim();
     const password = String(fd.get('password') || '');
+    const fullName = String(fd.get('fullName') || '').trim();
 
     try {
       if (mode === 'register') {
+        if (!fullName) {
+          setError('Please enter your name.');
+          setLoading(false);
+          return;
+        }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await ensureUserProfile(cred.user.uid, cred.user.email, cred.user.displayName);
+        await updateProfile(cred.user, { displayName: fullName });
+        await ensureUserProfile(cred.user.uid, cred.user.email, fullName);
         router.push(nextPath() || '/dashboard');
       } else if (mode === 'login') {
         const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -253,7 +262,20 @@ export default function AuthPage() {
         )}
 
         <form method="post" action="?" onSubmit={submitEmail}>
-          <label>Email</label>
+          {mode === 'register' && (
+            <>
+              <label>Full name</label>
+              <input
+                name="fullName"
+                type="text"
+                required
+                autoComplete="name"
+                placeholder="e.g. Mary O'Donnell"
+              />
+            </>
+          )}
+
+          <label style={mode === 'register' ? { marginTop: 18 } : undefined}>Email</label>
           <input
             name="email"
             type="email"
@@ -305,13 +327,36 @@ export default function AuthPage() {
                   </button>
                 )}
               </div>
-              <input
-                name="password"
-                type="password"
-                minLength={6}
-                required
-                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  minLength={6}
+                  required
+                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                  style={{ paddingRight: 60 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  style={{
+                    position: 'absolute',
+                    right: 12,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 0,
+                    padding: 0,
+                    color: 'var(--sage)',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </>
           )}
 
