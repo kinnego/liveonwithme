@@ -16,6 +16,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { resizeForMobile } from '@/lib/image';
+import { canEditMemorial } from '@/lib/roles';
+import type { Memorial } from '@/lib/types';
 import PhotoFocusEditor from '@/components/PhotoFocusEditor';
 import { PageSkeleton } from '@/components/Skeleton';
 
@@ -48,7 +50,7 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
           return;
         }
         const snap = await getDoc(doc(db, 'memorials', id));
-        if (!snap.exists() || snap.data().ownerId !== u.uid) {
+        if (!snap.exists() || !canEditMemorial(u.uid, snap.data() as Memorial)) {
           return router.push('/dashboard');
         }
         setM({ id: snap.id, ...snap.data() });

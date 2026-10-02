@@ -7,7 +7,8 @@ import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { calculateAgeAtDeath } from '@/lib/age';
 import { resizeForMobile } from '@/lib/image';
-import type { Cemetery } from '@/lib/types';
+import type { Cemetery, Memorial } from '@/lib/types';
+import { canEditMemorial } from '@/lib/roles';
 import CemeteryPicker from '@/components/CemeteryPicker';
 import { PageSkeleton } from '@/components/Skeleton';
 import { DEFAULT_SONG_LABEL, parseYoutubeVideoId } from '@/lib/song';
@@ -31,7 +32,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
       onAuthStateChanged(auth, async (u) => {
         if (!u) return router.push('/auth');
         const snap = await getDoc(doc(db, 'memorials', id));
-        if (!snap.exists() || snap.data().ownerId !== u.uid) {
+        if (!snap.exists() || !canEditMemorial(u.uid, snap.data() as Memorial)) {
           return router.push('/dashboard');
         }
         const data: any = { id: snap.id, ...snap.data() };

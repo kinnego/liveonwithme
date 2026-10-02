@@ -77,16 +77,28 @@ export async function POST(req: NextRequest) {
 
     const memorial = memSnap.data()!;
     const currentSuccessors: string[] = memorial.successorUids || [];
+    const currentCoManagers: string[] = memorial.coManagerUids || [];
 
     if (transfer.nominationType === 'primary') {
       // Swap custody. Previous owner is preserved as first backup so they can
-      // still see the memorial in their dashboard.
+      // still see the memorial in their dashboard. If the new owner was a
+      // co-manager, drop them from that list — they're the owner now.
       const nextSuccessors = [memorial.ownerId, ...currentSuccessors.filter((s) => s !== uid)];
       await memRef.update({
         ownerId: uid,
         successorUids: nextSuccessors,
+        coManagerUids: currentCoManagers.filter((c) => c !== uid),
         updatedAt: FieldValue.serverTimestamp(),
       });
+    } else if (transfer.nominationType === 'coManager') {
+      // Co-manager accepts: append to coManagerUids. Owner can't be their own
+      // co-manager, and we don't duplicate.
+      if (uid !== memorial.ownerId && !currentCoManagers.includes(uid)) {
+        await memRef.update({
+          coManagerUids: [...currentCoManagers, uid],
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
     } else {
       // Backup nomination: append to successorUids if not already there.
       if (!currentSuccessors.includes(uid)) {

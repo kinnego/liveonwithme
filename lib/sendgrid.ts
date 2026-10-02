@@ -106,6 +106,81 @@ function firstName(fullName?: string): string {
   return fullName.trim().split(/\s+/)[0] || '';
 }
 
+export async function sendCustodyInvite(
+  to: string,
+  token: string,
+  memorialName: string,
+  inviterName: string | undefined,
+  nominationType: 'primary' | 'backup' | 'coManager'
+) {
+  const link = `${siteUrl()}/custody/accept/${encodeURIComponent(token)}`;
+  const from = inviterName?.trim() ? inviterName.trim() : 'a family member';
+
+  const heading =
+    nominationType === 'primary'
+      ? `You've been invited to look after ${memorialName}'s memorial`
+      : nominationType === 'coManager'
+        ? `You've been invited to help manage ${memorialName}'s memorial`
+        : `You've been named a backup custodian for ${memorialName}'s memorial`;
+
+  const bodyIntro =
+    nominationType === 'primary'
+      ? `${from} would like to pass custody of ${memorialName}'s memorial on LiveOnWith.me to you. Accepting means you become the person who looks after it from now on. The memorial URL stays the same.`
+      : nominationType === 'coManager'
+        ? `${from} has invited you to help manage ${memorialName}'s memorial on LiveOnWith.me. You'll be able to approve memories, add photos and edit the story alongside them.`
+        : `${from} has named you as a backup custodian for ${memorialName}'s memorial on LiveOnWith.me. Nothing changes today — but if the primary custodian is ever unable to look after it, custody would move to you.`;
+
+  const subject =
+    nominationType === 'coManager'
+      ? `Help manage ${memorialName}'s memorial`
+      : nominationType === 'primary'
+        ? `Custody of ${memorialName}'s memorial`
+        : `Backup custodian for ${memorialName}'s memorial`;
+
+  const text = [
+    heading,
+    '',
+    bodyIntro,
+    '',
+    'Open the private link below to accept or decline:',
+    link,
+    '',
+    "Please sign in with this email address so we can match the invitation to you. If you don't have a LiveOnWith.me account yet, we'll help you create one.",
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:26px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          ${heading}
+        </h1>
+        <p style="font-family:Inter,system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 22px;">
+          ${bodyIntro}
+        </p>
+        <p style="text-align:center;margin:32px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open the invitation
+          </a>
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
+          If the button doesn't work, copy and paste this into your browser:<br>
+          <span style="word-break:break-all;color:#688076;">${link}</span>
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
+          Please sign in with this email address so we can match the invitation to you. If you don't have a LiveOnWith.me account yet, we'll help you create one.
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
 export async function sendClaimInvite(
   to: string,
   token: string,

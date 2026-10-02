@@ -35,16 +35,20 @@ function StatusBadge({ status }: { status?: string }) {
 export default function Dashboard() {
   const [owned, setOwned] = useState<any[]>([]);
   const [nominated, setNominated] = useState<any[]>([]);
+  const [coManaging, setCoManaging] = useState<any[]>([]);
   const router = useRouter();
 
   useEffect(() => {
     let stopOwned: (() => void) | undefined;
     let stopNominated: (() => void) | undefined;
+    let stopCoManaging: (() => void) | undefined;
     const teardownListeners = () => {
       stopOwned?.();
       stopNominated?.();
+      stopCoManaging?.();
       stopOwned = undefined;
       stopNominated = undefined;
+      stopCoManaging = undefined;
     };
     const stopAuth = onAuthStateChanged(auth, (u) => {
       // Always tear down first: on signout the old listeners would re-evaluate
@@ -53,6 +57,7 @@ export default function Dashboard() {
       if (!u) {
         setOwned([]);
         setNominated([]);
+        setCoManaging([]);
         router.push('/auth');
         return;
       }
@@ -63,6 +68,14 @@ export default function Dashboard() {
       stopNominated = onSnapshot(
         query(collection(db, 'memorials'), where('successorUids', 'array-contains', u.uid)),
         (s) => setNominated(s.docs.map((d) => ({ id: d.id, ...d.data() })))
+      );
+      // Soft-fail: before the firestore.rules update is deployed, this query
+      // returns permission-denied. Treat that as "no co-managed memorials yet"
+      // instead of surfacing a loud console error.
+      stopCoManaging = onSnapshot(
+        query(collection(db, 'memorials'), where('coManagerUids', 'array-contains', u.uid)),
+        (s) => setCoManaging(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => setCoManaging([])
       );
     });
     return () => {
@@ -110,6 +123,30 @@ export default function Dashboard() {
             </Link>
           ))}
         </div>
+      )}
+
+      {coManaging.length > 0 && (
+        <section style={{ marginTop: 40 }}>
+          <div className="eyebrow">Helping manage</div>
+          <h3 style={{ marginTop: 6 }}>Memorials you co-manage</h3>
+          <p className="muted" style={{ marginBottom: 20 }}>
+            You can add photos, approve memories, and edit the story alongside the owner.
+          </p>
+          <div className="featureGrid">
+            {coManaging.map((m) => (
+              <Link href={`/memorial/${m.id}/manage`} className="card" key={m.id}>
+                <StatusBadge status={m.status} />
+                <h3 style={{ marginTop: 18 }}>{m.fullName}</h3>
+                <p className="muted">
+                  {m.kind === 'legacy'
+                    ? m.born?.slice(0, 4) || 'A legacy page'
+                    : `${m.born?.slice(0, 4) || ''}${m.died ? ` — ${m.died.slice(0, 4)}` : ''}`}
+                </p>
+                <span>Manage {m.kind === 'legacy' ? 'page' : 'memorial'} →</span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {nominated.length > 0 && (

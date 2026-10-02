@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { r2Client, R2_BUCKET } from '@/lib/r2';
 import { adminDb, verifyIdToken } from '@/lib/firebase-admin';
-import { isSuperAdmin } from '@/lib/roles';
+import { canEditMemorial, isSuperAdmin } from '@/lib/roles';
 import type { Memorial, UserProfile } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     const profSnap = await db.collection('users').doc(uid).get();
     const prof = profSnap.exists ? (profSnap.data() as UserProfile) : null;
     const allowed =
-      memorial.ownerId === uid ||
+      canEditMemorial(uid, memorial) ||
       (memorial.successorUids || []).includes(uid) ||
       isSuperAdmin(prof);
     if (!allowed) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });

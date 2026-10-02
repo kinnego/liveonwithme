@@ -4,8 +4,13 @@ service firebase.storage {
     function memorial(memorialId) {
       return firestore.get(/databases/(default)/documents/memorials/$(memorialId)).data;
     }
-    function owner(memorialId) {
-      return request.auth != null && memorial(memorialId).ownerId == request.auth.uid;
+    // Owner OR co-manager — same edit rights for day-to-day media.
+    function canEdit(memorialId) {
+      let m = memorial(memorialId);
+      return request.auth != null && (
+        m.ownerId == request.auth.uid
+        || request.auth.uid in m.get('coManagerUids', [])
+      );
     }
     function visible(memorialId) {
       return memorial(memorialId).visibility in ['public', 'unlisted'];
@@ -15,14 +20,14 @@ service firebase.storage {
     }
 
     match /memorials/{memorialId}/{fileName} {
-      allow read: if owner(memorialId) || visible(memorialId);
-      allow create, update, delete: if owner(memorialId) && (request.resource == null || validImage());
+      allow read: if canEdit(memorialId) || visible(memorialId);
+      allow create, update, delete: if canEdit(memorialId) && (request.resource == null || validImage());
     }
 
     match /contributions/{memorialId}/{fileName} {
       allow create: if validImage();
-      allow read: if owner(memorialId) || visible(memorialId);
-      allow update, delete: if owner(memorialId);
+      allow read: if canEdit(memorialId) || visible(memorialId);
+      allow update, delete: if canEdit(memorialId);
     }
   }
 }

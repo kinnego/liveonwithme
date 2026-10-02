@@ -20,7 +20,16 @@ import { writeAudit } from '@/lib/audit';
 import { longToken } from '@/lib/ids';
 import { readQuotas, readPricing } from '@/lib/config';
 import { isSecondaryOnPlot } from '@/lib/pricing';
-import { DEFAULT_PRICING, DEFAULT_QUOTAS, MediaQuotasConfig, PricingConfig } from '@/lib/types';
+import { canEditMemorial, isMemorialOwner } from '@/lib/roles';
+import { arrayRemove } from 'firebase/firestore';
+import {
+  DEFAULT_PRICING,
+  DEFAULT_QUOTAS,
+  MAX_CO_MANAGERS,
+  MediaQuotasConfig,
+  Memorial,
+  PricingConfig,
+} from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 import PlotLocationEditor from '@/components/PlotLocationEditor';
 import SongEditor from '@/components/SongEditor';
@@ -88,8 +97,14 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const [successorEmail, setSuccessorEmail] = useState('');
   const [successorType, setSuccessorType] = useState<'backup' | 'primary'>('backup');
   const [nominationError, setNominationError] = useState('');
-  const [nominationLink, setNominationLink] = useState('');
   const [savingNomination, setSavingNomination] = useState(false);
+  const [coManagerEmail, setCoManagerEmail] = useState('');
+  const [coManagerError, setCoManagerError] = useState('');
+  const [coManagerInvite, setCoManagerInvite] = useState<{ id: string; link: string; email: string } | null>(null);
+  const [savingCoManager, setSavingCoManager] = useState(false);
+  const [nominationInvite, setNominationInvite] = useState<{ id: string; link: string; email: string } | null>(null);
+  const [emailStatus, setEmailStatus] = useState<Record<string, { sending?: boolean; sent?: boolean; error?: string }>>({});
+  const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [quotas, setQuotas] = useState<MediaQuotasConfig>(DEFAULT_QUOTAS);
   const [usageBytes, setUsageBytes] = useState<number>(0);
   const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
@@ -119,7 +134,9 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           return;
         }
         const snap = await getDoc(doc(db, 'memorials', id));
-        if (!snap.exists() || snap.data().ownerId !== u.uid) return router.push('/dashboard');
+        if (!snap.exists() || !canEditMemorial(u.uid, snap.data() as Memorial)) {
+          return router.push('/dashboard');
+        }
         const memData: any = { id: snap.id, ...snap.data() };
         setM(memData);
         stopContrib = onSnapshot(
@@ -130,15 +147,20 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           ),
           (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() })))
         );
-        stopTransfers = onSnapshot(
-          query(
-            collection(db, 'custodyTransfers'),
-            where('memorialId', '==', id),
-            where('fromUid', '==', u.uid),
-            where('status', '==', 'pending')
-          ),
-          (s) => setPendingTransfers(s.docs.map((d) => ({ id: d.id, ...d.data() })))
-        );
+        // Only the owner issues custody/co-manager invitations, so the
+        // "pending invitations" list is owner-only; skip the subscription
+        // when a co-manager visits.
+        if (isMemorialOwner(u.uid, memData)) {
+          stopTransfers = onSnapshot(
+            query(
+              collection(db, 'custodyTransfers'),
+              where('memorialId', '==', id),
+              where('fromUid', '==', u.uid),
+              where('status', '==', 'pending')
+            ),
+            (s) => setPendingTransfers(s.docs.map((d) => ({ id: d.id, ...d.data() })))
+          );
+        }
         stopAll = onSnapshot(
           query(collection(db, 'contributions'), where('memorialId', '==', id)),
           (s) => {
@@ -164,6 +186,47 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
       teardown();
     };
   }, [params, router]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2200);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  function showToast(text: string) {
+    setToast({ text, key: Date.now() });
+  }
+
+  async function copyToClipboard(text: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(label);
+    } catch {
+      showToast('Could not copy — please select and copy the link manually.');
+    }
+  }
+
+  async function sendInviteEmail(transferId: string) {
+    if (!auth.currentUser) return;
+    setEmailStatus((s) => ({ ...s, [transferId]: { sending: true } }));
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/custody/send-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ transferId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not send that invitation.');
+      setEmailStatus((s) => ({ ...s, [transferId]: { sent: true } }));
+      showToast('Invitation emailed');
+    } catch (err: any) {
+      setEmailStatus((s) => ({ ...s, [transferId]: { error: err.message } }));
+    }
+  }
 
   async function refreshMemorial() {
     if (!m) return;
@@ -213,13 +276,14 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
     }
     setSavingNomination(true);
     setNominationError('');
-    setNominationLink('');
+    setNominationInvite(null);
     try {
       const token = longToken(32);
+      const email = successorEmail.trim().toLowerCase();
       const ref = await addDoc(collection(db, 'custodyTransfers'), {
         memorialId: m.id,
         fromUid: auth.currentUser.uid,
-        toEmail: successorEmail.trim().toLowerCase(),
+        toEmail: email,
         token,
         nominationType: successorType,
         status: 'pending',
@@ -233,12 +297,12 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         actorEmail: auth.currentUser.email || undefined,
         details: {
           memorialId: m.id,
-          toEmail: successorEmail.trim().toLowerCase(),
+          toEmail: email,
           nominationType: successorType,
         },
       });
       const link = `${window.location.origin}/custody/accept/${token}`;
-      setNominationLink(link);
+      setNominationInvite({ id: ref.id, link, email });
       setSuccessorEmail('');
     } catch (err: any) {
       setNominationError(err.message || 'Something went wrong sending the invitation.');
@@ -260,6 +324,70 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
       actorUid: auth.currentUser.uid,
       actorEmail: auth.currentUser.email || undefined,
     });
+  }
+
+  async function inviteCoManager() {
+    if (!m || !auth.currentUser) return;
+    const email = coManagerEmail.trim().toLowerCase();
+    if (!email) {
+      setCoManagerError('Please add an email address for the person you\u2019re inviting.');
+      return;
+    }
+    if ((m.coManagerUids || []).length >= MAX_CO_MANAGERS) {
+      setCoManagerError(`You can have up to ${MAX_CO_MANAGERS} co-managers. Remove one before inviting another.`);
+      return;
+    }
+    setSavingCoManager(true);
+    setCoManagerError('');
+    setCoManagerInvite(null);
+    try {
+      const token = longToken(32);
+      const ref = await addDoc(collection(db, 'custodyTransfers'), {
+        memorialId: m.id,
+        fromUid: auth.currentUser.uid,
+        toEmail: email,
+        token,
+        nominationType: 'coManager',
+        status: 'pending',
+        invitedAt: serverTimestamp(),
+      });
+      await writeAudit({
+        entityType: 'custodyTransfer',
+        entityId: ref.id,
+        action: 'invited',
+        actorUid: auth.currentUser.uid,
+        actorEmail: auth.currentUser.email || undefined,
+        details: { memorialId: m.id, toEmail: email, nominationType: 'coManager' },
+      });
+      const link = `${window.location.origin}/custody/accept/${token}`;
+      setCoManagerInvite({ id: ref.id, link, email });
+      setCoManagerEmail('');
+    } catch (err: any) {
+      setCoManagerError(err.message || 'Something went wrong sending the invitation.');
+    } finally {
+      setSavingCoManager(false);
+    }
+  }
+
+  async function removeCoManager(uid: string) {
+    if (!m || !auth.currentUser) return;
+    try {
+      await updateDoc(doc(db, 'memorials', m.id), {
+        coManagerUids: arrayRemove(uid),
+        updatedAt: serverTimestamp(),
+      });
+      await writeAudit({
+        entityType: 'memorial',
+        entityId: m.id,
+        action: 'coManagerRemoved',
+        actorUid: auth.currentUser.uid,
+        actorEmail: auth.currentUser.email || undefined,
+        details: { removedUid: uid },
+      });
+      await refreshMemorial();
+    } catch (err: any) {
+      setCoManagerError(err.message || 'Could not remove that co-manager.');
+    }
   }
 
   async function linkPlot() {
@@ -304,6 +432,8 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const isAwaitingPayment = m.status === 'awaiting_payment';
   const isPartnerPaid = m.paymentStatus === 'paid_via_partner' || m.paymentStatus === 'paid_via_funeral_director';
   const isLegacy = m.kind === 'legacy';
+  const isOwner = isMemorialOwner(auth.currentUser?.uid, m);
+  const coManagerUids: string[] = m.coManagerUids || [];
   const pageWord = isLegacy ? 'page' : 'memorial';
   const pageWordCap = isLegacy ? 'Page' : 'Memorial';
   const firstName = m.fullName.split(' ')[0];
@@ -336,8 +466,25 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         </div>
       </div>
 
+      {!isOwner && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 24,
+            background: '#fffdf9',
+            border: '1px solid var(--line)',
+          }}
+        >
+          <div className="eyebrow">You&rsquo;re a co-manager</div>
+          <p className="muted" style={{ margin: '8px 0 0' }}>
+            You can approve memories, add photos and edit the story. The memorial&rsquo;s
+            owner looks after publishing, succession and billing.
+          </p>
+        </div>
+      )}
+
       {/* Go Live section */}
-      {!isLive && (
+      {isOwner && !isLive && (
         <div
           className="card"
           style={{
@@ -418,7 +565,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
             <button
               className="button"
-              onClick={() => navigator.clipboard.writeText(publicUrl)}
+              onClick={() => copyToClipboard(publicUrl, `${pageWordCap} link copied to clipboard`)}
             >
               Copy {pageWord} link
             </button>
@@ -549,6 +696,97 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
       )}
 
       <div className="card" style={{ marginBottom: 30 }}>
+        <div className="eyebrow">People who help manage this memorial</div>
+        <h3 style={{ marginTop: 10 }}>
+          {isOwner ? 'Invite a co-manager' : 'Co-managers'}
+        </h3>
+        <p className="muted">
+          {isOwner
+            ? `A co-manager can add photos, approve condolences, and edit the story alongside you. They can't transfer custody or delete the memorial — only you can do that. You can have up to ${MAX_CO_MANAGERS}.`
+            : `These people can help manage the memorial alongside the owner.`}
+        </p>
+
+        {coManagerUids.length > 0 ? (
+          <ul className="muted" style={{ margin: '14px 0 0', paddingLeft: 20, fontSize: 14 }}>
+            {coManagerUids.map((uid) => (
+              <li key={uid} style={{ marginBottom: 6 }}>
+                <code>{uid}</code>
+                {isOwner && (
+                  <button
+                    className="button secondary small"
+                    style={{ marginLeft: 10 }}
+                    onClick={() => removeCoManager(uid)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          isOwner && (
+            <p className="muted" style={{ marginTop: 6, fontSize: 13 }}>
+              No co-managers yet.
+            </p>
+          )
+        )}
+
+        {isOwner && coManagerUids.length < MAX_CO_MANAGERS && (
+          <div style={{ marginTop: 22 }}>
+            <label htmlFor="coManagerEmail">Email of the person you want to invite</label>
+            <input
+              id="coManagerEmail"
+              type="email"
+              value={coManagerEmail}
+              onChange={(e) => setCoManagerEmail(e.target.value)}
+              placeholder="e.g. sister@example.com"
+            />
+            {coManagerError && (
+              <p style={{ color: '#a94442', marginTop: 12, fontSize: 14 }}>{coManagerError}</p>
+            )}
+            {coManagerInvite && (
+              <div style={{ marginTop: 16, padding: '14px 18px', background: '#e8f0ea', borderRadius: 12, border: '1px solid #a8bcae' }}>
+                <p style={{ margin: 0, fontSize: 14 }}>
+                  <strong>Invitation ready for {coManagerInvite.email}.</strong> Email it to
+                  them, or copy the link and share it however suits. Once they sign in with
+                  the same email and accept, they&rsquo;ll be able to help manage the memorial.
+                </p>
+                <p style={{ margin: '8px 0', fontSize: 13, wordBreak: 'break-all' }}>{coManagerInvite.link}</p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    className="button small"
+                    onClick={() => sendInviteEmail(coManagerInvite.id)}
+                    disabled={!!emailStatus[coManagerInvite.id]?.sending}
+                  >
+                    {emailStatus[coManagerInvite.id]?.sending
+                      ? 'Sending\u2026'
+                      : emailStatus[coManagerInvite.id]?.sent
+                        ? 'Email sent — resend'
+                        : `Email invitation to ${coManagerInvite.email}`}
+                  </button>
+                  <button
+                    className="button secondary small"
+                    onClick={() => copyToClipboard(coManagerInvite.link, 'Invitation link copied to clipboard')}
+                  >
+                    Copy invitation link
+                  </button>
+                </div>
+                {emailStatus[coManagerInvite.id]?.error && (
+                  <p style={{ color: '#a94442', margin: '10px 0 0', fontSize: 13 }}>
+                    {emailStatus[coManagerInvite.id]?.error}
+                  </p>
+                )}
+              </div>
+            )}
+            <button className="button" style={{ marginTop: 18 }} onClick={inviteCoManager} disabled={savingCoManager}>
+              {savingCoManager ? 'Preparing invitation\u2026' : 'Send invitation'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {isOwner && (
+      <div className="card" style={{ marginBottom: 30 }}>
         <div className="eyebrow">Looking to the future</div>
         <h3 style={{ marginTop: 10 }}>Nominate someone to look after this memorial</h3>
         <p className="muted">
@@ -578,6 +816,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             </p>
             {pendingTransfers.map((t) => {
               const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/custody/accept/${t.token}`;
+              const status = emailStatus[t.id] || {};
               return (
                 <div key={t.id} style={{ marginTop: 10, padding: '12px 16px', border: '1px solid var(--line)', borderRadius: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -587,12 +826,23 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                         · {t.nominationType === 'primary' ? 'transfer of custody' : 'backup nomination'}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        className="button small"
+                        onClick={() => sendInviteEmail(t.id)}
+                        disabled={!!status.sending}
+                      >
+                        {status.sending
+                          ? 'Sending\u2026'
+                          : status.sent
+                            ? 'Email sent — resend'
+                            : 'Email invitation'}
+                      </button>
                       <button
                         className="button secondary small"
-                        onClick={() => navigator.clipboard.writeText(link)}
+                        onClick={() => copyToClipboard(link, 'Invitation link copied to clipboard')}
                       >
-                        Copy invitation link
+                        Copy link
                       </button>
                       <button className="button secondary small" onClick={() => cancelNomination(t.id)}>
                         Cancel
@@ -602,6 +852,9 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                   <p className="muted" style={{ margin: '6px 0 0', fontSize: 12, wordBreak: 'break-all' }}>
                     {link}
                   </p>
+                  {status.error && (
+                    <p style={{ color: '#a94442', margin: '6px 0 0', fontSize: 13 }}>{status.error}</p>
+                  )}
                 </div>
               );
             })}
@@ -646,19 +899,38 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             <p style={{ color: '#a94442', marginTop: 12, fontSize: 14 }}>{nominationError}</p>
           )}
 
-          {nominationLink && (
+          {nominationInvite && (
             <div style={{ marginTop: 16, padding: '14px 18px', background: '#e8f0ea', borderRadius: 12, border: '1px solid #a8bcae' }}>
               <p style={{ margin: 0, fontSize: 14 }}>
-                <strong>Invitation ready.</strong> Send this link to the person you nominated.
-                Once they sign in with the same email and accept, we&rsquo;ll do the rest.
+                <strong>Invitation ready for {nominationInvite.email}.</strong> Email it to them,
+                or copy the link and share it however suits. Once they sign in with the same
+                email and accept, we&rsquo;ll do the rest.
               </p>
-              <p style={{ margin: '8px 0', fontSize: 13, wordBreak: 'break-all' }}>{nominationLink}</p>
-              <button
-                className="button secondary small"
-                onClick={() => navigator.clipboard.writeText(nominationLink)}
-              >
-                Copy invitation link
-              </button>
+              <p style={{ margin: '8px 0', fontSize: 13, wordBreak: 'break-all' }}>{nominationInvite.link}</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  className="button small"
+                  onClick={() => sendInviteEmail(nominationInvite.id)}
+                  disabled={!!emailStatus[nominationInvite.id]?.sending}
+                >
+                  {emailStatus[nominationInvite.id]?.sending
+                    ? 'Sending\u2026'
+                    : emailStatus[nominationInvite.id]?.sent
+                      ? 'Email sent — resend'
+                      : `Email invitation to ${nominationInvite.email}`}
+                </button>
+                <button
+                  className="button secondary small"
+                  onClick={() => copyToClipboard(nominationInvite.link, 'Invitation link copied to clipboard')}
+                >
+                  Copy invitation link
+                </button>
+              </div>
+              {emailStatus[nominationInvite.id]?.error && (
+                <p style={{ color: '#a94442', margin: '10px 0 0', fontSize: 13 }}>
+                  {emailStatus[nominationInvite.id]?.error}
+                </p>
+              )}
             </div>
           )}
 
@@ -667,6 +939,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           </button>
         </div>
       </div>
+      )}
 
       {(!m.epitaph || !m.story) && (
         <div
@@ -734,7 +1007,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           <button
             className="button soft"
             disabled={!isLive}
-            onClick={() => navigator.clipboard.writeText(publicUrl)}
+            onClick={() => copyToClipboard(publicUrl, `${pageWordCap} link copied to clipboard`)}
           >
             {isLive ? `Copy ${pageWord} link` : 'Publish first to share'}
           </button>
@@ -822,6 +1095,30 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             })
           )}
         </section>
+      )}
+
+      {toast && (
+        <div
+          key={toast.key}
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            bottom: 30,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#25312d',
+            color: '#fffdf9',
+            padding: '10px 20px',
+            borderRadius: 999,
+            fontSize: 14,
+            fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+            boxShadow: '0 10px 28px rgba(0,0,0,0.22)',
+            zIndex: 1000,
+          }}
+        >
+          {toast.text}
+        </div>
       )}
     </main>
   );

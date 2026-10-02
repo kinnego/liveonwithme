@@ -16,6 +16,8 @@ import {
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { canEditMemorial } from '@/lib/roles';
+import type { Memorial } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -57,7 +59,7 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
           return;
         }
         const snap = await getDoc(doc(db, 'memorials', id));
-        if (!snap.exists() || snap.data().ownerId !== u.uid) {
+        if (!snap.exists() || !canEditMemorial(u.uid, snap.data() as Memorial)) {
           return router.push('/dashboard');
         }
         setM({ id: snap.id, ...snap.data() });

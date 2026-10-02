@@ -98,15 +98,17 @@ export default function AuthPage() {
   // Visitors arriving from a "start something" route almost certainly don't
   // have an account yet — default to register so we're not asking them for a
   // password they never set. Existing users can flip to login with one click.
-  const [flowContext, setFlowContext] = useState<'default' | 'partner' | 'help'>('default');
+  const [flowContext, setFlowContext] = useState<'default' | 'partner' | 'help' | 'invite'>('default');
   useEffect(() => {
     const next = nextPath();
     if (next?.startsWith('/partner/')) setFlowContext('partner');
     else if (next?.startsWith('/help/')) setFlowContext('help');
+    else if (next?.startsWith('/custody/accept/')) setFlowContext('invite');
     if (
       next === '/create' ||
       next?.startsWith('/partner/') ||
-      next?.startsWith('/help/')
+      next?.startsWith('/help/') ||
+      next?.startsWith('/custody/accept/')
     ) {
       setMode('register');
     }
@@ -179,7 +181,9 @@ export default function AuthPage() {
         ? 'Create your partner account'
         : flowContext === 'help'
           ? 'Sign in or create an account'
-          : 'Create your account',
+          : flowContext === 'invite'
+            ? 'Create your account to continue'
+            : 'Create your account',
     reset: 'Reset your password',
   }[mode];
 
@@ -190,7 +194,9 @@ export default function AuthPage() {
         ? 'Set up your account so you can offer LiveOnWith.me to the families you serve.'
         : flowContext === 'help'
           ? 'You\'ll need a quick account before we can look at your request.'
-          : 'Your account gives you a private place to build memorials or your own legacy.',
+          : flowContext === 'invite'
+            ? 'Use the email address the invitation was sent to. Already have an account? Choose "I already have an account" below.'
+            : 'Your account gives you a private place to build memorials or your own legacy.',
     reset: 'Enter your email and we\'ll send you a reset link.',
   }[mode];
 

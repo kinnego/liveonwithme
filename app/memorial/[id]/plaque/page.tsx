@@ -14,7 +14,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import { auth, db } from '@/lib/firebase';
-import { isSuperAdmin } from '@/lib/roles';
+import { canEditMemorial, isSuperAdmin } from '@/lib/roles';
 import type { Memorial, PlaqueShape, PlaqueOrientation, UserProfile } from '@/lib/types';
 import {
   buildPlaqueSvg,
@@ -143,7 +143,7 @@ export default function MemorialPlaquePage({
           const profSnap = await getDoc(doc(db, 'users', u.uid));
           const prof = profSnap.exists() ? (profSnap.data() as UserProfile) : null;
           const allowed =
-            m.ownerId === u.uid ||
+            canEditMemorial(u.uid, m) ||
             (m.successorUids || []).includes(u.uid) ||
             isSuperAdmin(prof);
           if (!allowed) {

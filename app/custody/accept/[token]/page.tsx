@@ -110,17 +110,17 @@ export default function AcceptCustody({
       <main className="shell">
         <div className="formCard center">
           <div className="eyebrow">Custody invitation</div>
-          <h2>Please sign in to continue</h2>
+          <h2>Create an account to continue</h2>
           <p className="muted">
-            Sign in with the email address the invitation was sent to. If you don&rsquo;t have an
-            account yet, that&rsquo;s fine — sign in with the same email and we&rsquo;ll create one.
+            Please use the email address the invitation was sent to. If you already have a
+            LiveOnWith.me account with that email, you can sign in instead.
           </p>
           <Link
             href={`/auth?next=${encodeURIComponent(`/custody/accept/${token}`)}`}
             className="button"
             style={{ marginTop: 20 }}
           >
-            Sign in
+            Create account
           </Link>
         </div>
       </main>
@@ -181,16 +181,18 @@ export default function AcceptCustody({
   }
 
   if (outcome === 'accepted') {
+    const acceptedCopy =
+      transfer?.nominationType === 'primary'
+        ? `You are now the custodian of ${memorial?.fullName}'s memorial. It will appear in your dashboard.`
+        : transfer?.nominationType === 'coManager'
+          ? `You can now help manage ${memorial?.fullName}'s memorial — approving memories, adding photos, and editing the story. It will appear in your dashboard.`
+          : `You are now listed as a backup custodian for ${memorial?.fullName}'s memorial. If the primary custodian is ever unable to look after it, custody will move to you.`;
     return (
       <main className="shell">
         <div className="formCard center">
           <div className="eyebrow">Thank you</div>
-          <h2>Custody accepted</h2>
-          <p className="muted">
-            {transfer?.nominationType === 'primary'
-              ? `You are now the custodian of ${memorial?.fullName}'s memorial. It will appear in your dashboard.`
-              : `You are now listed as a backup custodian for ${memorial?.fullName}'s memorial. If the primary custodian is ever unable to look after it, custody will move to you.`}
-          </p>
+          <h2>{transfer?.nominationType === 'coManager' ? 'Invitation accepted' : 'Custody accepted'}</h2>
+          <p className="muted">{acceptedCopy}</p>
           <Link href="/dashboard" className="button" style={{ marginTop: 20 }}>
             Go to my dashboard
           </Link>
@@ -212,20 +214,28 @@ export default function AcceptCustody({
     );
   }
 
-  const nominationLabel = transfer?.nominationType === 'primary' ? 'as the new custodian' : 'as a backup custodian';
+  const nominationLabel =
+    transfer?.nominationType === 'primary'
+      ? 'as the new custodian of'
+      : transfer?.nominationType === 'coManager'
+        ? 'to help manage'
+        : 'as a backup custodian of';
+  const eyebrow = transfer?.nominationType === 'coManager' ? 'Co-manager invitation' : 'Custody invitation';
+  const bodyCopy =
+    transfer?.nominationType === 'primary'
+      ? `Accepting means you become the person who looks after this memorial from now on. The current custodian will remain listed as a backup so they can still see it. The memorial URL stays exactly the same.`
+      : transfer?.nominationType === 'coManager'
+        ? `You'll be able to approve memories, add photos, and edit the story alongside the current custodian. You can't transfer custody or delete the memorial — those stay with the owner.`
+        : `A backup custodian doesn't do anything today — but if the primary custodian is ever unable to look after the memorial, custody moves to you. It's a gentle way for a family to make sure nothing is ever lost.`;
 
   return (
     <main className="shell">
       <div className="formCard">
-        <div className="eyebrow">Custody invitation</div>
+        <div className="eyebrow">{eyebrow}</div>
         <h2>
-          You&rsquo;ve been invited {nominationLabel} of {memorial?.fullName || 'a memorial'}
+          You&rsquo;ve been invited {nominationLabel} {memorial?.fullName || 'a memorial'}
         </h2>
-        <p className="muted">
-          {transfer?.nominationType === 'primary'
-            ? `Accepting means you become the person who looks after this memorial from now on. The current custodian will remain listed as a backup so they can still see it. The memorial URL stays exactly the same.`
-            : `A backup custodian doesn't do anything today — but if the primary custodian is ever unable to look after the memorial, custody moves to you. It's a gentle way for a family to make sure nothing is ever lost.`}
-        </p>
+        <p className="muted">{bodyCopy}</p>
 
         <div className="card" style={{ background: '#fffdf9', marginTop: 24 }}>
           <p style={{ margin: 0 }}>

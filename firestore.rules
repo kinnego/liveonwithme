@@ -24,6 +24,16 @@ service cloud.firestore {
 
     function memorial(id) { return get(/databases/$(database)/documents/memorials/$(id)).data; }
     function ownsMemorial(id) { return signedIn() && memorial(id).ownerId == request.auth.uid; }
+    // Co-managers can edit day-to-day content (contributions, photos, story)
+    // but cannot touch custody-related fields — see the memorial update rule
+    // below for the field-level guard.
+    function canEditMemorialDoc(id) {
+      let m = memorial(id);
+      return signedIn() && (
+        m.ownerId == request.auth.uid
+        || request.auth.uid in m.get('coManagerUids', [])
+      );
+    }
     function memorialIsLive(id) { return memorial(id).status == 'live'; }
     function memorialIsLiveAndVisible(id) {
       let m = memorial(id);
@@ -76,23 +86,38 @@ service cloud.firestore {
         (resource.data.status == 'live' && resource.data.visibility in ['public','unlisted'])
         || (signedIn() && resource.data.ownerId == request.auth.uid)
         || (signedIn() && request.auth.uid in resource.data.get('successorUids', []))
+        || (signedIn() && request.auth.uid in resource.data.get('coManagerUids', []))
         || isSuperAdmin();
 
       allow list: if
         (signedIn() && resource.data.ownerId == request.auth.uid)
         || (signedIn() && request.auth.uid in resource.data.get('successorUids', []))
+        || (signedIn() && request.auth.uid in resource.data.get('coManagerUids', []))
         || (resource.data.status == 'live' && resource.data.visibility == 'public')
         || isSuperAdmin();
 
-      // Custodian can edit content but never payment/status/custody fields.
+      // Custodian or co-manager can edit content but never payment/status/
+      // custody-list fields. Co-managers additionally cannot modify the
+      // coManagerUids array — only the owner can grant or revoke that role.
       allow update: if signedIn()
-        && resource.data.ownerId == request.auth.uid
+        && (
+          resource.data.ownerId == request.auth.uid
+          || request.auth.uid in resource.data.get('coManagerUids', [])
+        )
         && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.status == resource.data.status
         && request.resource.data.paymentStatus == resource.data.paymentStatus
         && request.resource.data.salesChannel == resource.data.salesChannel
         && request.resource.data.get('partnerUid', null) == resource.data.get('partnerUid', null)
-        && request.resource.data.get('referralId', null) == resource.data.get('referralId', null);
+        && request.resource.data.get('referralId', null) == resource.data.get('referralId', null)
+        && (
+          resource.data.ownerId == request.auth.uid
+          || request.resource.data.get('coManagerUids', []) == resource.data.get('coManagerUids', [])
+        )
+        && (
+          resource.data.ownerId == request.auth.uid
+          || request.resource.data.get('successorUids', []) == resource.data.get('successorUids', [])
+        );
 
       // Super admin can do administrative fixes (rare, audited).
       allow update, delete: if isSuperAdmin();
@@ -110,14 +135,13 @@ service cloud.firestore {
           && memorialIsLive(request.resource.data.memorialId)
         )
         || (
-          signedIn()
-          && ownsMemorial(request.resource.data.memorialId)
+          canEditMemorialDoc(request.resource.data.memorialId)
           && request.resource.data.source == 'family'
         );
-      allow read: if ownsMemorial(resource.data.memorialId)
+      allow read: if canEditMemorialDoc(resource.data.memorialId)
         || (resource.data.status == 'approved' && memorialIsLiveAndVisible(resource.data.memorialId))
         || isSuperAdmin();
-      allow update, delete: if ownsMemorial(resource.data.memorialId) || isSuperAdmin();
+      allow update, delete: if canEditMemorialDoc(resource.data.memorialId) || isSuperAdmin();
     }
 
     // ─── plots ───────────────────────────────────────────────────────────────
@@ -185,11 +209,14 @@ service cloud.firestore {
     // ─── custody transfers ───────────────────────────────────────────────────
     match /custodyTransfers/{id} {
       // Only the current custodian of the memorial may create a transfer.
+      // 'coManager' is a non-destructive add (grants edit rights) alongside
+      // the existing 'primary' (full handover) and 'backup' (successor-only)
+      // flows.
       allow create: if signedIn()
         && ownsMemorial(request.resource.data.memorialId)
         && request.resource.data.fromUid == request.auth.uid
         && request.resource.data.status == 'pending'
-        && request.resource.data.nominationType in ['primary', 'backup'];
+        && request.resource.data.nominationType in ['primary', 'backup', 'coManager'];
 
       // Read: the sender, the invited email owner (once signed in), super admin.
       allow get: if signedIn() && (

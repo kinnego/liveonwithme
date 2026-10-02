@@ -126,6 +126,10 @@ export interface Memorial {
   ownerId: string; // current custodian (stable field name for backward compat + rules)
   createdByUid?: string;
   successorUids?: string[]; // ordered: [primary, backup1, backup2, ...]
+  // Flat set of helpers who can edit day-to-day (approve condolences, upload
+  // photos, edit the story) without ever being able to transfer custody,
+  // publish, or delete. Owner-controlled; capped at MAX_CO_MANAGERS below.
+  coManagerUids?: string[];
 
   kind?: MemorialKind; // 'memorial' (deceased) or 'legacy' (alive, self-created)
 
@@ -275,7 +279,11 @@ export type CustodyTransferStatus =
   | 'expired'
   | 'cancelled';
 
-export type CustodyNominationType = 'primary' | 'backup';
+export type CustodyNominationType = 'primary' | 'backup' | 'coManager';
+
+// Keep the ceiling low — more than a handful of equal editors tends to cause
+// disputes rather than help on a memorial. The owner stays separate from this.
+export const MAX_CO_MANAGERS = 3;
 
 export interface CustodyTransfer {
   id: string;
