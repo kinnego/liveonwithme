@@ -434,6 +434,8 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const isLegacy = m.kind === 'legacy';
   const isOwner = isMemorialOwner(auth.currentUser?.uid, m);
   const coManagerUids: string[] = m.coManagerUids || [];
+  const coManagerPending = pendingTransfers.filter((t) => t.nominationType === 'coManager');
+  const successionPending = pendingTransfers.filter((t) => t.nominationType !== 'coManager');
   const pageWord = isLegacy ? 'page' : 'memorial';
   const pageWordCap = isLegacy ? 'Page' : 'Memorial';
   const firstName = m.fullName.split(' ')[0];
@@ -724,11 +726,58 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             ))}
           </ul>
         ) : (
-          isOwner && (
+          isOwner && coManagerPending.length === 0 && (
             <p className="muted" style={{ marginTop: 6, fontSize: 13 }}>
               No co-managers yet.
             </p>
           )
+        )}
+
+        {isOwner && coManagerPending.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 750, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+              Pending co-manager invitations
+            </p>
+            {coManagerPending.map((t) => {
+              const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/custody/accept/${t.token}`;
+              const status = emailStatus[t.id] || {};
+              return (
+                <div key={t.id} style={{ marginTop: 10, padding: '12px 16px', border: '1px solid var(--line)', borderRadius: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <strong>{t.toEmail}</strong>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        className="button small"
+                        onClick={() => sendInviteEmail(t.id)}
+                        disabled={!!status.sending}
+                      >
+                        {status.sending
+                          ? 'Sending\u2026'
+                          : status.sent
+                            ? 'Email sent — resend'
+                            : 'Email invitation'}
+                      </button>
+                      <button
+                        className="button secondary small"
+                        onClick={() => copyToClipboard(link, 'Invitation link copied to clipboard')}
+                      >
+                        Copy link
+                      </button>
+                      <button className="button secondary small" onClick={() => cancelNomination(t.id)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                  <p className="muted" style={{ margin: '6px 0 0', fontSize: 12, wordBreak: 'break-all' }}>
+                    {link}
+                  </p>
+                  {status.error && (
+                    <p style={{ color: '#a94442', margin: '6px 0 0', fontSize: 13 }}>{status.error}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
 
         {isOwner && coManagerUids.length < MAX_CO_MANAGERS && (
@@ -809,12 +858,12 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           </div>
         )}
 
-        {pendingTransfers.length > 0 && (
+        {successionPending.length > 0 && (
           <div style={{ marginTop: 18 }}>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 750, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--muted)' }}>
               Pending invitations
             </p>
-            {pendingTransfers.map((t) => {
+            {successionPending.map((t) => {
               const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/custody/accept/${t.token}`;
               const status = emailStatus[t.id] || {};
               return (
