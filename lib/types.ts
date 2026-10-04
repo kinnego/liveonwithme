@@ -170,6 +170,15 @@ export interface Memorial {
 
   // legacy (before-death) helpers
   legacyLastEditedAt?: unknown;
+  // One-time claim code for a self-managed (kind === 'legacy') page. The
+  // plaintext is shown to the owner exactly once at generation time; only
+  // the SHA-256 hash is stored. The hint (last 5 chars of the canonical
+  // form) lets the owner confirm which code is active without ever seeing
+  // the full value again. Set and cleared only by the admin SDK — client
+  // writes to these fields are blocked by firestore.rules.
+  legacyClaimCodeHash?: string;
+  legacyClaimCodeHint?: string;
+  legacyClaimCodeSetAt?: unknown;
 
   publishedAt?: unknown;
   createdAt?: unknown;

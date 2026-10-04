@@ -105,6 +105,9 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const [nominationInvite, setNominationInvite] = useState<{ id: string; link: string; email: string } | null>(null);
   const [emailStatus, setEmailStatus] = useState<Record<string, { sending?: boolean; sent?: boolean; error?: string }>>({});
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [codeError, setCodeError] = useState('');
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [quotas, setQuotas] = useState<MediaQuotasConfig>(DEFAULT_QUOTAS);
   const [usageBytes, setUsageBytes] = useState<number>(0);
   const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
@@ -367,6 +370,67 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
     } finally {
       setSavingCoManager(false);
     }
+  }
+
+  async function generateClaimCode() {
+    if (!m || !auth.currentUser) return;
+    setGeneratingCode(true);
+    setCodeError('');
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/legacy/generate-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ memorialId: m.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not generate a claim code.');
+      setGeneratedCode(data.code);
+      await refreshMemorial();
+    } catch (err: any) {
+      setCodeError(err.message);
+    } finally {
+      setGeneratingCode(false);
+    }
+  }
+
+  function printClaimLetter() {
+    if (!generatedCode || !m) return;
+    const w = window.open('', '_blank', 'width=720,height=900');
+    if (!w) {
+      showToast('Please allow pop-ups so we can open the printable letter.');
+      return;
+    }
+    const esc = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const fullName = esc(m.fullName || 'My page');
+    const slug = esc(m.slug || '');
+    const origin = window.location.origin;
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"/><title>LiveOnWith.me claim letter — ${fullName}</title><style>
+      body { font-family: Georgia, 'Times New Roman', serif; color: #25312d; max-width: 620px; margin: 60px auto; padding: 0 40px; line-height: 1.55; }
+      h1 { font-size: 24px; margin: 0 0 24px; letter-spacing: 0.02em; font-weight: 500; }
+      .mark { text-align: center; font-size: 18px; letter-spacing: 0.04em; margin-bottom: 32px; }
+      .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 22px; letter-spacing: 0.1em; padding: 20px; border: 2px solid #25312d; border-radius: 8px; text-align: center; margin: 28px 0; background: #fffdf9; }
+      .muted { color: #6d7772; font-size: 14px; }
+      .footer { margin-top: 44px; border-top: 1px solid #d8d4cc; padding-top: 20px; font-size: 13px; color: #6d7772; }
+      a { color: #25312d; }
+      @media print { body { margin: 20mm; padding: 0; } }
+    </style></head><body>
+      <div class="mark">LiveOnWith.me</div>
+      <h1>For whoever looks after my memory</h1>
+      <p>I set up a page on LiveOnWith.me for myself at <strong>${fullName}</strong>. If you're reading this, it's time for someone to take over looking after it.</p>
+      <p>Visit this page and sign in with your own email address:</p>
+      <p style="font-family: ui-monospace, monospace; font-size: 16px;"><a href="${origin}/legacy/claim">${origin}/legacy/claim</a></p>
+      <p>Then enter this code when prompted:</p>
+      <div class="code">${esc(generatedCode)}</div>
+      <p class="muted">The code is single-use. Entering it moves the page into your care — you'll be able to add photographs, memories, and share the page with others. The web address of the page itself never changes.</p>
+      <div class="footer">LiveOnWith.me — a quiet place to remember and be remembered.<br/>The page lives at: <a href="${origin}/m/${slug}">${origin}/m/${slug}</a></div>
+      <script>setTimeout(function(){window.print();}, 400);</script>
+    </body></html>`);
+    w.document.close();
   }
 
   async function removeCoManager(uid: string) {
@@ -990,6 +1054,61 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
       </div>
       )}
 
+      {isLegacy && isOwner && (
+        <div className="card" style={{ marginBottom: 30 }}>
+          <div className="eyebrow">For when the time comes</div>
+          <h3 style={{ marginTop: 10 }}>Legacy claim code</h3>
+          <p className="muted">
+            A one-time printed code for the person you&rsquo;d like to look after this page
+            when you&rsquo;re gone. Keep it somewhere safe — with your will, in a deed box, with
+            someone you trust. Entering the code on LiveOnWith.me transfers the page in a
+            single step, so share it carefully.
+          </p>
+
+          {m.legacyClaimCodeHint ? (
+            <div
+              style={{
+                marginTop: 18,
+                padding: '14px 18px',
+                background: '#fffdf9',
+                border: '1px solid var(--line)',
+                borderRadius: 12,
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 14 }}>
+                <strong>A claim code is set.</strong> It ends in{' '}
+                <code style={{ letterSpacing: '0.08em' }}>&hellip;{m.legacyClaimCodeHint}</code>.
+              </p>
+              <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }}>
+                Lost the letter, or need to change who inherits? Generate a new code — the old
+                one will stop working immediately.
+              </p>
+            </div>
+          ) : (
+            <p className="muted" style={{ marginTop: 14, fontSize: 13 }}>
+              No claim code yet. Generate one and print it when you&rsquo;re ready.
+            </p>
+          )}
+
+          {codeError && (
+            <p style={{ color: '#a94442', marginTop: 12, fontSize: 14 }}>{codeError}</p>
+          )}
+
+          <button
+            className="button"
+            style={{ marginTop: 18 }}
+            onClick={generateClaimCode}
+            disabled={generatingCode}
+          >
+            {generatingCode
+              ? 'Generating\u2026'
+              : m.legacyClaimCodeHint
+                ? 'Regenerate claim code'
+                : 'Generate claim code'}
+          </button>
+        </div>
+      )}
+
       {(!m.epitaph || !m.story) && (
         <div
           className="card"
@@ -1144,6 +1263,73 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             })
           )}
         </section>
+      )}
+
+      {generatedCode && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(37, 49, 45, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+            zIndex: 2000,
+          }}
+          onClick={() => setGeneratedCode(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fffdf9',
+              padding: '32px 32px 28px',
+              borderRadius: 20,
+              maxWidth: 520,
+              width: '100%',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+            }}
+          >
+            <div className="eyebrow">Your claim code</div>
+            <h3 style={{ marginTop: 10 }}>Keep this safe</h3>
+            <p className="muted" style={{ fontSize: 14 }}>
+              This is the <strong>only</strong> time we&rsquo;ll show you the code. Print the letter,
+              or copy the code into a safe place now. Anyone who has it can take over the page.
+            </p>
+            <div
+              style={{
+                margin: '20px 0',
+                padding: '20px',
+                border: '2px solid #25312d',
+                borderRadius: 10,
+                background: '#f7f4ee',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+                fontSize: 18,
+                letterSpacing: '0.08em',
+                textAlign: 'center',
+                wordBreak: 'break-all',
+              }}
+            >
+              {generatedCode}
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                className="button"
+                onClick={() => copyToClipboard(generatedCode, 'Claim code copied to clipboard')}
+              >
+                Copy code
+              </button>
+              <button className="button secondary" onClick={printClaimLetter}>
+                Print letter
+              </button>
+              <button className="button secondary" onClick={() => setGeneratedCode(null)}>
+                I&rsquo;ve saved it
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {toast && (

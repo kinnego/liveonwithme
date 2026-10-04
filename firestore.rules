@@ -98,7 +98,10 @@ service cloud.firestore {
 
       // Custodian or co-manager can edit content but never payment/status/
       // custody-list fields. Co-managers additionally cannot modify the
-      // coManagerUids array — only the owner can grant or revoke that role.
+      // coManagerUids array, successorUids, or kind — only the owner can
+      // grant/revoke co-manager rights, nominate successors, or convert a
+      // legacy page to a memorial. Legacy claim-code fields are managed
+      // exclusively server-side via the admin SDK — no client write path.
       allow update: if signedIn()
         && (
           resource.data.ownerId == request.auth.uid
@@ -110,6 +113,9 @@ service cloud.firestore {
         && request.resource.data.salesChannel == resource.data.salesChannel
         && request.resource.data.get('partnerUid', null) == resource.data.get('partnerUid', null)
         && request.resource.data.get('referralId', null) == resource.data.get('referralId', null)
+        && request.resource.data.get('legacyClaimCodeHash', null) == resource.data.get('legacyClaimCodeHash', null)
+        && request.resource.data.get('legacyClaimCodeHint', null) == resource.data.get('legacyClaimCodeHint', null)
+        && request.resource.data.get('legacyClaimCodeSetAt', null) == resource.data.get('legacyClaimCodeSetAt', null)
         && (
           resource.data.ownerId == request.auth.uid
           || request.resource.data.get('coManagerUids', []) == resource.data.get('coManagerUids', [])
@@ -117,6 +123,10 @@ service cloud.firestore {
         && (
           resource.data.ownerId == request.auth.uid
           || request.resource.data.get('successorUids', []) == resource.data.get('successorUids', [])
+        )
+        && (
+          resource.data.ownerId == request.auth.uid
+          || request.resource.data.get('kind', null) == resource.data.get('kind', null)
         );
 
       // Super admin can do administrative fixes (rare, audited).

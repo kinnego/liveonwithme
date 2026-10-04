@@ -1,6 +1,28 @@
 # Status & next steps
 
-Last updated: 2026-10-02, branch `claude/ubuntu-machine-or-phone-ovt1xa` (the GitHub default — there is no separate `main`).
+Last updated: 2026-10-04, branch `claude/ubuntu-machine-or-phone-ovt1xa` (the GitHub default — there is no separate `main`).
+
+## 2026-10-04 session handoff
+
+### Shipped since last update
+
+- **Legacy claim code for self-managed pages.** An owner of a `kind === 'legacy'` page can now generate a one-time printed code and store it with their will. On the manage page, a new "Legacy claim code" card (owner + legacy only) offers Generate / Regenerate; the plaintext is shown exactly once in a modal with Copy + "Print letter" (opens a printable popup pre-formatted with the code, the `/legacy/claim` URL, and the page link).
+- **Public claim page at `/legacy/claim`.** Signed-in-only. User enters the code, server hashes it, matches against `memorials.legacyClaimCodeHash`, and performs a transactional custody swap: `ownerId` → claimant, previous owner prepended to `successorUids`, co-manager removed if the claimant was one, `kind` flipped from `'legacy'` to `'memorial'`, code fields deleted. Audit event `legacy_claimed`.
+- **Code format.** 20 characters from the Crockford-ish alphabet (no 0/O/I/1/L), 4 groups of 5 — ~99 bits of entropy. SHA-256 hashed; only the hash + last-5-char hint persist. Dashes/spaces/casing in the printed letter don't matter when retyping (normalized before hashing).
+- **Firestore rules updated and deployed.** `legacyClaimCodeHash`, `legacyClaimCodeHint`, `legacyClaimCodeSetAt` are universally locked (no client write path — admin SDK only). `kind` is now owner-only (co-managers can't flip legacy→memorial). Deployed via `firebase deploy --only firestore:rules`.
+
+### Required before anything else works in production
+
+- **No new env vars required for this session's work.**
+- Firestore rules were deployed from this session (`firebase deploy --only firestore:rules`). No pending rules changes.
+
+### Smoke tests after each deploy
+
+1. **Legacy code generate + print.** Create a legacy page (or use an existing one owned by you). Open manage → scroll to "Legacy claim code" card → Generate claim code. Modal appears with the 20-char code. Click Print letter → popup opens with the formatted letter → auto-prints. Click "I've saved it". Reload the page — the card should show "A claim code is set. It ends in …XXXXX".
+2. **Legacy code claim (same user).** From the owner account, visit `/legacy/claim`, paste the code → should get "You already own this page." (400).
+3. **Legacy code claim (different user).** Sign in as a second account (different email). Visit `/legacy/claim`, paste the code → redirected to `/memorial/{id}/manage`. Verify: ownerId is the new user; previous owner appears in successorUids on Firestore; `kind` is now `'memorial'`; code fields are gone; manage page no longer shows the Legacy claim code card for the new owner (because `isLegacy` is now false).
+4. **Regenerate invalidates old code.** Owner generates code A, prints it. Owner clicks Regenerate → gets code B. Try claiming with code A from another account → "We couldn't match that code to a page." Try with code B → succeeds.
+5. **Double-claim race (optional).** The claim route uses a Firestore transaction, so simultaneous claims by two different accounts should result in one success + one 409. Hard to test manually; trust the transaction.
 
 ## 2026-10-02 session handoff
 
