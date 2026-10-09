@@ -639,85 +639,85 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         </div>
       )}
 
-      {isLive && (
-        <div className="card" style={{ marginBottom: 30 }}>
-          <div className="eyebrow">Headstone QR</div>
-          <h3 style={{ marginTop: 10 }}>A QR code for the resting place</h3>
-          {m.plotId ? (
-            <>
-              <p className="muted">
-                This memorial is linked to a plot. The QR code sits with the plot, so anyone who
-                scans it sees everyone remembered at that resting place. A beautiful way to
-                honour a family grave.
-              </p>
-              <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-                <Link href={`/plot/${m.plotId}/plaque`} className="button">
-                  Get oval plaque (logo + QR)
-                </Link>
-                <Link href={`/plot/${m.plotId}/qr`} className="button secondary">
-                  QR code only
-                </Link>
-                <Link href={`/plot/${m.plotId}`} className="button secondary">
-                  View plot page
-                </Link>
-                <Link
-                  href={`/create?plot=${encodeURIComponent(m.plotId)}`}
-                  className="button secondary"
-                >
-                  Add another memorial to this plot
-                </Link>
-              </div>
-              <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>
-                Additional names on this plot use the reduced rate. The QR is already engraved
-                on the stone, so nothing physical needs to change.
-              </p>
-            </>
-          ) : m.cemetery?.placeId ? (
-            <>
-              <p className="muted">
-                Create the plot for {m.fullName.split(' ')[0]}&rsquo;s resting place and we&rsquo;ll
-                generate an etchable QR code your engraver (e.g. stonemason or laser engraver) can
-                add to the headstone. The QR links
-                to a page listing everyone remembered at that plot, so future family members can
-                be added over time without ever changing the code on the stone.
-              </p>
-              {plotError && (
-                <p style={{ color: '#a94442', marginTop: 12, fontSize: 14 }}>{plotError}</p>
-              )}
-              <button className="button" style={{ marginTop: 16 }} onClick={linkPlot} disabled={linkingPlot}>
-                {linkingPlot ? 'Creating plot…' : 'Create plot & get QR code'}
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="muted">
-                To generate a headstone QR, first add the cemetery to the memorial. The plot lives
-                at that cemetery, and the QR code links to the plot.
-              </p>
-              <Link href={`/memorial/${m.id}/edit`} className="button secondary" style={{ marginTop: 16 }}>
-                Add cemetery details
-              </Link>
-            </>
-          )}
-        </div>
-      )}
-
-      {isLive && (
-        <div className="card" style={{ marginBottom: 30 }}>
-          <div className="eyebrow">Memorial plaque</div>
-          <h3 style={{ marginTop: 10 }}>A keepsake plaque for {m.fullName.split(' ')[0]}</h3>
+      {(!m.epitaph || !m.story) && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 24,
+            background: 'linear-gradient(135deg, #fffdf9, #f6efe1)',
+            borderColor: '#e0d3b0',
+          }}
+        >
+          <div className="eyebrow">Finish setting up</div>
+          <h3 style={{ marginTop: 10 }}>
+            {isLegacy ? 'A few more words to make it yours' : `A few more words about ${firstName}`}
+          </h3>
           <p className="muted">
-            Design a plaque that links straight to {m.fullName.split(' ')[0]}&rsquo;s page — lovely
-            for a mantelpiece, a prayer card, or a wake remembrance. If you&rsquo;ve set a hero
-            photo it can go in the centre of the QR; otherwise the LiveOnWith.me mark steps in.
+            {isLegacy
+              ? "Add a short line for beneath your name and the fuller story when you're ready. Write as little or as much as feels right."
+              : `Add a short line for beneath the name and the fuller story when you're ready. Write as little or as much as feels right.`}
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-            <Link href={`/memorial/${m.id}/plaque`} className="button">
-              Design the plaque
+            <Link href={`/memorial/${m.id}/edit`} className="button">
+              {!m.epitaph && !m.story
+                ? isLegacy ? 'Add a line and your story' : 'Add a line and their story'
+                : !m.epitaph
+                  ? isLegacy ? 'Add a line beneath your name' : 'Add a line beneath the name'
+                  : 'Add the story'}
+            </Link>
+            <Link href={`/memorial/${m.id}/gallery`} className="button secondary">
+              Add photographs
             </Link>
           </div>
         </div>
       )}
+
+      {/* Primary content-editing surface — kept near the top so the owner can
+          reach text, photos, memories and the song/video in one glance. */}
+      <div className="featureGrid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+        <div className="card">
+          <h3>{isLegacy ? 'Edit the details' : 'Edit their story'}</h3>
+          <p className="muted">Name, dates, introduction, life story and privacy.</p>
+          <Link href={`/memorial/${m.id}/edit`} className="button soft">
+            Edit {pageWord}
+          </Link>
+        </div>
+        <div className="card">
+          <h3>Photographs</h3>
+          <p className="muted">Upload photographs, star up to 4 favourites for the highlighted strip.</p>
+          <Link href={`/memorial/${m.id}/gallery`} className="button soft">
+            Open gallery
+          </Link>
+        </div>
+        <div className="card">
+          <h3>{isLegacy ? 'Your own memories' : 'Family memories'}</h3>
+          <p className="muted">
+            {isLegacy
+              ? 'Write in your own voice. The memories and moments you want carried forward.'
+              : `Write your own memories. The family's voice on the memorial.`}
+          </p>
+          <Link href={`/memorial/${m.id}/memories`} className="button soft">
+            Write memories
+          </Link>
+        </div>
+        <div className="card">
+          <h3>Invite people</h3>
+          <p className="muted">Send the private link to people who knew them.</p>
+          <button
+            className="button soft"
+            disabled={!isLive}
+            onClick={() => copyToClipboard(publicUrl, `${pageWordCap} link copied to clipboard`)}
+          >
+            {isLive ? `Copy ${pageWord} link` : 'Publish first to share'}
+          </button>
+        </div>
+      </div>
+
+      <SongEditor
+        memorialId={m.id}
+        currentSongUrl={m.songUrl}
+        currentSongLabel={m.songLabel}
+      />
 
       {isLive && m.plotId && m.cemetery && auth.currentUser && (
         <PlotLocationEditor
@@ -727,13 +727,6 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           actorEmail={auth.currentUser.email || undefined}
         />
       )}
-
-      <SongEditor
-        memorialId={m.id}
-        currentSongUrl={m.songUrl}
-        currentSongLabel={m.songLabel}
-      />
-
 
       {isLive && quotas.totalBytesPerMemorial > 0 && (
         <div className="card" style={{ marginBottom: 30, display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1109,79 +1102,6 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         </div>
       )}
 
-      {(!m.epitaph || !m.story) && (
-        <div
-          className="card"
-          style={{
-            marginBottom: 24,
-            background: 'linear-gradient(135deg, #fffdf9, #f6efe1)',
-            borderColor: '#e0d3b0',
-          }}
-        >
-          <div className="eyebrow">Finish setting up</div>
-          <h3 style={{ marginTop: 10 }}>
-            {isLegacy ? 'A few more words to make it yours' : `A few more words about ${firstName}`}
-          </h3>
-          <p className="muted">
-            {isLegacy
-              ? "Add a short line for beneath your name and the fuller story when you're ready. Write as little or as much as feels right."
-              : `Add a short line for beneath the name and the fuller story when you're ready. Write as little or as much as feels right.`}
-          </p>
-          <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-            <Link href={`/memorial/${m.id}/edit`} className="button">
-              {!m.epitaph && !m.story
-                ? isLegacy ? 'Add a line and your story' : 'Add a line and their story'
-                : !m.epitaph
-                  ? isLegacy ? 'Add a line beneath your name' : 'Add a line beneath the name'
-                  : 'Add the story'}
-            </Link>
-            <Link href={`/memorial/${m.id}/gallery`} className="button secondary">
-              Add photographs
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Existing management cards */}
-      <div className="featureGrid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
-        <div className="card">
-          <h3>{isLegacy ? 'Edit the details' : 'Edit their story'}</h3>
-          <p className="muted">Name, dates, introduction, life story and privacy.</p>
-          <Link href={`/memorial/${m.id}/edit`} className="button soft">
-            Edit {pageWord}
-          </Link>
-        </div>
-        <div className="card">
-          <h3>Photographs</h3>
-          <p className="muted">Upload photographs, star up to 4 favourites for the highlighted strip.</p>
-          <Link href={`/memorial/${m.id}/gallery`} className="button soft">
-            Open gallery
-          </Link>
-        </div>
-        <div className="card">
-          <h3>{isLegacy ? 'Your own memories' : 'Family memories'}</h3>
-          <p className="muted">
-            {isLegacy
-              ? 'Write in your own voice. The memories and moments you want carried forward.'
-              : `Write your own memories. The family's voice on the memorial.`}
-          </p>
-          <Link href={`/memorial/${m.id}/memories`} className="button soft">
-            Write memories
-          </Link>
-        </div>
-        <div className="card">
-          <h3>Invite people</h3>
-          <p className="muted">Send the private link to people who knew them.</p>
-          <button
-            className="button soft"
-            disabled={!isLive}
-            onClick={() => copyToClipboard(publicUrl, `${pageWordCap} link copied to clipboard`)}
-          >
-            {isLive ? `Copy ${pageWord} link` : 'Publish first to share'}
-          </button>
-        </div>
-      </div>
-
       {isLive && (
         <section style={{ marginTop: 55 }}>
           <div className="eyebrow">Contributions inbox</div>
@@ -1263,6 +1183,89 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             })
           )}
         </section>
+      )}
+
+      {/* Plaque design cards — kept at the bottom. These are "once set up"
+          decisions rather than ongoing content work, so they sit after
+          everything the owner touches regularly. */}
+      {isLive && (
+        <div className="card" style={{ marginBottom: 30 }}>
+          <div className="eyebrow">Headstone QR</div>
+          <h3 style={{ marginTop: 10 }}>A QR code for the resting place</h3>
+          {m.plotId ? (
+            <>
+              <p className="muted">
+                This memorial is linked to a plot. The QR code sits with the plot, so anyone who
+                scans it sees everyone remembered at that resting place. A beautiful way to
+                honour a family grave.
+              </p>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+                <Link href={`/plot/${m.plotId}/plaque`} className="button">
+                  Get oval plaque (logo + QR)
+                </Link>
+                <Link href={`/plot/${m.plotId}/qr`} className="button secondary">
+                  QR code only
+                </Link>
+                <Link href={`/plot/${m.plotId}`} className="button secondary">
+                  View plot page
+                </Link>
+                <Link
+                  href={`/create?plot=${encodeURIComponent(m.plotId)}`}
+                  className="button secondary"
+                >
+                  Add another memorial to this plot
+                </Link>
+              </div>
+              <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>
+                Additional names on this plot use the reduced rate. The QR is already engraved
+                on the stone, so nothing physical needs to change.
+              </p>
+            </>
+          ) : m.cemetery?.placeId ? (
+            <>
+              <p className="muted">
+                Create the plot for {m.fullName.split(' ')[0]}&rsquo;s resting place and we&rsquo;ll
+                generate an etchable QR code your engraver (e.g. stonemason or laser engraver) can
+                add to the headstone. The QR links
+                to a page listing everyone remembered at that plot, so future family members can
+                be added over time without ever changing the code on the stone.
+              </p>
+              {plotError && (
+                <p style={{ color: '#a94442', marginTop: 12, fontSize: 14 }}>{plotError}</p>
+              )}
+              <button className="button" style={{ marginTop: 16 }} onClick={linkPlot} disabled={linkingPlot}>
+                {linkingPlot ? 'Creating plot…' : 'Create plot & get QR code'}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="muted">
+                To generate a headstone QR, first add the cemetery to the memorial. The plot lives
+                at that cemetery, and the QR code links to the plot.
+              </p>
+              <Link href={`/memorial/${m.id}/edit`} className="button secondary" style={{ marginTop: 16 }}>
+                Add cemetery details
+              </Link>
+            </>
+          )}
+        </div>
+      )}
+
+      {isLive && (
+        <div className="card" style={{ marginBottom: 30 }}>
+          <div className="eyebrow">Memorial plaque</div>
+          <h3 style={{ marginTop: 10 }}>A keepsake plaque for {m.fullName.split(' ')[0]}</h3>
+          <p className="muted">
+            Design a plaque that links straight to {m.fullName.split(' ')[0]}&rsquo;s page — lovely
+            for a mantelpiece, a prayer card, or a wake remembrance. If you&rsquo;ve set a hero
+            photo it can go in the centre of the QR; otherwise the LiveOnWith.me mark steps in.
+          </p>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+            <Link href={`/memorial/${m.id}/plaque`} className="button">
+              Design the plaque
+            </Link>
+          </div>
+        </div>
       )}
 
       {generatedCode && (

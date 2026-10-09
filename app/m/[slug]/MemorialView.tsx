@@ -1,7 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import QRCode from 'qrcode';
 import {
   collection,
   addDoc,
@@ -17,7 +16,7 @@ import { auth, db } from '@/lib/firebase';
 import { walkingDirectionsUrl } from '@/lib/plot';
 import { parseYoutubeVideoId, DEFAULT_SONG_LABEL } from '@/lib/song';
 import { resizeForMobile } from '@/lib/image';
-import { qrWithCenteredImage, sameOriginUrlToDataUrl } from '@/lib/qr';
+import { canEditMemorial } from '@/lib/roles';
 import { PageSkeleton } from '@/components/Skeleton';
 import SongPlayer from '@/components/SongPlayer';
 import Lightbox from 'yet-another-react-lightbox';
@@ -30,7 +29,6 @@ export const dynamic = 'force-dynamic';
 
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
-const SITE_LOGO_PATH = '/brand/live-on-with-me-logo-512.png';
 
 const demoPhotoUrls: Record<string, string> = {
   'demo-hero': '/demo/liveonwithme_lifestyle_01.jpg',
@@ -158,55 +156,6 @@ This is a place for all the pieces of Mary that live on in the people who knew h
 
 type LoadState = 'loading' | 'not_found' | 'draft_no_access' | 'ready';
 
-async function loadHeroDataUrl(
-  memorial: any,
-  viewer: User | null,
-): Promise<string | null> {
-  if (!memorial?.heroPhotoPath && !(memorial?.id === 'demo' && memorial?.heroPhotoUrl)) {
-    return null;
-  }
-  // Demo memorial's hero lives under /public, so a same-origin fetch is enough.
-  if (memorial.id === 'demo' && memorial.heroPhotoUrl?.startsWith('/')) {
-    try {
-      return await sameOriginUrlToDataUrl(memorial.heroPhotoUrl);
-    } catch {
-      return null;
-    }
-  }
-  // Owner previewing their own draft/unlisted memorial? The public endpoint
-  // only serves live memorials, so hit the authenticated route instead — it
-  // handles ownerId / successor / super-admin and returns the same data URL.
-  const isCustodian =
-    viewer &&
-    (viewer.uid === memorial.ownerId ||
-      (memorial.successorUids || []).includes(viewer.uid));
-  if (isCustodian) {
-    try {
-      const token = await viewer!.getIdToken();
-      const res = await fetch(
-        `/api/memorial/hero-photo?memorialId=${encodeURIComponent(memorial.id)}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.dataUrl) return data.dataUrl;
-      }
-    } catch {
-      /* fall through to public endpoint */
-    }
-  }
-  try {
-    const res = await fetch(
-      `/api/memorial/public-hero-photo?slug=${encodeURIComponent(memorial.slug || memorial.id)}`,
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.dataUrl || null;
-  } catch {
-    return null;
-  }
-}
-
 export default function Memorial({ params }: { params: Promise<{ slug: string }> }) {
   const [memorial, setMemorial] = useState<any>();
   const [plotCoords, setPlotCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -218,7 +167,6 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
   const [user, setUser] = useState<User | null>(null);
   const [isPreview, setIsPreview] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
-  const [qrSvg, setQrSvg] = useState('');
 
   useEffect(() => {
     if (!auth) return;
@@ -303,53 +251,6 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
       setLoadState('ready');
     });
   }, [params, user]);
-
-  // Build a QR code that points to this memorial, with the hero photo (if any)
-  // or the site mark dropped into its centre. The mono + contrast filter needs
-  // same-origin pixels, so we fetch the hero through an API endpoint that
-  // returns a data URL. On the Mary demo, the hero already lives under /public
-  // so a plain fetch is enough.
-  useEffect(() => {
-    if (loadState !== 'ready' || !memorial) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const target = `${SITE_URL}/m/${memorial.slug || memorial.id}`;
-        const [rawQr, logoDataUrl, heroDataUrl] = await Promise.all([
-          QRCode.toString(target, {
-            type: 'svg',
-            margin: 0,
-            color: { dark: '#000000', light: '#ffffff' },
-            errorCorrectionLevel: 'H',
-          }),
-          sameOriginUrlToDataUrl(SITE_LOGO_PATH),
-          loadHeroDataUrl(memorial, user),
-        ]);
-        if (cancelled) return;
-        const decorated = heroDataUrl
-          ? qrWithCenteredImage({
-              qrSvg: rawQr,
-              imageDataUrl: heroDataUrl,
-              photoShape: 'circle',
-              applyMonoFilter: true,
-              idPrefix: 'pageHero',
-            })
-          : qrWithCenteredImage({
-              qrSvg: rawQr,
-              imageDataUrl: logoDataUrl,
-              photoShape: 'circle',
-              applyMonoFilter: false,
-              idPrefix: 'pageLogo',
-            });
-        setQrSvg(decorated);
-      } catch {
-        /* QR is a nice-to-have — if the fetch fails we simply hide the block */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [loadState, memorial, user]);
 
   // Single canonical list of images that can appear in the lightbox: hero
   // first, then gallery photos, then any memory attachments not already in
@@ -789,36 +690,6 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         )}
       </section>
 
-      {qrSvg && (
-        <section id="qr" className="section center">
-          <div className="eyebrow">Scan or share</div>
-          <h2>A QR code for {firstName}&rsquo;s memorial</h2>
-          <p className="muted" style={{ maxWidth: 520, margin: '0 auto 24px' }}>
-            Point a phone camera at the code to open this page. Save or share the image
-            so friends and family can find {firstName} too.
-          </p>
-          <div
-            style={{
-              width: 260,
-              maxWidth: '100%',
-              margin: '0 auto',
-              borderRadius: 20,
-              padding: 18,
-              background: '#ffffff',
-              boxShadow: 'var(--shadow)',
-            }}
-            // qrcode produces a raw <svg>; set it inline so SVG filters (used
-            // for the mono photo centre) render in the same document.
-            dangerouslySetInnerHTML={{
-              __html: qrSvg.replace(
-                /<svg([^>]*)>/,
-                '<svg$1 style="display:block;width:100%;height:auto;">',
-              ),
-            }}
-          />
-        </section>
-      )}
-
       {!isPreview && memorial.id === 'demo' && (
         <section id="share" className="section">
           <div className="formCard">
@@ -1056,6 +927,17 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         carousel={{ finite: lightboxSlides.length <= 1 }}
         styles={{ container: { backgroundColor: 'rgba(15, 22, 20, 0.94)' } }}
       />
+
+      {canEditMemorial(user?.uid, memorial) && (
+        <Link
+          className="editFab"
+          href={`/memorial/${memorial.id}/manage`}
+          aria-label="Manage this memorial"
+        >
+          <span aria-hidden>✎</span>
+          <span>Manage memorial</span>
+        </Link>
+      )}
     </main>
   );
 }
