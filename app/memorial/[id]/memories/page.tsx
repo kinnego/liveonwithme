@@ -170,14 +170,18 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
 
   if (!m) return <PageSkeleton variant="detail" label="Loading memories" />;
 
+  // The gallery writes photo contributions with source: 'family' and an empty
+  // memory string, so filter those out — this page is only for written memories.
+  const memoryItems = items.filter((item) => (item.memory || '').trim().length > 0);
+
   return (
     <main className="shell">
       <div className="dashboardHead">
         <div>
-          <div className="eyebrow">Memories written by the family</div>
+          <div className="eyebrow">Memories from the memorial keeper</div>
           <h2 style={{ marginBottom: 0 }}>{m.fullName}</h2>
           <p className="muted" style={{ marginTop: 8 }}>
-            These appear in the &ldquo;In their words&rdquo; section of the memorial. Family
+            These appear in the &ldquo;In their words&rdquo; section of the memorial. Keeper
             memories are always visible.
           </p>
         </div>
@@ -264,12 +268,12 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
         </form>
       </div>
 
-      {items.length === 0 ? (
+      {memoryItems.length === 0 ? (
         <div className="card">
-          <p className="muted">No family memories yet. The first one you add above will appear here.</p>
+          <p className="muted">No memories yet. The first one you add above will appear here.</p>
         </div>
       ) : (
-        items.map((item) => (
+        memoryItems.map((item) => (
           <div className="card" key={item.id} style={{ marginBottom: 12 }}>
             <div className="quote" style={{ fontSize: 22, margin: '0 0 12px' }}>
               &ldquo;{item.memory}&rdquo;

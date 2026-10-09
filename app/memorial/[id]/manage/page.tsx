@@ -112,6 +112,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const [usageBytes, setUsageBytes] = useState<number>(0);
   const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
   const [isSecondary, setIsSecondary] = useState(false);
+  const [coManagerInfo, setCoManagerInfo] = useState<Record<string, { email?: string; displayName?: string }>>({});
   const router = useRouter();
 
   useEffect(() => {
@@ -195,6 +196,41 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
     const t = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // Resolve each co-manager UID to a friendly email/name via the server
+  // endpoint — client rules don't allow reading other users' profile docs.
+  useEffect(() => {
+    const uids: string[] = m?.coManagerUids || [];
+    if (!m?.id || uids.length === 0) {
+      setCoManagerInfo({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) return;
+        const res = await fetch('/api/memorial/co-manager-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ memorialId: m.id }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const map: Record<string, { email?: string; displayName?: string }> = {};
+        for (const row of data.coManagers || []) {
+          map[row.uid] = { email: row.email, displayName: row.displayName };
+        }
+        setCoManagerInfo(map);
+      } catch {
+        /* leave info empty; UI falls back to a short UID label */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [m?.id, (m?.coManagerUids || []).join(',')]);
 
   function showToast(text: string) {
     setToast({ text, key: Date.now() });
@@ -511,7 +547,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
     <main className="shell">
       <div className="dashboardHead">
         <div>
-          <div className="eyebrow">{isLegacy ? 'Your page' : 'Family controls'}</div>
+          <div className="eyebrow">{isLegacy ? 'Your page' : 'Keeper controls'}</div>
           <h2 style={{ marginBottom: 5 }}>{m.fullName}</h2>
           <p className="muted" style={{ margin: 0 }}>
             <StatusBadge status={m.status} />
@@ -690,26 +726,15 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           </Link>
         </div>
         <div className="card">
-          <h3>{isLegacy ? 'Your own memories' : 'Family memories'}</h3>
+          <h3>{isLegacy ? 'Your own memories' : 'Keeper memories'}</h3>
           <p className="muted">
             {isLegacy
               ? 'Write in your own voice. The memories and moments you want carried forward.'
-              : `Write your own memories. The family's voice on the memorial.`}
+              : `Write your own memories. The keeper's voice on the memorial.`}
           </p>
           <Link href={`/memorial/${m.id}/memories`} className="button soft">
             Write memories
           </Link>
-        </div>
-        <div className="card">
-          <h3>Invite people</h3>
-          <p className="muted">Send the private link to people who knew them.</p>
-          <button
-            className="button soft"
-            disabled={!isLive}
-            onClick={() => copyToClipboard(publicUrl, `${pageWordCap} link copied to clipboard`)}
-          >
-            {isLive ? `Copy ${pageWord} link` : 'Publish first to share'}
-          </button>
         </div>
       </div>
 
@@ -767,20 +792,27 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
 
         {coManagerUids.length > 0 ? (
           <ul className="muted" style={{ margin: '14px 0 0', paddingLeft: 20, fontSize: 14 }}>
-            {coManagerUids.map((uid) => (
-              <li key={uid} style={{ marginBottom: 6 }}>
-                <code>{uid}</code>
-                {isOwner && (
-                  <button
-                    className="button secondary small"
-                    style={{ marginLeft: 10 }}
-                    onClick={() => removeCoManager(uid)}
-                  >
-                    Remove
-                  </button>
-                )}
-              </li>
-            ))}
+            {coManagerUids.map((uid) => {
+              const info = coManagerInfo[uid];
+              const label = info?.displayName || info?.email || `${uid.slice(0, 8)}…`;
+              return (
+                <li key={uid} style={{ marginBottom: 6 }}>
+                  <span>{label}</span>
+                  {info?.displayName && info.email && (
+                    <span style={{ marginLeft: 6, fontSize: 13 }}>({info.email})</span>
+                  )}
+                  {isOwner && (
+                    <button
+                      className="button secondary small"
+                      style={{ marginLeft: 10 }}
+                      onClick={() => removeCoManager(uid)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         ) : (
           isOwner && coManagerPending.length === 0 && (
@@ -896,7 +928,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         <div className="eyebrow">Looking to the future</div>
         <h3 style={{ marginTop: 10 }}>Nominate someone to look after this memorial</h3>
         <p className="muted">
-          A memorial is meant to outlast any one of us. Nominate a trusted family member as a{' '}
+          A memorial is meant to outlast any one of us. Nominate a trusted person as a{' '}
           <strong>backup</strong>. Nothing changes today, but if you&rsquo;re ever unable to look
           after the memorial, custody will move to them. You can also{' '}
           <strong>transfer custody now</strong> if you&rsquo;d like someone else to take over.
@@ -1160,7 +1192,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                         className="button small"
                         onClick={() => contribStatus(c.id, 'approved')}
                       >
-                        Keep in family archive
+                        Keep in archive
                       </button>
                     )}
                     {c.photoPath && (

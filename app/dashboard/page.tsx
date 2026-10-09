@@ -88,7 +88,7 @@ export default function Dashboard() {
     <main className="shell">
       <div className="dashboardHead">
         <div>
-          <div className="eyebrow">Your family space</div>
+          <div className="eyebrow">Your keeper space</div>
           <h2 style={{ marginBottom: 0 }}>Memorials</h2>
         </div>
         <Link href="/create" className="button">

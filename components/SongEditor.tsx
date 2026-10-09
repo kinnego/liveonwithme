@@ -73,7 +73,7 @@ export default function SongEditor({ memorialId, currentSongUrl, currentSongLabe
   const previewLabel = label.trim() || DEFAULT_SONG_LABEL;
 
   return (
-    <div className="card" style={{ marginBottom: 30 }}>
+    <div className="card" style={{ marginTop: 30, marginBottom: 30 }}>
       <div className="eyebrow">Their song</div>
       <h3 style={{ marginTop: 10 }}>
         {hasSong ? 'A song is set' : 'Add a song visitors can play'}

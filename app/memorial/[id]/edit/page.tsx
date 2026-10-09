@@ -11,7 +11,6 @@ import type { Cemetery, Memorial } from '@/lib/types';
 import { canEditMemorial } from '@/lib/roles';
 import CemeteryPicker from '@/components/CemeteryPicker';
 import { PageSkeleton } from '@/components/Skeleton';
-import { DEFAULT_SONG_LABEL, parseYoutubeVideoId } from '@/lib/song';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,11 +66,6 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
     try {
       const fd = new FormData(e.currentTarget);
       const nextFullName = String(fd.get('fullName'));
-      const rawSongUrl = String(fd.get('songUrl') || '').trim();
-      const rawSongLabel = String(fd.get('songLabel') || '').trim();
-      if (rawSongUrl && !parseYoutubeVideoId(rawSongUrl)) {
-        throw new Error('That does not look like a valid YouTube link. Paste the full URL from the YouTube page.');
-      }
       const updates: Record<string, unknown> = {
         fullName: nextFullName,
         fullNameLower: nextFullName.toLowerCase(),
@@ -80,8 +74,6 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
         ageAtDeath: calculateAgeAtDeath(born, died),
         epitaph: String(fd.get('epitaph') || ''),
         story: String(fd.get('story') || ''),
-        songUrl: rawSongUrl,
-        songLabel: rawSongLabel,
         visibility: String(fd.get('visibility') || 'unlisted'),
         cemetery: cemetery ?? null,
         updatedAt: serverTimestamp(),
@@ -229,34 +221,6 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
 
           <label htmlFor="story">{storyLabel}</label>
           <textarea id="story" name="story" defaultValue={m.story || ''} />
-
-          <label htmlFor="songUrl">
-            {isLegacy ? 'Your favourite song (optional)' : 'Their favourite song (optional)'}
-          </label>
-          <input
-            id="songUrl"
-            name="songUrl"
-            type="url"
-            inputMode="url"
-            placeholder="Paste a YouTube link"
-            defaultValue={m.songUrl || ''}
-          />
-          <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-            Visitors see a small play button on the page. Nothing plays automatically.
-          </p>
-
-          <label htmlFor="songLabel">Button text (optional)</label>
-          <input
-            id="songLabel"
-            name="songLabel"
-            type="text"
-            maxLength={80}
-            placeholder={DEFAULT_SONG_LABEL}
-            defaultValue={m.songLabel || ''}
-          />
-          <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-            Leave blank to use the default: &ldquo;{DEFAULT_SONG_LABEL}&rdquo;.
-          </p>
 
           <label htmlFor="visibility">Who can see it?</label>
           <select id="visibility" name="visibility" defaultValue={m.visibility || 'unlisted'}>
