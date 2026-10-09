@@ -26,6 +26,7 @@ async function loadMemorial(slug: string) {
     if (!snap.exists) return null;
     const data = snap.data() as any;
     if (data.status !== 'live') return null;
+    if (data.offline === true) return null;
     if (!['public', 'unlisted'].includes(data.visibility)) return null;
     return data;
   } catch {

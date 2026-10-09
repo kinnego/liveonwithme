@@ -76,7 +76,11 @@ export default function CemeteryPage({
             where('visibility', '==', 'public')
           )
         );
-        setMemorials(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Memorial)));
+        setMemorials(
+          snap.docs
+            .map((d) => ({ id: d.id, ...d.data() } as Memorial))
+            .filter((m) => (m as any).offline !== true)
+        );
       } catch (err: any) {
         console.error('Cemetery query failed:', err);
         setError(

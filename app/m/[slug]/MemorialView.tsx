@@ -198,14 +198,15 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
       const data: any = { id: s.id, ...s.data() };
       const isOwner = user?.uid === data.ownerId;
       const isLive = data.status === 'live';
+      const isOffline = data.offline === true;
 
-      if (!isLive && !isOwner) {
+      if ((!isLive || isOffline) && !isOwner) {
         setLoadState('draft_no_access');
         return;
       }
 
       setMemorial(data);
-      setIsPreview(!isLive && isOwner);
+      setIsPreview((!isLive || isOffline) && isOwner);
 
       // If the memorial is linked to a plot with an exact pin, fetch it so
       // we can offer walking directions straight to the grave. Plots are

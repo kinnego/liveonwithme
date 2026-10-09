@@ -28,8 +28,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .get(),
   ]);
 
-  const memorialEntries: MetadataRoute.Sitemap = memorialsSnap.docs.map(
-    (d: QueryDocumentSnapshot) => {
+  const memorialEntries: MetadataRoute.Sitemap = memorialsSnap.docs
+    .filter((d: QueryDocumentSnapshot) => d.data().offline !== true)
+    .map((d: QueryDocumentSnapshot) => {
       const data = d.data();
       const updated = data.updatedAt?.toDate?.() || data.publishedAt?.toDate?.() || now;
       return {
@@ -38,8 +39,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: 'weekly' as const,
         priority: 0.9,
       };
-    }
-  );
+    });
 
   const plotIds = new Set<string>();
   membershipsSnap.forEach((d: QueryDocumentSnapshot) => {

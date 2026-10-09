@@ -119,18 +119,20 @@ export default function UnifiedSearch() {
         fsLimit(6),
       ),
     );
-    return snap.docs.map((d) => {
-      const data = d.data() as any;
-      return {
-        kind: 'person' as const,
-        id: d.id,
-        fullName: data.fullName || '',
-        nickname: data.nickname || undefined,
-        born: data.born,
-        died: data.died,
-        cemeteryName: data.cemetery?.name,
-      };
-    });
+    return snap.docs
+      .filter((d) => (d.data() as any).offline !== true)
+      .map((d) => {
+        const data = d.data() as any;
+        return {
+          kind: 'person' as const,
+          id: d.id,
+          fullName: data.fullName || '',
+          nickname: data.nickname || undefined,
+          born: data.born,
+          died: data.died,
+          cemeteryName: data.cemetery?.name,
+        };
+      });
   }
 
   async function fetchGoogleCemeteries(q: string): Promise<GoogleCemeteryHit[]> {

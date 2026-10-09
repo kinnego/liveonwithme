@@ -67,18 +67,20 @@ export default function MemorialNameSearch() {
           ),
         );
         if (cancelled) return;
-        const rows: Result[] = snap.docs.map((d) => {
-          const data = d.data() as any;
-          return {
-            id: d.id,
-            fullName: data.fullName || '',
-            nickname: data.nickname || undefined,
-            born: data.born,
-            died: data.died,
-            cemeteryName: data.cemetery?.name,
-            address: data.address || undefined,
-          };
-        });
+        const rows: Result[] = snap.docs
+          .filter((d) => (d.data() as any).offline !== true)
+          .map((d) => {
+            const data = d.data() as any;
+            return {
+              id: d.id,
+              fullName: data.fullName || '',
+              nickname: data.nickname || undefined,
+              born: data.born,
+              died: data.died,
+              cemeteryName: data.cemetery?.name,
+              address: data.address || undefined,
+            };
+          });
         setResults(rows);
         setStatus('ready');
       } catch (err) {

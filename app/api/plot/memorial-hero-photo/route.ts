@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
       if (!memSnap.exists) continue;
       const memorial = { id: memSnap.id, ...(memSnap.data() as Omit<Memorial, 'id'>) };
       if (memorial.status !== 'live') continue;
+      if ((memorial as any).offline === true) continue;
       if (!memorial.heroPhotoPath) continue;
 
       const res = await r2Client.send(

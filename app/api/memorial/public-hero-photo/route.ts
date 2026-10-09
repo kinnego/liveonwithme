@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
     // its hero can appear in the QR too. Owners viewing drafts fall back to
     // the authenticated /api/memorial/hero-photo route on the client.
     if (memorial.status !== 'live') return NextResponse.json({ dataUrl: null });
+    if ((memorial as any).offline === true) return NextResponse.json({ dataUrl: null });
     if (!memorial.heroPhotoPath) return NextResponse.json({ dataUrl: null });
 
     const res = await r2Client.send(

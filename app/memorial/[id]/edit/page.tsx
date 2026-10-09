@@ -118,12 +118,19 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
   const isLegacy = m.kind === 'legacy';
   const pageWord = isLegacy ? 'page' : 'memorial';
   const nameLabel = isLegacy ? 'Full name' : 'Their full name';
-  const epitaphLabel = isLegacy ? 'A few words beneath the name' : 'A few words beneath their name';
+  const epitaphLabel = isLegacy
+    ? 'A few words beneath the name (less is more here)'
+    : 'A few words beneath their name (less is more here)';
   const storyLabel = isLegacy ? 'The story' : 'Their story';
 
   return (
     <main className="shell">
       <div className="formCard">
+        <div style={{ marginBottom: 14 }}>
+          <Link href={`/memorial/${m.id}/manage`} className="button secondary small">
+            ← Back to manage
+          </Link>
+        </div>
         <div className="eyebrow">Edit {pageWord}</div>
         <h2>{m.fullName}</h2>
         <p className="muted">Change anything. It saves back to this {pageWord}.</p>

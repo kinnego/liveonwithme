@@ -307,6 +307,24 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
     await updateDoc(doc(db, 'contributions', id), { status: value });
   }
 
+  async function toggleOffline(nextOffline: boolean) {
+    if (!m) return;
+    const confirmText = nextOffline
+      ? 'Take this memorial offline? Visitors with the link will see a not-found page until you bring it back online.'
+      : 'Bring this memorial back online so visitors can see it again?';
+    if (!confirm(confirmText)) return;
+    try {
+      await updateDoc(doc(db, 'memorials', m.id), {
+        offline: nextOffline,
+        updatedAt: serverTimestamp(),
+      });
+      await refreshMemorial();
+      showToast(nextOffline ? 'Memorial taken offline' : 'Memorial is back online');
+    } catch (err: any) {
+      alert(err?.message || 'Could not change the online state.');
+    }
+  }
+
   async function nominate() {
     if (!m || !auth.currentUser) return;
     if (!successorEmail.trim()) {
@@ -533,6 +551,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const isPartnerPaid = m.paymentStatus === 'paid_via_partner' || m.paymentStatus === 'paid_via_funeral_director';
   const isLegacy = m.kind === 'legacy';
   const isOwner = isMemorialOwner(auth.currentUser?.uid, m);
+  const isOffline = m.offline === true;
   const coManagerUids: string[] = m.coManagerUids || [];
   const coManagerPending = pendingTransfers.filter((t) => t.nominationType === 'coManager');
   const successionPending = pendingTransfers.filter((t) => t.nominationType !== 'coManager');
@@ -646,7 +665,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         </div>
       )}
 
-      {isLive && (
+      {isLive && !isOffline && (
         <div
           className="card"
           style={{
@@ -671,7 +690,41 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             >
               Copy {pageWord} link
             </button>
+            {isOwner && (
+              <button className="button secondary" onClick={() => toggleOffline(true)}>
+                Take offline
+              </button>
+            )}
           </div>
+        </div>
+      )}
+
+      {isLive && isOffline && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 30,
+            background: 'linear-gradient(135deg, #fffdf9, #f6efe1)',
+            borderColor: '#d6c89e',
+          }}
+        >
+          <div className="eyebrow">{pageWordCap} is offline</div>
+          <h3 style={{ marginTop: 10 }}>Nobody can see this {pageWord} right now</h3>
+          <p className="muted">
+            The public link, QR code and search results all show a not-found page until you
+            bring it back online. Nothing has been deleted — your content is safe.
+          </p>
+          {isOwner ? (
+            <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
+              <button className="button" onClick={() => toggleOffline(false)}>
+                Bring back online
+              </button>
+            </div>
+          ) : (
+            <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
+              Only the owner can bring it back online.
+            </p>
+          )}
         </div>
       )}
 
