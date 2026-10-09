@@ -338,7 +338,7 @@ export default function MemorialPlaquePage({
     return (
       <main className="shell">
         <div className="formCard center">
-          <div className="eyebrow">Memorial plaque</div>
+          <div className="eyebrow">For a keepsake</div>
           <h2>We couldn&rsquo;t find that memorial.</h2>
           <Link href="/dashboard" className="button" style={{ marginTop: 20 }}>
             Back to dashboard
@@ -352,7 +352,7 @@ export default function MemorialPlaquePage({
     return (
       <main className="shell">
         <div className="formCard center">
-          <div className="eyebrow">Memorial plaque</div>
+          <div className="eyebrow">For a keepsake</div>
           <h2>Only the memorial&rsquo;s custodian can design the plaque.</h2>
           {memorial && (
             <Link href={`/m/${memorial.slug}`} className="button" style={{ marginTop: 20 }}>
@@ -377,14 +377,26 @@ export default function MemorialPlaquePage({
   return (
     <main className="shell">
       <div className="formCard">
-        <div className="eyebrow">Memorial plaque</div>
-        <h2>A keepsake plaque for {memorial.fullName}</h2>
+        <div className="eyebrow">For a keepsake</div>
+        <h2>A personal plaque for {memorial.fullName}</h2>
         <p className="muted">
-          Design a plaque that links straight to {memorial.fullName}&rsquo;s memorial page. Lovely
-          for a mantelpiece, a prayer card, a wake remembrance, or wherever feels right. If a hero
-          photo is set we&rsquo;ll offer to place it in the centre of the QR; otherwise the
-          LiveOnWith.me mark steps in.
+          A small plaque to keep, carry or hand out — for a mantelpiece, a prayer card, a wake
+          remembrance, or wherever feels right. The QR links straight to {memorial.fullName}&rsquo;s
+          memorial page (not the plot). If a hero photo is set we&rsquo;ll offer to place it in
+          the centre of the QR; otherwise the LiveOnWith.me mark steps in.
         </p>
+        {memorial.plotId && (
+          <p className="muted" style={{ fontSize: 13 }}>
+            Looking for the QR that goes on the headstone? That&rsquo;s the{' '}
+            <Link
+              href={`/plot/${memorial.plotId}/plaque`}
+              style={{ color: 'var(--brand)', textDecoration: 'underline' }}
+            >
+              grave plaque
+            </Link>{' '}
+            — it links to the plot so every name there is reachable from one code.
+          </p>
+        )}
 
         <div style={{ margin: '28px auto 10px', maxWidth: previewMaxWidth, textAlign: 'center' }}>
           {plaquePngUrl ? (

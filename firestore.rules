@@ -9,7 +9,6 @@ service cloud.firestore {
     function userDoc(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data;
     }
-    function userRole(uid) { return userDoc(uid).role; }
     function isSuperAdmin() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))

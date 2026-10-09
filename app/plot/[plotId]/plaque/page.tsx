@@ -362,11 +362,16 @@ export default function PlotPlaque({
   return (
     <main className="shell">
       <div className="formCard">
-        <div className="eyebrow">Headstone plaque</div>
+        <div className="eyebrow">For the grave</div>
         <h2>{plot.name || plot.cemetery?.name || 'Plot plaque'}</h2>
         <p className="muted">
-          Design the plaque for the stone. The QR links to every memorial at this plot — present
+          The plaque that goes on the stone. The QR links to every memorial at this plot — present
           and future — so there&rsquo;s nothing on the plaque that would need re-engraving later.
+        </p>
+        <p className="muted" style={{ fontSize: 13 }}>
+          For a personal plaque for a single person — mantelpiece, prayer card, wake — use the{' '}
+          <span style={{ fontStyle: 'italic' }}>For a keepsake</span> option from each memorial&rsquo;s
+          manage page.
         </p>
 
         <div style={{ margin: '28px auto 10px', maxWidth: previewMaxWidth, textAlign: 'center' }}>

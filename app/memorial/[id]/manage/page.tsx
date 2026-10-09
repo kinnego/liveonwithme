@@ -56,9 +56,17 @@ function ContributionPhoto({ path }: { path: string }) {
 
   if (!url) return <div className="thumb" />;
   return (
-    <div className="thumb">
-      <img src={url} alt="Submitted" />
-    </div>
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="thumb"
+      aria-label="Open photo in a new tab"
+      title="Open photo in a new tab"
+      style={{ display: 'block', cursor: 'zoom-in' }}
+    >
+      <img src={url} alt="Submitted photo" />
+    </a>
   );
 }
 
@@ -1192,12 +1200,13 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           <div className="eyebrow">Contributions inbox</div>
           <h2>Waiting for you</h2>
           {items.length === 0 ? (
-            <div className="card">
+            <div className="card" style={{ marginBottom: 30 }}>
               <p className="muted">There are no contributions waiting at the moment.</p>
             </div>
           ) : (
             items.map((c) => {
               const isPrivate = c.audience === 'family_only';
+              const isFromKeeper = c.source === 'family';
               return (
                 <div className="card contribution" key={c.id} style={{ marginBottom: 12 }}>
                   {c.photoPath ? (
@@ -1206,8 +1215,10 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                     <div className="thumb" />
                   )}
                   <div>
-                    <strong>{c.contributorName}</strong>
-                    {c.relationship && <span className="muted"> · {c.relationship}</span>}
+                    <strong>{isFromKeeper ? 'One of your uploads' : c.contributorName}</strong>
+                    {!isFromKeeper && c.relationship && (
+                      <span className="muted"> · {c.relationship}</span>
+                    )}
                     {isPrivate && (
                       <span
                         style={{
@@ -1226,7 +1237,16 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                         Private message
                       </span>
                     )}
-                    <p>{c.memory || c.caption || 'Photograph submitted'}</p>
+                    {(c.memory || c.caption) ? (
+                      <p>{c.memory || c.caption}</p>
+                    ) : !isFromKeeper ? (
+                      <p>Photograph submitted</p>
+                    ) : null}
+                    {isFromKeeper && (
+                      <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                        Hidden from the gallery. Approve to put it back on the memorial.
+                      </p>
+                    )}
                     {isPrivate && (
                       <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
                         The sender asked that this stays with the family only. It won&rsquo;t appear
@@ -1275,7 +1295,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           everything the owner touches regularly. */}
       {isLive && (
         <div className="card" style={{ marginBottom: 30 }}>
-          <div className="eyebrow">Headstone QR</div>
+          <div className="eyebrow">For the grave</div>
           <h3 style={{ marginTop: 10 }}>A QR code for the resting place</h3>
           {m.plotId ? (
             <>
@@ -1338,12 +1358,13 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
 
       {isLive && (
         <div className="card" style={{ marginBottom: 30 }}>
-          <div className="eyebrow">Memorial plaque</div>
-          <h3 style={{ marginTop: 10 }}>A keepsake plaque for {m.fullName.split(' ')[0]}</h3>
+          <div className="eyebrow">For a keepsake</div>
+          <h3 style={{ marginTop: 10 }}>A personal plaque for {m.fullName.split(' ')[0]}</h3>
           <p className="muted">
-            Design a plaque that links straight to {m.fullName.split(' ')[0]}&rsquo;s page — lovely
-            for a mantelpiece, a prayer card, or a wake remembrance. If you&rsquo;ve set a hero
-            photo it can go in the centre of the QR; otherwise the LiveOnWith.me mark steps in.
+            A small plaque to keep, carry or hand out — for a mantelpiece, a prayer card, or a
+            wake remembrance. The QR links straight to {m.fullName.split(' ')[0]}&rsquo;s page
+            (not the plot). If you&rsquo;ve set a hero photo it can go in the centre of the QR;
+            otherwise the LiveOnWith.me mark steps in.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
             <Link href={`/memorial/${m.id}/plaque`} className="button">
