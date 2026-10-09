@@ -156,18 +156,40 @@ This is a place for all the pieces of Mary that live on in the people who knew h
 
 type LoadState = 'loading' | 'not_found' | 'draft_no_access' | 'ready';
 
-export default function Memorial({ params }: { params: Promise<{ slug: string }> }) {
-  const [memorial, setMemorial] = useState<any>();
+export default function Memorial({
+  params,
+  initialMemorial,
+}: {
+  params: Promise<{ slug: string }>;
+  initialMemorial: Record<string, any> | null;
+}) {
+  // Seed state from the server-provided memorial so first paint has
+  // everything it needs (title, hero URL, cemetery, etc.) without waiting
+  // for a client Firestore read. `initialMemorial` is null when the server
+  // couldn't serve the page publicly (draft, offline, or missing); in that
+  // case the client falls back to an auth-aware fetch for owner preview.
+  const [memorial, setMemorial] = useState<any>(initialMemorial || undefined);
   const [plotCoords, setPlotCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [hero, setHero] = useState('');
+  const [hero, setHero] = useState(() => {
+    if (!initialMemorial) return '';
+    if (initialMemorial.heroPhotoUrl) return initialMemorial.heroPhotoUrl;
+    if (initialMemorial.heroPhotoPath && R2_PUBLIC_URL) {
+      return `${R2_PUBLIC_URL}/${initialMemorial.heroPhotoPath}`;
+    }
+    return '';
+  });
   const [approved, setApproved] = useState<any[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [sent, setSent] = useState(false);
-  const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [loadState, setLoadState] = useState<LoadState>(
+    initialMemorial ? 'ready' : 'loading',
+  );
   const [user, setUser] = useState<User | null>(null);
   const [isPreview, setIsPreview] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
 
+  // Auth state drives the "Manage" button visibility only — it never
+  // triggers the data load, so sign-in/out doesn't refetch the memorial.
   useEffect(() => {
     if (!auth) return;
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
@@ -175,8 +197,13 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
   }, []);
 
   useEffect(() => {
-    params.then(async (p) => {
+    let cancelled = false;
+
+    (async () => {
+      const p = await params;
+
       if (p.slug === 'mary-demo') {
+        if (cancelled) return;
         setMemorial(demo);
         setHero(demo.heroPhotoUrl);
         setApproved(demoContributions);
@@ -189,14 +216,70 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
         return;
       }
 
+      // Fast path: server handed us the memorial. Fire plot + contributions
+      // reads in parallel without blocking paint.
+      if (initialMemorial) {
+        const plotPromise = initialMemorial.plotId
+          ? getDoc(doc(db, 'plots', initialMemorial.plotId))
+          : Promise.resolve(null);
+        const contribPromise = getDocs(
+          query(
+            collection(db, 'contributions'),
+            where('memorialId', '==', p.slug),
+            where('status', '==', 'approved'),
+          ),
+        );
+
+        plotPromise
+          .then((ps) => {
+            if (cancelled || !ps || !ps.exists()) return;
+            const pd = ps.data() as any;
+            if (typeof pd.lat === 'number' && typeof pd.lng === 'number') {
+              setPlotCoords({ lat: pd.lat, lng: pd.lng });
+            }
+          })
+          .catch(() => {
+            // Non-fatal: page still renders, we just don't show directions.
+          });
+
+        try {
+          const c = await contribPromise;
+          if (cancelled) return;
+          const rows = c.docs.map((d) => ({ id: d.id, ...d.data() }));
+          setApproved(rows);
+          const urls: Record<string, string> = {};
+          for (const row of rows) {
+            if ((row as any).photoPath) {
+              urls[row.id] = `${R2_PUBLIC_URL}/${(row as any).photoPath}`;
+            }
+          }
+          if (Object.keys(urls).length) setPhotoUrls((x) => ({ ...x, ...urls }));
+        } catch {
+          // Non-fatal: the memorial still renders without contributions.
+        }
+        return;
+      }
+
+      // Slow path: server returned null (draft/offline/missing). Wait for
+      // auth to resolve so an owner can preview their own in-progress page.
+      const authed = await new Promise<User | null>((resolve) => {
+        if (!auth) return resolve(null);
+        const unsub = onAuthStateChanged(auth, (u) => {
+          unsub();
+          resolve(u);
+        });
+      });
+      if (cancelled) return;
+
       const s = await getDoc(doc(db, 'memorials', p.slug));
+      if (cancelled) return;
       if (!s.exists()) {
         setLoadState('not_found');
         return;
       }
 
       const data: any = { id: s.id, ...s.data() };
-      const isOwner = user?.uid === data.ownerId;
+      const isOwner = authed?.uid === data.ownerId;
       const isLive = data.status === 'live';
       const isOffline = data.offline === true;
 
@@ -207,51 +290,47 @@ export default function Memorial({ params }: { params: Promise<{ slug: string }>
 
       setMemorial(data);
       setIsPreview((!isLive || isOffline) && isOwner);
+      if (data.heroPhotoPath) {
+        setHero(`${R2_PUBLIC_URL}/${data.heroPhotoPath}`);
+      }
 
-      // If the memorial is linked to a plot with an exact pin, fetch it so
-      // we can offer walking directions straight to the grave. Plots are
-      // publicly readable.
       if (data.plotId) {
         getDoc(doc(db, 'plots', data.plotId))
           .then((ps) => {
-            if (!ps.exists()) return;
+            if (cancelled || !ps.exists()) return;
             const pd = ps.data() as any;
             if (typeof pd.lat === 'number' && typeof pd.lng === 'number') {
               setPlotCoords({ lat: pd.lat, lng: pd.lng });
             }
           })
-          .catch(() => {
-            // Non-fatal: page still renders, we just don't show directions.
-          });
+          .catch(() => {});
       }
 
-      if (data.heroPhotoPath) {
-        setHero(`${R2_PUBLIC_URL}/${data.heroPhotoPath}`);
-      }
-
-      if (isLive || isOwner) {
-        const c = await getDocs(
-          query(
-            collection(db, 'contributions'),
-            where('memorialId', '==', p.slug),
-            where('status', '==', 'approved')
-          )
-        );
-
-        const rows = c.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setApproved(rows);
-
-        for (const row of rows) {
-          if ((row as any).photoPath) {
-            const url = `${R2_PUBLIC_URL}/${(row as any).photoPath}`;
-            setPhotoUrls((x) => ({ ...x, [row.id]: url }));
-          }
+      const c = await getDocs(
+        query(
+          collection(db, 'contributions'),
+          where('memorialId', '==', p.slug),
+          where('status', '==', 'approved'),
+        ),
+      );
+      if (cancelled) return;
+      const rows = c.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setApproved(rows);
+      const urls: Record<string, string> = {};
+      for (const row of rows) {
+        if ((row as any).photoPath) {
+          urls[row.id] = `${R2_PUBLIC_URL}/${(row as any).photoPath}`;
         }
       }
+      if (Object.keys(urls).length) setPhotoUrls(urls);
 
       setLoadState('ready');
-    });
-  }, [params, user]);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [params, initialMemorial]);
 
   // Single canonical list of images that can appear in the lightbox: hero
   // first, then gallery photos, then any memory attachments not already in

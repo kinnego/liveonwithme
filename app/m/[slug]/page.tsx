@@ -1,7 +1,10 @@
 // Server wrapper for the memorial page. Generates SEO metadata + JSON-LD
 // structured data on the server so search engines and social previews get
-// something meaningful without waiting for client-side hydration.
+// something meaningful without waiting for client-side hydration. The
+// fetched memorial is also handed to the client component as initial
+// state, so the public view paints without a second Firestore round-trip.
 
+import { cache } from 'react';
 import type { Metadata } from 'next';
 import { adminDb } from '@/lib/firebase-admin';
 import MemorialView from './MemorialView';
@@ -9,7 +12,9 @@ import MemorialView from './MemorialView';
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
 
-async function loadMemorial(slug: string) {
+// Wrapped in React cache() so generateMetadata() and Page() dedupe into a
+// single Firestore read per request.
+const loadMemorial = cache(async (slug: string) => {
   if (slug === 'mary-demo') {
     return {
       fullName: "Mary O'Donnell",
@@ -19,7 +24,7 @@ async function loadMemorial(slug: string) {
       heroPhotoUrl: '/demo/liveonwithme_lifestyle_01.jpg',
       visibility: 'public',
       status: 'live',
-    };
+    } as Record<string, any>;
   }
   try {
     const snap = await adminDb().collection('memorials').doc(slug).get();
@@ -28,11 +33,13 @@ async function loadMemorial(slug: string) {
     if (data.status !== 'live') return null;
     if (data.offline === true) return null;
     if (!['public', 'unlisted'].includes(data.visibility)) return null;
-    return data;
+    // JSON round-trip strips Firestore Timestamps so the plain object can
+    // cross the server/client boundary as a prop.
+    return { id: snap.id, ...JSON.parse(JSON.stringify(data)) };
   } catch {
     return null;
   }
-}
+});
 
 export async function generateMetadata({
   params,
@@ -121,7 +128,7 @@ export default async function Page({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <MemorialView params={params} />
+      <MemorialView params={params} initialMemorial={m} />
     </>
   );
 }
