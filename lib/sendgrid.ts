@@ -181,6 +181,91 @@ export async function sendCustodyInvite(
   });
 }
 
+export async function sendContributionAlert(
+  to: string,
+  args: {
+    memorialId: string;
+    deceasedFullName: string;
+    contributorName: string;
+    relationship?: string;
+    memoryText?: string;
+    hasPhoto: boolean;
+    isPrivate: boolean;
+  },
+) {
+  const first = firstName(args.deceasedFullName) || args.deceasedFullName;
+  const link = `${siteUrl()}/memorial/${encodeURIComponent(args.memorialId)}/manage`;
+
+  const subject = args.isPrivate
+    ? `A private message for ${first}'s family`
+    : `A new memory for ${first}`;
+
+  const who = args.relationship
+    ? `${args.contributorName} (${args.relationship})`
+    : args.contributorName;
+
+  const whatBits: string[] = [];
+  if (args.memoryText?.trim()) whatBits.push('a message');
+  if (args.hasPhoto) whatBits.push('a photograph');
+  const what = whatBits.length ? whatBits.join(' and ') : 'something';
+
+  const snippet = (args.memoryText || '').trim().slice(0, 280);
+
+  const privacyLine = args.isPrivate
+    ? "It was marked as a private message — it won't appear on the memorial, but it's saved here for you."
+    : "It's waiting for your approval before it appears on the memorial.";
+
+  const text = [
+    `${who} shared ${what} for ${args.deceasedFullName} on LiveOnWith.me.`,
+    '',
+    snippet ? `"${snippet}"` : '',
+    snippet ? '' : null,
+    privacyLine,
+    '',
+    'Open the memorial inbox to review:',
+    link,
+    '',
+    '— LiveOnWith.me',
+  ]
+    .filter((x) => x !== null)
+    .join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:26px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          ${args.isPrivate ? `A private message for ${args.deceasedFullName}'s family` : `A new memory for ${args.deceasedFullName}`}
+        </h1>
+        <p style="font-family:Inter,system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">
+          <strong>${who}</strong> shared ${what} on LiveOnWith.me.
+        </p>
+        ${
+          snippet
+            ? `<blockquote style="font-family:Georgia,serif;font-style:italic;font-size:17px;line-height:1.55;color:#53635d;border-left:3px solid #dde5df;margin:0 0 20px;padding:4px 0 4px 16px;">${snippet.replace(/</g, '&lt;')}${(args.memoryText || '').length > 280 ? '…' : ''}</blockquote>`
+            : ''
+        }
+        <p style="font-family:Inter,system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.6;color:#25312d;margin:0 0 22px;">
+          ${privacyLine}
+        </p>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open the inbox
+          </a>
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
+          If the button doesn't work, copy and paste this into your browser:<br>
+          <span style="word-break:break-all;color:#688076;">${link}</span>
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
 export async function sendClaimInvite(
   to: string,
   token: string,

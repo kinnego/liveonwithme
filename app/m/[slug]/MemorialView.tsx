@@ -416,7 +416,7 @@ export default function Memorial({
     }
 
     const audience = fd.get('audience') === 'family_only' ? 'family_only' : 'public';
-    await addDoc(collection(db, 'contributions'), {
+    const ref = await addDoc(collection(db, 'contributions'), {
       memorialId: memorial.id,
       contributorName: String(fd.get('name')),
       contributorEmail: String(fd.get('email') || ''),
@@ -430,6 +430,15 @@ export default function Memorial({
       sizeBytes,
       createdAt: serverTimestamp(),
     });
+
+    // Fire-and-forget: tell every keeper on this memorial that a new
+    // contribution is in their inbox. If email dispatch fails we still
+    // show "Thanks" — the record is already saved.
+    fetch('/api/contribution/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contributionId: ref.id }),
+    }).catch(() => {});
 
     setSent(true);
   }
