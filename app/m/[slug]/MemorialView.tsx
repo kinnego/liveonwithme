@@ -593,13 +593,45 @@ export default function Memorial({
         </div>
       </section>
 
-      <div className="memorialNav">
-        <a href="#story">Their story</a>
-        {featuredPhotos.length > 0 && <a href="#favourites">Favourites</a>}
-        <a href="#photos">Photographs</a>
-        <a href="#memories">Memories</a>
-        {!isPreview && <a href="#share">Share something</a>}
-      </div>
+      <nav className="memorialNav" aria-label="Memorial sections">
+        <a href="#story">
+          <svg className="navIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H18a2 2 0 0 1 2 2v12.5a1.5 1.5 0 0 1-1.5 1.5H7a3 3 0 0 1-3-3V5.5Z" />
+            <path d="M8 8h8M8 12h8M8 16h5" />
+          </svg>
+          <span>Their story</span>
+        </a>
+        {featuredPhotos.length > 0 && (
+          <a href="#favourites">
+            <svg className="navIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m12 4 2.6 5.3 5.9.9-4.3 4.2 1 5.8L12 17.6l-5.2 2.6 1-5.8L3.5 10.2l5.9-.9L12 4Z" />
+            </svg>
+            <span>Favourites</span>
+          </a>
+        )}
+        <a href="#photos">
+          <svg className="navIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h3l1.5-2h6l1.5 2h3A1.5 1.5 0 0 1 21 7.5v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-10Z" />
+            <circle cx="12" cy="13" r="3.5" />
+          </svg>
+          <span>Photographs</span>
+        </a>
+        <a href="#memories">
+          <svg className="navIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+          </svg>
+          <span>Memories</span>
+        </a>
+        {!isPreview && (
+          <a href="#share">
+            <svg className="navIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M12 15V4M8 8l4-4 4 4" />
+              <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+            </svg>
+            <span>Share</span>
+          </a>
+        )}
+      </nav>
 
       <section id="story" className="section">
         <div className="eyebrow center">Their life, remembered</div>
