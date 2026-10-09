@@ -10,6 +10,7 @@ import {
   where,
   updateDoc,
   addDoc,
+  deleteDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -97,6 +98,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function Manage({ params }: { params: Promise<{ id: string }> }) {
   const [m, setM] = useState<any>();
   const [items, setItems] = useState<any[]>([]);
+  const [rejectedItems, setRejectedItems] = useState<any[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
   const [linkingPlot, setLinkingPlot] = useState(false);
@@ -125,14 +127,17 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
 
   useEffect(() => {
     let stopContrib: (() => void) | undefined;
+    let stopRejected: (() => void) | undefined;
     let stopTransfers: (() => void) | undefined;
     let stopAll: (() => void) | undefined;
     let stopAuth: (() => void) | undefined;
     const teardown = () => {
       stopContrib?.();
+      stopRejected?.();
       stopTransfers?.();
       stopAll?.();
       stopContrib = undefined;
+      stopRejected = undefined;
       stopTransfers = undefined;
       stopAll = undefined;
     };
@@ -158,6 +163,14 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             where('status', '==', 'pending')
           ),
           (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() })))
+        );
+        stopRejected = onSnapshot(
+          query(
+            collection(db, 'contributions'),
+            where('memorialId', '==', id),
+            where('status', '==', 'rejected')
+          ),
+          (s) => setRejectedItems(s.docs.map((d) => ({ id: d.id, ...d.data() })))
         );
         // Only the owner issues custody/co-manager invitations, so the
         // "pending invitations" list is owner-only; skip the subscription
@@ -313,6 +326,11 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
 
   async function contribStatus(id: string, value: string) {
     await updateDoc(doc(db, 'contributions', id), { status: value });
+  }
+
+  async function contribDelete(id: string) {
+    if (!confirm('Delete this permanently? This cannot be undone.')) return;
+    await deleteDoc(doc(db, 'contributions', id));
   }
 
   async function toggleOffline(nextOffline: boolean) {
@@ -1280,13 +1298,81 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                       className="button secondary small"
                       onClick={() => contribStatus(c.id, 'rejected')}
                     >
-                      {isPrivate ? 'Delete' : 'Not now'}
+                      Set aside
                     </button>
                   </div>
                 </div>
               );
             })
           )}
+        </section>
+      )}
+
+      {isLive && rejectedItems.length > 0 && (
+        <section style={{ marginTop: 40 }}>
+          <div className="eyebrow">Set aside</div>
+          <h2>Decide later</h2>
+          <p className="muted" style={{ marginTop: -8, marginBottom: 20 }}>
+            Nothing here is on the memorial. Approve any of these to put them up, or
+            delete permanently when you&rsquo;re done with them.
+          </p>
+          {rejectedItems.map((c) => {
+            const isPrivate = c.audience === 'family_only';
+            return (
+              <div className="card contribution" key={c.id} style={{ marginBottom: 12 }}>
+                {c.photoPath ? (
+                  <ContributionPhoto path={c.photoPath} />
+                ) : (
+                  <div className="thumb" />
+                )}
+                <div>
+                  <strong>{c.contributorName}</strong>
+                  {c.relationship && <span className="muted"> · {c.relationship}</span>}
+                  {isPrivate && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        marginLeft: 10,
+                        padding: '3px 10px',
+                        borderRadius: 999,
+                        background: '#f0e8d8',
+                        color: '#8b6f30',
+                        fontSize: 11,
+                        fontWeight: 750,
+                        letterSpacing: '.04em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Private message
+                    </span>
+                  )}
+                  <p>{c.memory || c.caption || 'Photograph submitted'}</p>
+                </div>
+                <div className="toolbar">
+                  <button
+                    className="button small"
+                    onClick={() => contribStatus(c.id, 'approved')}
+                  >
+                    {isPrivate ? 'Keep in archive' : 'Approve for the memorial'}
+                  </button>
+                  {c.photoPath && (
+                    <button
+                      className="button secondary small"
+                      onClick={() => download(c.photoPath, c.caption)}
+                    >
+                      Download
+                    </button>
+                  )}
+                  <button
+                    className="button secondary small"
+                    onClick={() => contribDelete(c.id)}
+                  >
+                    Delete permanently
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </section>
       )}
 
