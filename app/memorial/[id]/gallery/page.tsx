@@ -75,12 +75,17 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
     };
   }, [params, router]);
 
-  async function uploadToR2(file: File, path: string, memorialId?: string) {
+  async function uploadToR2(file: File, memorialId: string) {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('path', path);
-    if (memorialId) formData.append('memorialId', memorialId);
-    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    formData.append('kind', 'memorial-gallery');
+    formData.append('memorialId', memorialId);
+    const token = await auth.currentUser?.getIdToken();
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Upload failed');
     return data as { path: string; sizeBytes: number };
@@ -105,14 +110,13 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
         setUploadProgress(`Preparing photo ${i + 1} of ${files.length}…`);
         const optimised = await resizeForMobile(files[i]);
         setUploadProgress(`Uploading photo ${i + 1} of ${files.length}…`);
-        const photoPath = `memorials/${m.id}/${crypto.randomUUID()}-${optimised.name}`;
-        const uploaded = await uploadToR2(optimised, photoPath, m.id);
+        const uploaded = await uploadToR2(optimised, m.id);
         await addDoc(collection(db, 'contributions'), {
           memorialId: m.id,
           contributorName: 'Family',
           relationship: '',
           memory: '',
-          photoPath,
+          photoPath: uploaded.path,
           caption: '',
           status: 'approved',
           source: 'family',

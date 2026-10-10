@@ -7,17 +7,13 @@ import {
   signInWithCustomToken,
   updatePassword,
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { createPerson } from '@/lib/person';
-import { slugify } from '@/lib/ids';
-import { writeAudit } from '@/lib/audit';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
 
-type Phase = 'verifying' | 'claiming' | 'setPassword' | 'error';
+type Phase = 'verifying' | 'setPassword' | 'error';
 
 export default function Claim({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState('');
@@ -32,100 +28,6 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
   useEffect(() => {
     params.then((p) => setId(p.id));
   }, [params]);
-
-  async function finishClaim(referralId: string) {
-    setStatus('claiming');
-    try {
-      const u = auth.currentUser;
-      if (!u) throw new Error('Sign-in did not complete.');
-
-      const userSnap = await getDoc(doc(db, 'users', u.uid));
-      if (!userSnap.exists()) {
-        await setDoc(doc(db, 'users', u.uid), {
-          uid: u.uid,
-          email: u.email,
-          role: 'family',
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      const refSnap = await getDoc(doc(db, 'referrals', referralId));
-      if (!refSnap.exists()) throw new Error('This invite link is no longer valid.');
-      const referral = refSnap.data();
-
-      if (referral.status === 'claimed') {
-        if (referral.claimedByUid === u.uid && referral.memorialId) {
-          router.push(`/memorial/${referral.memorialId}/manage`);
-          return;
-        }
-        throw new Error('This memorial has already been claimed.');
-      }
-
-      const personId = await createPerson({
-        fullName: referral.deceasedFullName,
-        born: referral.deceasedBorn || undefined,
-        died: referral.deceasedDied || undefined,
-        isLiving: !referral.deceasedDied,
-        createdByUid: u.uid,
-      });
-
-      const slug = `${slugify(referral.deceasedFullName)}-${Math.random().toString(36).slice(2, 7)}`;
-      const batch = writeBatch(db);
-
-      batch.set(doc(db, 'memorials', slug), {
-        ownerId: u.uid,
-        createdByUid: u.uid,
-        personId,
-        plotId: null,
-        successorUids: [],
-        slug,
-        fullName: referral.deceasedFullName,
-        fullNameLower: String(referral.deceasedFullName || '').toLowerCase(),
-        nickname: referral.deceasedNickname || '',
-        shortName: referral.deceasedShortName || '',
-        address: referral.deceasedAddress || '',
-        born: referral.deceasedBorn || '',
-        died: referral.deceasedDied || '',
-        kind: referral.deceasedDied ? 'memorial' : 'legacy',
-        epitaph: '',
-        story: '',
-        visibility: 'unlisted',
-        heroPhotoPath: '',
-        status: 'draft',
-        paymentStatus: 'paid_via_partner',
-        salesChannel: 'partner',
-        partnerUid: referral.partnerUid || referral.funeralDirectorUid || null,
-        referralId,
-        publishedAt: null,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      batch.update(doc(db, 'referrals', referralId), {
-        status: 'claimed',
-        claimedByUid: u.uid,
-        memorialId: slug,
-        updatedAt: serverTimestamp(),
-      });
-
-      await batch.commit();
-
-      await writeAudit({
-        entityType: 'memorial',
-        entityId: slug,
-        action: 'claimed_from_partner_referral',
-        actorUid: u.uid,
-        actorEmail: u.email || undefined,
-        details: { referralId, partnerUid: referral.partnerUid || referral.funeralDirectorUid || null },
-      });
-
-      setPendingMemorialSlug(slug);
-      setStatus('setPassword');
-    } catch (err: any) {
-      setError(err.message);
-      setStatus('error');
-    }
-  }
 
   async function submitPassword(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -186,7 +88,13 @@ export default function Claim({ params }: { params: Promise<{ id: string }> }) {
           return;
         }
         await signInWithCustomToken(auth, data.customToken);
-        await finishClaim(data.referralId || id);
+        const slug = data.memorialSlug as string;
+        setPendingMemorialSlug(slug);
+        if (data.needsPasswordSetup) {
+          setStatus('setPassword');
+        } else {
+          router.push(`/memorial/${slug}/manage`);
+        }
       } catch (err: any) {
         setError(err.message || 'Something went wrong.');
         setStatus('error');

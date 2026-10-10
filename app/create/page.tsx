@@ -165,11 +165,11 @@ function CreateInner() {
     setMode(next);
   }
 
-  async function uploadToR2(file: File, path: string, memorialId?: string) {
+  async function uploadToR2(file: File, kind: 'memorial-hero' | 'memorial-gallery' | 'memorial-memory', memorialId: string) {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('path', path);
-    if (memorialId) formData.append('memorialId', memorialId);
+    formData.append('kind', kind);
+    formData.append('memorialId', memorialId);
     const token = await auth.currentUser?.getIdToken();
     const res = await fetch('/api/upload', {
       method: 'POST',
@@ -247,10 +247,9 @@ function CreateInner() {
       if (photo?.size) {
         setProgress('Adding the photograph…');
         const optimised = await resizeForMobile(photo);
-        const heroPhotoPath = `memorials/${slug}/${crypto.randomUUID()}-${optimised.name}`;
-        const uploaded = await uploadToR2(optimised, heroPhotoPath, slug);
+        const uploaded = await uploadToR2(optimised, 'memorial-hero', slug);
         await updateDoc(memorialRef, {
-          heroPhotoPath,
+          heroPhotoPath: uploaded.path,
           heroPhotoSize: uploaded.sizeBytes,
           updatedAt: serverTimestamp(),
         });

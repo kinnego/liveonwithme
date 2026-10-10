@@ -36,7 +36,41 @@ export async function POST(req: NextRequest) {
     }
 
     // Partner-paid path: partner has already paid wholesale — publish free.
+    // Defence in depth: even though the only path that can tag a memorial
+    // `paid_via_partner` is the admin-SDK claim route, re-verify the
+    // referral record here so a bug or data migration elsewhere can't let a
+    // forged tag publish for free. We check: referral exists, wholesale is
+    // paid, the referral is claimed by this user, and it points at this
+    // memorial.
     if (memorial.paymentStatus === 'paid_via_partner' || memorial.paymentStatus === 'paid_via_funeral_director') {
+      const referralId = memorial.referralId;
+      if (!referralId || typeof referralId !== 'string') {
+        return NextResponse.json(
+          { error: 'This memorial is missing its partner referral. Please contact support.' },
+          { status: 400 }
+        );
+      }
+      const refSnap = await db.collection('referrals').doc(referralId).get();
+      if (!refSnap.exists) {
+        return NextResponse.json(
+          { error: 'The partner referral behind this memorial is missing. Please contact support.' },
+          { status: 400 }
+        );
+      }
+      const referral = refSnap.data()!;
+      if (referral.wholesalePaymentStatus !== 'paid') {
+        return NextResponse.json(
+          { error: 'The partner hasn\'t completed payment yet. Please contact them to publish this memorial.' },
+          { status: 400 }
+        );
+      }
+      if (referral.memorialId !== memorialId || referral.claimedByUid !== uid) {
+        return NextResponse.json(
+          { error: 'This memorial doesn\'t match its partner referral. Please contact support.' },
+          { status: 400 }
+        );
+      }
+
       await memRef.update({
         status: 'live',
         paymentStatus: 'paid_via_partner',
@@ -49,7 +83,7 @@ export async function POST(req: NextRequest) {
         entityId: memorialId,
         action: 'published_via_partner',
         actorUid: uid,
-        details: { referralId: memorial.referralId || null },
+        details: { referralId },
       });
 
       return NextResponse.json({ success: true, live: true });

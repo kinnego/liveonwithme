@@ -80,11 +80,19 @@ service cloud.firestore {
 
     // ─── memorials ───────────────────────────────────────────────────────────
     match /memorials/{id} {
-      allow create: if signedIn()
+      // Clients can only create unpaid, direct-channel drafts. The
+      // paid_via_partner path (where the family skips Stripe because a partner
+      // already paid wholesale) must go through a trusted admin endpoint that
+      // verifies the referral — otherwise anyone could set paymentStatus
+      // themselves and publish for free. Super admin bypasses for recovery.
+      allow create: if (signedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.status == 'draft'
-        && request.resource.data.paymentStatus in ['unpaid', 'paid_via_partner']
-        && request.resource.data.salesChannel in ['direct', 'partner'];
+        && request.resource.data.paymentStatus == 'unpaid'
+        && request.resource.data.salesChannel == 'direct'
+        && request.resource.data.get('partnerUid', null) == null
+        && request.resource.data.get('referralId', null) == null)
+        || isSuperAdmin();
 
       allow get: if
         (resource.data.status == 'live' && resource.data.get('offline', false) == false && resource.data.visibility in ['public','unlisted'])
@@ -450,10 +458,20 @@ service cloud.firestore {
 
     // ─── users ───────────────────────────────────────────────────────────────
     match /users/{uid} {
+      // Role elevation guard: the super_admin check uses the Firebase-issued
+      // auth email (request.auth.token.email), NOT the client-written doc
+      // email field. The latter is attacker-controlled and would let anyone
+      // bootstrap themselves as super_admin by typing hello@freastar.com into
+      // the signup form. Clients get `family` only; the one super_admin is
+      // bootstrapped via the matching Google-signed-in email.
       allow create: if isSelf(uid)
         && (
           request.resource.data.role == 'family'
-          || (request.resource.data.role == 'super_admin' && request.resource.data.email == 'hello@freastar.com')
+          || (
+            request.resource.data.role == 'super_admin'
+            && request.auth.token.email == 'hello@freastar.com'
+            && request.auth.token.get('email_verified', false) == true
+          )
         );
       allow get: if isSelf(uid) || isSuperAdmin();
       allow list: if isSuperAdmin();

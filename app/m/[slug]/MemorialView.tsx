@@ -375,11 +375,11 @@ export default function Memorial({
     return slides;
   }, [hero, approved, photoUrls, memorial?.fullName]);
 
-  async function uploadToR2(file: File, path: string, memorialId?: string) {
+  async function uploadContribution(file: File, memorialId: string) {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('path', path);
-    if (memorialId) formData.append('memorialId', memorialId);
+    formData.append('kind', 'contribution');
+    formData.append('memorialId', memorialId);
 
     const res = await fetch('/api/upload', {
       method: 'POST',
@@ -405,9 +405,9 @@ export default function Memorial({
 
     if (photo?.size) {
       const optimised = await resizeForMobile(photo);
-      photoPath = `contributions/${memorial.id}/${crypto.randomUUID()}-${optimised.name}`;
       try {
-        const uploaded = await uploadToR2(optimised, photoPath, memorial.id);
+        const uploaded = await uploadContribution(optimised, memorial.id);
+        photoPath = uploaded.path;
         sizeBytes = uploaded.sizeBytes;
       } catch (err: any) {
         alert(err.message || 'We couldn\u2019t save that photo. Please try again.');

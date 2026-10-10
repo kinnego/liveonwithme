@@ -46,12 +46,17 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
 
   const derivedAge = calculateAgeAtDeath(born, died);
 
-  async function uploadToR2(file: File, path: string, memorialId?: string) {
+  async function uploadToR2(file: File, kind: 'memorial-hero' | 'memorial-gallery' | 'memorial-memory', memorialId: string) {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('path', path);
-    if (memorialId) formData.append('memorialId', memorialId);
-    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    formData.append('kind', kind);
+    formData.append('memorialId', memorialId);
+    const token = await auth.currentUser?.getIdToken();
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Photo upload failed');
     return data as { path: string; sizeBytes: number };
@@ -97,9 +102,8 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
       const photo = fd.get('photo') as File;
       if (photo?.size) {
         const optimised = await resizeForMobile(photo);
-        const heroPhotoPath = `memorials/${m.id}/${crypto.randomUUID()}-${optimised.name}`;
-        const uploaded = await uploadToR2(optimised, heroPhotoPath, m.id);
-        updates.heroPhotoPath = heroPhotoPath;
+        const uploaded = await uploadToR2(optimised, 'memorial-hero', m.id);
+        updates.heroPhotoPath = uploaded.path;
         updates.heroPhotoSize = uploaded.sizeBytes;
       }
 

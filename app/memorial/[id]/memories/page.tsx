@@ -24,15 +24,20 @@ export const dynamic = 'force-dynamic';
 
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
-async function uploadToR2(file: File, path: string, memorialId: string) {
+async function uploadToR2(file: File, memorialId: string) {
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('path', path);
+  formData.append('kind', 'memorial-memory');
   formData.append('memorialId', memorialId);
-  const res = await fetch('/api/upload', { method: 'POST', body: formData });
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch('/api/upload', {
+    method: 'POST',
+    body: formData,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Upload failed');
-  return data as { path: string; sizeBytes: number };
+  return data as { path: string; sizeBytes: number; contentType?: string };
 }
 
 export default function Memories({ params }: { params: Promise<{ id: string }> }) {
@@ -100,11 +105,9 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
       let newAudioPath: string | null = null;
       let newAudioMimeType: string | null = null;
       if (audioFile && audioFile.size > 0) {
-        const safeName = audioFile.name.replace(/[^\w.-]+/g, '_');
-        const path = `contributions/${m.id}/${crypto.randomUUID()}-${safeName}`;
-        const uploaded = await uploadToR2(audioFile, path, m.id);
+        const uploaded = await uploadToR2(audioFile, m.id);
         newAudioPath = uploaded.path;
-        newAudioMimeType = audioFile.type || 'audio/mpeg';
+        newAudioMimeType = uploaded.contentType || audioFile.type || 'audio/mpeg';
       }
 
       if (editingId) {
