@@ -23,11 +23,16 @@ export async function GET(req: NextRequest) {
     if (!memSnap.exists) return NextResponse.json({ dataUrl: null });
     const memorial = { id: memSnap.id, ...(memSnap.data() as Omit<Memorial, 'id'>) };
 
-    // Mirror MemorialView's client-side gate: any live memorial renders, so
-    // its hero can appear in the QR too. Owners viewing drafts fall back to
-    // the authenticated /api/memorial/hero-photo route on the client.
+    // Public gate: must be live, not offline, and explicitly public/unlisted.
+    // A private memorial — even if live — must not leak its hero photo via
+    // this unauthenticated route. Keepers viewing drafts/private pages fall
+    // back to the authenticated /api/memorial/hero-photo route on the client.
+    const visibility = (memorial as any).visibility;
     if (memorial.status !== 'live') return NextResponse.json({ dataUrl: null });
     if ((memorial as any).offline === true) return NextResponse.json({ dataUrl: null });
+    if (visibility !== 'public' && visibility !== 'unlisted') {
+      return NextResponse.json({ dataUrl: null });
+    }
     if (!memorial.heroPhotoPath) return NextResponse.json({ dataUrl: null });
 
     const res = await r2Client.send(

@@ -219,12 +219,26 @@ service cloud.firestore {
 
       allow get, list: if true;
 
-      // Only the plot admin can flip status; only the requester can withdraw.
-      allow update: if signedIn() && (
-        isPlotAdmin(resource.data.plotId)
-        || resource.data.requestedByUid == request.auth.uid
-        || isSuperAdmin()
-      );
+      // Only the plot admin (or super admin) can flip status, approve, or
+      // edit any field on an existing request. A requester has no legitimate
+      // update path — if they want out, they delete (the withdrawal flow).
+      // The previous rule let the requester update any field, which meant
+      // they could self-approve or rewrite the request's memorialId/plotId
+      // after creation; this hasOnly guard pins the admin branch to the
+      // fields admins actually touch, and removes the requester-update
+      // branch entirely. The plot/memorial IDs and the requester identity
+      // are immutable after creation.
+      allow update: if signedIn()
+        && (isPlotAdmin(resource.data.plotId) || isSuperAdmin())
+        && request.resource.data.plotId == resource.data.plotId
+        && request.resource.data.memorialId == resource.data.memorialId
+        && request.resource.data.requestedByUid == resource.data.requestedByUid
+        && request.resource.data.get('personId', null) == resource.data.get('personId', null)
+        && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
+        && request.resource.data.status in ['requested', 'approved', 'rejected'];
+
+      // Delete is the requester's "withdraw" lever and the admin's "clean
+      // up" lever.
       allow delete: if signedIn() && (
         resource.data.requestedByUid == request.auth.uid
         || isPlotAdmin(resource.data.plotId)
