@@ -156,27 +156,35 @@ export async function POST(req: NextRequest) {
 
     // Authorisation branches by kind. Memorial-side uploads require a signed-
     // in owner or co-manager; the contribution path lets anonymous visitors
-    // upload only to a live, published memorial.
+    // upload only to a live, public/unlisted memorial, but a signed-in owner
+    // or co-manager can also contribute via this path on any state (draft,
+    // private, offline) — useful when a keeper is testing or wants to add
+    // something to a page the public can't see.
+    const uid = await softVerifyToken(req.headers.get('Authorization'));
+    const isOwner = !!uid && memorial.ownerId === uid;
+    const isCoManager =
+      !!uid && Array.isArray(memorial.coManagerUids) && memorial.coManagerUids.includes(uid);
+    const isKeeper = isOwner || isCoManager;
+
     if (MEMORIAL_KINDS.includes(kind)) {
-      const uid = await softVerifyToken(req.headers.get('Authorization'));
       if (!uid) {
         return NextResponse.json({ error: 'Sign in to upload' }, { status: 401 });
       }
-      const isOwner = memorial.ownerId === uid;
-      const isCoManager = Array.isArray(memorial.coManagerUids) && memorial.coManagerUids.includes(uid);
-      if (!isOwner && !isCoManager) {
+      if (!isKeeper) {
         return NextResponse.json({ error: 'You don\'t have access to this memorial' }, { status: 403 });
       }
     } else {
       // contribution flow
-      const isLive = memorial.status === 'live';
-      const isOffline = memorial.offline === true;
-      const visibility = memorial.visibility;
-      if (!isLive || isOffline || (visibility !== 'public' && visibility !== 'unlisted')) {
-        return NextResponse.json(
-          { error: 'This memorial isn\'t accepting contributions right now.' },
-          { status: 403 }
-        );
+      if (!isKeeper) {
+        const isLive = memorial.status === 'live';
+        const isOffline = memorial.offline === true;
+        const visibility = memorial.visibility;
+        if (!isLive || isOffline || (visibility !== 'public' && visibility !== 'unlisted')) {
+          return NextResponse.json(
+            { error: 'This memorial isn\'t accepting contributions right now.' },
+            { status: 403 }
+          );
+        }
       }
     }
 

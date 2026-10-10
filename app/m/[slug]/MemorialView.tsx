@@ -381,9 +381,14 @@ export default function Memorial({
     formData.append('kind', 'contribution');
     formData.append('memorialId', memorialId);
 
+    // Pass the keeper's ID token when they're signed in so the server can
+    // let owner/co-managers contribute to their own private/offline pages.
+    // Anonymous visitors just omit the header.
+    const token = await auth.currentUser?.getIdToken().catch(() => null);
     const res = await fetch('/api/upload', {
       method: 'POST',
       body: formData,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
 
     const data = await res.json();
