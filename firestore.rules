@@ -35,13 +35,16 @@ service cloud.firestore {
     }
     function memorialIsLive(id) {
       let m = memorial(id);
-      return m.status == 'live' && m.get('offline', false) == false;
+      return m.status == 'live'
+        && m.get('offline', false) == false
+        && m.get('pendingDeletionAt', null) == null;
     }
     function memorialIsLiveAndVisible(id) {
       let m = memorial(id);
       return m.status == 'live'
         && m.get('offline', false) == false
-        && m.visibility in ['public','unlisted'];
+        && m.get('pendingDeletionAt', null) == null
+        && m.visibility in ['public','unlisted','private'];
     }
 
     function plot(id) { return get(/databases/$(database)/documents/plots/$(id)).data; }
@@ -95,7 +98,7 @@ service cloud.firestore {
         || isSuperAdmin();
 
       allow get: if
-        (resource.data.status == 'live' && resource.data.get('offline', false) == false && resource.data.visibility in ['public','unlisted'])
+        (resource.data.status == 'live' && resource.data.get('offline', false) == false && resource.data.get('pendingDeletionAt', null) == null && resource.data.visibility in ['public','unlisted'])
         || (signedIn() && resource.data.ownerId == request.auth.uid)
         || (signedIn() && request.auth.uid in resource.data.get('successorUids', []))
         || (signedIn() && request.auth.uid in resource.data.get('coManagerUids', []))
@@ -105,7 +108,7 @@ service cloud.firestore {
         (signedIn() && resource.data.ownerId == request.auth.uid)
         || (signedIn() && request.auth.uid in resource.data.get('successorUids', []))
         || (signedIn() && request.auth.uid in resource.data.get('coManagerUids', []))
-        || (resource.data.status == 'live' && resource.data.get('offline', false) == false && resource.data.visibility == 'public')
+        || (resource.data.status == 'live' && resource.data.get('offline', false) == false && resource.data.get('pendingDeletionAt', null) == null && resource.data.visibility == 'public')
         || isSuperAdmin();
 
       // Custodian or co-manager can edit content but never payment/status/
@@ -467,6 +470,21 @@ service cloud.firestore {
     // created memorial. Written by /api/partner/send-invite, read + consumed
     // by /api/claim/verify. Not touched by any client SDK.
     match /claimTokens/{token} {
+      allow read, write: if false;
+    }
+
+    // ─── rate limits (server-only) ───────────────────────────────────────────
+    // Counter docs used by lib/rate-limit.ts to throttle sensitive endpoints
+    // (invite send, password reset, contribution notify, etc). Admin SDK only.
+    match /rateLimits/{bucket} {
+      allow read, write: if false;
+    }
+
+    // ─── processed stripe events (server-only) ───────────────────────────────
+    // Idempotency ledger for Stripe webhook deliveries, keyed by event.id.
+    // Written exclusively by /api/stripe/webhook; no client should ever read
+    // or write it.
+    match /processedStripeEvents/{eventId} {
       allow read, write: if false;
     }
 

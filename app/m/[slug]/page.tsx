@@ -32,7 +32,9 @@ const loadMemorial = cache(async (slug: string) => {
     const data = snap.data() as any;
     if (data.status !== 'live') return null;
     if (data.offline === true) return null;
-    if (!['public', 'unlisted'].includes(data.visibility)) return null;
+    // Legacy 'private' records (from the retired "Family only" option) are
+    // aliased to unlisted here: link-accessible, noindex. See lib/types.ts.
+    if (!['public', 'unlisted', 'private'].includes(data.visibility)) return null;
     // JSON round-trip strips Firestore Timestamps so the plain object can
     // cross the server/client boundary as a prop.
     return { id: snap.id, ...JSON.parse(JSON.stringify(data)) };

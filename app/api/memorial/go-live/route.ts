@@ -102,6 +102,45 @@ export async function POST(req: NextRequest) {
     const paymentKind = secondary ? 'secondary_memorial' : 'direct_memorial';
 
     const stripe = getStripe();
+
+    // Idempotent checkout: if a session for this memorial is already open
+    // and valid, hand the user back to it instead of minting a new one.
+    // Prevents double-charging when the user hits "Go Live" twice (slow
+    // network, impatient click) and makes replays via retry safe.
+    const pendingSnap = await db
+      .collection('payments')
+      .where('memorialId', '==', memorialId)
+      .where('status', '==', 'pending')
+      .where('provider', '==', 'stripe')
+      .limit(5)
+      .get();
+
+    for (const doc of pendingSnap.docs) {
+      const existing = doc.data();
+      const existingSessionId: string | undefined = existing.providerPaymentId;
+      if (!existingSessionId) continue;
+      try {
+        const existingSession = await stripe.checkout.sessions.retrieve(existingSessionId);
+        if (
+          existingSession.status === 'open' &&
+          existingSession.url &&
+          existingSession.amount_total === amount
+        ) {
+          return NextResponse.json({ success: true, checkoutUrl: existingSession.url });
+        }
+        // Session no longer usable — mark the stale row so the next list
+        // scan is short.
+        if (existingSession.status && existingSession.status !== 'open') {
+          await doc.ref.update({ status: 'expired' });
+        }
+      } catch (err) {
+        // Session not found on Stripe (e.g. deleted test data). Treat as
+        // stale and continue.
+        console.warn('stripe session retrieve failed', existingSessionId, (err as any)?.message);
+        await doc.ref.update({ status: 'expired' });
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -153,7 +192,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('go-live error:', err);
     return NextResponse.json(
-      { error: err.message || 'Could not initiate Go Live' },
+      { error: 'Could not initiate Go Live' },
       { status: 500 }
     );
   }

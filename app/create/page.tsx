@@ -221,7 +221,7 @@ function CreateInner() {
         featuredContributionIds: [],
         epitaph: '',
         story: '',
-        visibility: 'unlisted',
+        visibility: 'public',
         heroPhotoPath: '',
         status: 'draft',
         paymentStatus: 'unpaid',
@@ -267,6 +267,21 @@ function CreateInner() {
       try {
         window.localStorage.removeItem('createDraft');
         window.localStorage.removeItem('createMode');
+      } catch {}
+
+      // Fire-and-forget welcome email. The server route no-ops on second+
+      // memorials via users/{uid}.welcomeSentAt, so we don't need to gate
+      // the call here. Awaiting would delay the redirect for no gain.
+      try {
+        const token = await auth.currentUser.getIdToken();
+        void fetch('/api/memorial/welcome', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ memorialId: slug }),
+        }).catch(() => {});
       } catch {}
 
       router.push(`/memorial/${slug}/manage`);

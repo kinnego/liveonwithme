@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import { sendClaimInvite } from '@/lib/sendgrid';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -10,6 +11,26 @@ const TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 export async function POST(req: NextRequest) {
   try {
     const uid = await verifyIdToken(req.headers.get('Authorization'));
+
+    // Belt + braces: a compromised partner account shouldn't be able to spam
+    // bereaved families with invite emails. Cap at 10 per partner per hour
+    // and 30 per IP per hour (partners with legit volume won't hit this).
+    const ip = clientIp(req.headers);
+    const perUser = await rateLimit(`partner-invite:uid:${uid}`, { max: 10, windowSec: 3600 });
+    if (!perUser.allowed) {
+      return NextResponse.json(
+        { error: 'Too many invites. Please try again in a bit.' },
+        { status: 429, headers: { 'Retry-After': String(perUser.retryAfterSec) } },
+      );
+    }
+    const perIp = await rateLimit(`partner-invite:ip:${ip}`, { max: 30, windowSec: 3600 });
+    if (!perIp.allowed) {
+      return NextResponse.json(
+        { error: 'Too many invites. Please try again in a bit.' },
+        { status: 429, headers: { 'Retry-After': String(perIp.retryAfterSec) } },
+      );
+    }
+
     const { referralId } = await req.json();
     if (typeof referralId !== 'string' || !referralId) {
       return NextResponse.json({ error: 'referralId is required' }, { status: 400 });
@@ -90,7 +111,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('send-invite error', err);
     return NextResponse.json(
-      { error: err.message || 'Could not send invite' },
+      { error: 'Could not send invite' },
       { status: 500 }
     );
   }

@@ -3,6 +3,8 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { slugify } from '@/lib/ids';
 import { writeAuditAdmin } from '@/lib/audit-admin';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
+import { sendFamilyClaimedReferral } from '@/lib/sendgrid';
 
 export const runtime = 'nodejs';
 
@@ -14,6 +16,18 @@ export const runtime = 'nodejs';
 // session via signInWithCustomToken.
 export async function POST(req: NextRequest) {
   try {
+    // Per-IP cap: claim tokens are 32 random bytes so blind guessing isn't
+    // viable, but a brute-force attempt would show up as a flood from a
+    // single IP. Legitimate users click once; 30/hour has lots of headroom.
+    const ip = clientIp(req.headers);
+    const rl = await rateLimit(`claim-verify:ip:${ip}`, { max: 30, windowSec: 3600 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } },
+      );
+    }
+
     const { token } = await req.json();
     if (typeof token !== 'string' || !token) {
       return NextResponse.json({ error: 'Missing token.' }, { status: 400 });
@@ -171,7 +185,7 @@ export async function POST(req: NextRequest) {
         kind: referral.deceasedDied ? 'memorial' : 'legacy',
         epitaph: '',
         story: '',
-        visibility: 'unlisted',
+        visibility: 'public',
         heroPhotoPath: '',
         status: 'draft',
         // Only this server path sets paid_via_partner. Client rules block it.
@@ -225,6 +239,31 @@ export async function POST(req: NextRequest) {
         partnerUid: referral.partnerUid || referral.funeralDirectorUid || null,
       },
     });
+
+    // Tell the partner the family took over. Non-fatal — the claim is
+    // already committed and the family's sign-in must not be gated on
+    // SendGrid availability.
+    const partnerUid = (referral.partnerUid || referral.funeralDirectorUid) as string | undefined;
+    if (partnerUid) {
+      try {
+        const partnerAuth = await auth.getUser(partnerUid).catch(() => null);
+        const partnerProfSnap = await db.collection('users').doc(partnerUid).get();
+        const partnerProf = partnerProfSnap.data() as
+          | { displayName?: string; email?: string }
+          | undefined;
+        const to = partnerAuth?.email || partnerProf?.email || '';
+        if (to) {
+          await sendFamilyClaimedReferral(to, {
+            contactName: partnerAuth?.displayName || partnerProf?.displayName,
+            deceasedFullName: referral.deceasedFullName || 'the family',
+            bereavedName: referral.bereavedName,
+            referralId,
+          });
+        }
+      } catch (emailErr) {
+        console.error('family-claimed-referral email failed', emailErr);
+      }
+    }
 
     const customToken = await auth.createCustomToken(uid);
     return NextResponse.json({

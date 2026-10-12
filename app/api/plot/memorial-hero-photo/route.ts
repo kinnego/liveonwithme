@@ -40,11 +40,11 @@ export async function GET(req: NextRequest) {
       const memorial = { id: memSnap.id, ...(memSnap.data() as Omit<Memorial, 'id'>) };
       if (memorial.status !== 'live') continue;
       if ((memorial as any).offline === true) continue;
-      // The plot QR is a shared physical artefact — don't pull a private
-      // memorial's hero onto it even for the plot admin, since the memorial
-      // custodian explicitly chose to hide the page from the public.
+      // The plot QR is a shared physical artefact. Only pull heroes from
+      // memorials that are link-viewable (public or unlisted). Legacy
+      // 'private' is aliased to unlisted.
       const visibility = (memorial as any).visibility;
-      if (visibility !== 'public' && visibility !== 'unlisted') continue;
+      if (visibility !== 'public' && visibility !== 'unlisted' && visibility !== 'private') continue;
       if (!memorial.heroPhotoPath) continue;
 
       const res = await r2Client.send(
@@ -65,6 +65,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ dataUrl: null });
   } catch (err: any) {
     console.error('plot/memorial-hero-photo error', err);
-    return NextResponse.json({ error: err.message || 'Could not load photo' }, { status: 500 });
+    return NextResponse.json({ error: 'Could not load photo' }, { status: 500 });
   }
 }

@@ -630,6 +630,145 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         </div>
       )}
 
+      {isOwner && isDraft && (() => {
+        const steps = [
+          {
+            key: 'hero',
+            done: !!m.heroPhotoPath,
+            label: 'Add a photograph',
+            hint: 'A main photo for the top of the page.',
+            href: `/memorial/${m.id}/edit`,
+          },
+          {
+            key: 'story',
+            done: !!m.story,
+            label: isLegacy ? 'Share your story' : `Share ${firstName}'s story`,
+            hint: 'A few paragraphs about their life. Write as little or as much as feels right.',
+            href: `/memorial/${m.id}/edit`,
+          },
+          {
+            key: 'cemetery',
+            done: !!m.cemetery?.placeId,
+            label: 'Add the cemetery',
+            hint: 'There’s a dedicated section below with more detail — you can also do it here.',
+            href: `/memorial/${m.id}/edit`,
+          },
+        ];
+        const remaining = steps.filter((s) => !s.done).length;
+        if (remaining === 0) return null;
+        return (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="eyebrow">A few things that help</div>
+            <h3 style={{ marginTop: 10 }}>You&rsquo;ve started something beautiful</h3>
+            <p className="muted">
+              {isLegacy
+                ? 'Here are a few things that help your page come to life. Take them in your own time — nothing is required to publish.'
+                : `Here are a few things that help ${firstName}'s page come to life. Take them in your own time — nothing is required to publish.`}
+            </p>
+            <ul style={{ listStyle: 'none', margin: '18px 0 0', padding: 0 }}>
+              {steps.map((step, idx) => (
+                <li
+                  key={step.key}
+                  style={{
+                    borderTop: idx === 0 ? '1px solid var(--line)' : 'none',
+                    borderBottom: '1px solid var(--line)',
+                    padding: '14px 0',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        flex: '0 0 24px',
+                        width: 24,
+                        height: 24,
+                        borderRadius: '50%',
+                        background: step.done ? 'var(--sage)' : 'transparent',
+                        border: step.done ? 'none' : '1.5px solid #c8c0b2',
+                        color: 'white',
+                        display: 'grid',
+                        placeItems: 'center',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        marginTop: 3,
+                      }}
+                    >
+                      {step.done ? '✓' : ''}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontWeight: 650,
+                          color: step.done ? 'var(--muted)' : 'var(--ink)',
+                          textDecoration: step.done ? 'line-through' : 'none',
+                        }}
+                      >
+                        {step.label}
+                      </div>
+                      {!step.done && (
+                        <>
+                          <p className="muted" style={{ margin: '4px 0 10px', fontSize: 13 }}>
+                            {step.hint}
+                          </p>
+                          <Link href={step.href} className="button soft small">
+                            {step.key === 'hero' ? 'Add a photo' : 'Open editor'}
+                          </Link>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })()}
+
+      {isOwner && !isLive && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 24,
+            background: 'linear-gradient(135deg, #fffdf9, #e8ede8)',
+            borderColor: '#c8d4cb',
+          }}
+        >
+          <div className="eyebrow">The resting place</div>
+          {m.cemetery?.placeId ? (
+            <>
+              <h3 style={{ marginTop: 10 }}>Linked to {m.cemetery.name || 'a cemetery'}</h3>
+              <p className="muted">
+                {m.cemetery.address && (
+                  <span style={{ display: 'block', marginBottom: 8 }}>{m.cemetery.address}</span>
+                )}
+                {isLegacy
+                  ? 'Visitors will see the cemetery on your page. Once you publish, you can drop a pin on the exact plot so people can find it from the gate.'
+                  : `Visitors will see the cemetery on ${firstName}'s page. Once you publish, you can drop a pin on the exact plot so people can find it from the gate — and generate a QR for the headstone that links back to the memorial.`}
+              </p>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+                <Link href={`/memorial/${m.id}/edit`} className="button secondary">
+                  Change cemetery
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 style={{ marginTop: 10 }}>Where will people come to visit?</h3>
+              <p className="muted">
+                {isLegacy
+                  ? 'Adding the cemetery means visitors can get walking directions from the gate, see the plot on a map, and — later — a QR on the headstone will link back to this page. If this isn’t decided yet, you can add it any time.'
+                  : `Adding the cemetery means visitors can get walking directions from the gate, see the plot on a map, and a QR on ${firstName}'s headstone can link back to this page. If this isn’t decided yet, you can add it any time.`}
+              </p>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+                <Link href={`/memorial/${m.id}/edit`} className="button">
+                  Add cemetery details
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Go Live section */}
       {isOwner && !isLive && (
         <div
@@ -754,7 +893,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         </div>
       )}
 
-      {(!m.epitaph || !m.story) && (
+      {(!m.epitaph || !m.story) && !(isOwner && isDraft) && (
         <div
           className="card"
           style={{

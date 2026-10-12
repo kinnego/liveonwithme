@@ -6,7 +6,7 @@
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
-export type MemorialVisibility = 'public' | 'private' | 'unlisted';
+export type MemorialVisibility = 'public' | 'unlisted';
 
 export type MemorialStatus = 'draft' | 'awaiting_payment' | 'live';
 
@@ -169,6 +169,14 @@ export interface Memorial {
   // be paid-for and 'live' but hidden from public view while offline is true.
   // Default is false/undefined; the owner toggles it from the manage page.
   offline?: boolean;
+  // Set when an orphan is left behind by a GDPR account deletion with no
+  // successor or co-manager to promote. A nightly sweep purges memorials
+  // whose pendingDeletionAt is in the past (30-day grace). While this is
+  // set, the memorial is treated as not-publicly-visible by all gates, and
+  // the original owner can request restoration via support before the
+  // sweep runs.
+  pendingDeletionAt?: unknown;
+  pendingDeletionReason?: string;
   partnerUid?: string | null;    // if salesChannel === 'partner'
   referralId?: string | null;    // link to Referral doc
 

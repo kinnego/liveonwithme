@@ -44,6 +44,40 @@ export async function POST(req: NextRequest) {
 
     const pricing = await readPricingAdmin();
     const stripe = getStripe();
+
+    // Idempotent checkout: reuse an existing open session for this referral
+    // so repeated clicks don't mint new sessions (and don't produce multiple
+    // pending payment rows). Mirrors the pattern in /api/memorial/go-live.
+    const pendingSnap = await db
+      .collection('payments')
+      .where('referralId', '==', referralId)
+      .where('status', '==', 'pending')
+      .where('provider', '==', 'stripe')
+      .limit(5)
+      .get();
+
+    for (const doc of pendingSnap.docs) {
+      const existing = doc.data();
+      const existingSessionId: string | undefined = existing.providerPaymentId;
+      if (!existingSessionId) continue;
+      try {
+        const existingSession = await stripe.checkout.sessions.retrieve(existingSessionId);
+        if (
+          existingSession.status === 'open' &&
+          existingSession.url &&
+          existingSession.amount_total === pricing.partnerWholesalePriceCents
+        ) {
+          return NextResponse.json({ checkoutUrl: existingSession.url });
+        }
+        if (existingSession.status && existingSession.status !== 'open') {
+          await doc.ref.update({ status: 'expired' });
+        }
+      } catch (err) {
+        console.warn('stripe session retrieve failed', existingSessionId, (err as any)?.message);
+        await doc.ref.update({ status: 'expired' });
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -88,6 +122,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ checkoutUrl: session.url });
   } catch (err: any) {
     console.error('wholesale-checkout error', err);
-    return NextResponse.json({ error: err.message || 'Checkout failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Checkout failed' }, { status: 500 });
   }
 }

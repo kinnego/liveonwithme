@@ -14,12 +14,34 @@ import { adminAuth, adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import { writeAuditAdmin } from '@/lib/audit-admin';
 import { hashLegacyCode } from '@/lib/legacy-code-server';
 import { normalizeLegacyCode } from '@/lib/legacy-code';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
     const uid = await verifyIdToken(req.headers.get('Authorization'));
+
+    // Legacy codes are ~99 bits of entropy so blind guessing is implausible,
+    // but a stolen letter + account could be used to brute near-collisions
+    // (typos on retype). Cap per-UID at 20/hr and per-IP at 60/hr — well
+    // above any legitimate retry pattern.
+    const ip = clientIp(req.headers);
+    const perUser = await rateLimit(`legacy-claim:uid:${uid}`, { max: 20, windowSec: 3600 });
+    if (!perUser.allowed) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(perUser.retryAfterSec) } },
+      );
+    }
+    const perIp = await rateLimit(`legacy-claim:ip:${ip}`, { max: 60, windowSec: 3600 });
+    if (!perIp.allowed) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(perIp.retryAfterSec) } },
+      );
+    }
+
     const { code } = await req.json();
 
     const canonical = normalizeLegacyCode(code || '');
@@ -123,7 +145,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('legacy claim error:', err);
     return NextResponse.json(
-      { error: err.message || 'Something went wrong claiming this page.' },
+      { error: 'Something went wrong claiming this page.' },
       { status: 500 }
     );
   }

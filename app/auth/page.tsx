@@ -71,6 +71,16 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
+  // A quiet confirmation after a successful account deletion. The dashboard
+  // sends the user here with ?deleted=1 once the server has removed them.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('deleted') === '1') {
+      setNotice('Your account has been removed. Thank you.');
+    }
+  }, []);
+
   // Debounced check against /api/user/exists. Only surfaces in register mode;
   // we use the result to disable submit and offer a one-click switch to login.
   useEffect(() => {

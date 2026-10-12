@@ -1,6 +1,47 @@
 # Status & next steps
 
-Last updated: 2026-10-04, branch `claude/ubuntu-machine-or-phone-ovt1xa` (the GitHub default — there is no separate `main`).
+Last updated: 2026-10-12, branch `claude/ubuntu-machine-or-phone-ovt1xa` (the GitHub default — there is no separate `main`).
+
+## 2026-10-12 session handoff
+
+### Shipped since last update
+
+- **Visibility simplified.** Removed the "Family only" option entirely. The dropdown on the edit page now has two choices: "Public — anyone can find it" and "Only people with the link or QR". New memorials default to `public` (previously `unlisted`). Legacy records still carrying `visibility: 'private'` are aliased to `unlisted` at read time by every gate (`app/m/[slug]/page.tsx`, `app/plot/[plotId]/page.tsx`, `app/api/upload/route.ts`, both hero-photo routes, `firestore.rules`), so no data migration is needed — old records keep working as if they were unlisted.
+- **"Next Steps" card on the manage page.** Draft, owner-only. Checklist for hero photo, story, cemetery. Each row deep-links to the right place to complete the step.
+- **Dedicated "The resting place" card.** Separate section promoted out of the checklist because it's a load-bearing piece of the jigsaw. Two states: pitch + CTA when no cemetery is set; summary + "Change cemetery" when one is attached. Appears for owner + not-yet-live memorials.
+- **CSP widened for Google Sign-in.** `script-src` now includes `https://apis.google.com` + `https://www.gstatic.com`; `frame-src` includes `https://*.firebaseapp.com` + `https://accounts.google.com`. Signed-in popup now works.
+- **10 new transactional emails.** Partner lifecycle (received, admin notice, approved, rejected), wholesale receipt, family-claimed referral, memorial payment receipt, co-manager accepted (both parties), succession completed (both parties). Added `sendAccountDeletedConfirmation` for the GDPR flow. All sends go via two new notify routes (`/api/partner/application-notify`, `/api/admin/partners/notify`) and inline hooks in `stripe/webhook`, `claim/verify`, `custody/accept`. Fire-and-forget from the two client pages (`partner/apply`, `admin/partners`) so a SendGrid blip never blocks the user flow.
+- **GDPR account deletion.** `/api/account/delete` plus a quiet `<details>` disclosure labelled "Account" at the bottom of `/dashboard`. Owned memorials are handled by: (1) promote first successor, (2) else promote first co-manager, (3) else take offline + stamp `pendingDeletionAt = now + 30 days`. User's co-manager/successor seats elsewhere are removed. Contributions keyed on their email are PII-scrubbed (name/email/relationship wiped, memory text kept — belongs to the memorial's family). Partner applications and succession requests they submitted are deleted (PII-heavy). Pending custody transfers from or to them are cancelled. `users/{uid}` deleted, confirmation email sent, Firebase Auth account deleted. Super admin cannot delete through this path.
+
+### Required before anything else works in production
+
+- **Firestore rules pending deploy.** `firestore.rules` was updated this session so `memorialIsLive`, `memorialIsLiveAndVisible`, and the public `get`/`list` rules on `/memorials` now require `pendingDeletionAt == null`. Needs `firebase deploy --only firestore:rules` before the account-deletion soft-delete takes effect at the public-read layer. Until then the `offline: true` flag that is set alongside `pendingDeletionAt` already hides orphans — rules deploy is a defence-in-depth upgrade.
+- **No new env vars.** SendGrid, Firebase Admin, and R2 vars from prior sessions cover everything.
+
+### Smoke tests after each deploy
+
+1. **Visibility default on new memorials.** Create a page via `/create`. Open it in Firestore — `visibility` should be `public`. Open `/memorial/{id}/edit`, the dropdown should default to "Public — anyone can find it", with only two options total.
+2. **Legacy `private` records still viewable by link.** Pick a Firestore memorial with `visibility: 'private'` (if any exist) — hit `/m/{slug}` while signed out, should still render.
+3. **Next Steps card.** On a draft memorial you own, confirm the "Next Steps" card shows three rows (photo / story / cemetery), each ticked/unticked by actual state, each clickable to the edit page.
+4. **Resting place card.** On the same memorial, confirm "The resting place" card appears below Next Steps with the pitch + "Add cemetery details" CTA. Add a cemetery → confirm the card flips to the summary state. Confirm it disappears once the memorial is live.
+5. **Google Sign-in.** On a signed-out browser, visit `/auth` → "Continue with Google" — popup should load `apis.google.com/js/api.js` without a CSP console error, complete sign-in cleanly.
+6. **Partner application lifecycle emails.** Submit an application via `/partner/apply` → applicant should receive "Thanks for applying"; `hello@freastar.com` should receive the admin notice. Approve from `/admin/partners` → applicant receives "Welcome". Reject → applicant receives "About your application". Suspend → no email.
+7. **Wholesale + memorial receipts.** Partner pays wholesale via Stripe test card → partner receives the wholesale receipt. Family pays direct for a memorial → owner receives the memorial live receipt. Both are in addition to Stripe's own card receipt.
+8. **Family-claimed email.** Bereaved opens the claim link, sets their password → the partner on the referral receives "The family took over".
+9. **Co-manager + succession emails.** Invite a co-manager → on accept, owner receives "X is now a co-manager" and invitee receives "You're a co-manager". Nominate primary → on accept, new owner receives "You now look after …" and previous owner receives "Custody has passed to …".
+10. **Account deletion — happy path with successor.** Create a draft memorial as user A, nominate user B as primary successor. From `/dashboard` scroll to the "Account" disclosure, type your email, click "Delete my account". After reload: Firestore shows ownerId flipped to user B, user A's auth row is gone, confirmation email arrived at the deleted address.
+11. **Account deletion — orphan path.** Same but with no successor and no co-manager. After deletion: the memorial has `offline: true`, `pendingDeletionAt` ~30 days ahead, `pendingDeletionReason: 'owner_deleted_account'`. Public `/m/{slug}` returns a not-found. The confirmation email lists the orphaned memorial with its restore deadline.
+12. **Account deletion — super admin block.** Sign in as `hello@freastar.com`, open the disclosure, try to delete — should see "Super admin accounts cannot be removed through this flow."
+
+### Known limitations / unchanged
+
+- **30-day orphan sweep not yet implemented.** `pendingDeletionAt` is set but no cron purges memorials when the deadline passes. For now orphaned memorials stay `offline: true` forever unless a super admin cleans them manually. A scheduled Cloud Function or Netlify scheduled function reading `where('pendingDeletionAt', '<=', now)` and hard-deleting the memorial + its contributions + R2 photos is the shape of the fix.
+- **Three more "nice to have" emails are blocked on feature plumbing**, not SendGrid work:
+  - *Contribution reported for moderation* — needs a "report" button on public memorial view + a `contributionReports` collection + an admin inbox.
+  - *Email change confirmation* — needs a profile page where the user can edit their email (none exists today).
+  - *Account deletion confirmation* — shipped this session as `sendAccountDeletedConfirmation`.
+- **Account deletion does not require password re-entry**, only typed email match + the user's existing session + the rate limit + the confirmation email after. Stolen-session abuse is possible in theory but low-risk; add Firebase `reauthenticateWithCredential` before `getIdToken()` if we want to tighten.
+- **Account deletion scrubs contributions keyed by email only.** Contribution docs don't carry a `contributorUid`; if the user contributed under a different email than the one on their account, those records won't be scrubbed. GDPR-wise, acceptable (we erased everything we could associate with them).
 
 ## 2026-10-04 session handoff
 

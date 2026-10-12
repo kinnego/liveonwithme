@@ -68,6 +68,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, path, type: file.type, dataUrl });
   } catch (err: any) {
     console.error('plot/upload-mark error', err);
-    return NextResponse.json({ error: err.message || 'Upload failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 }

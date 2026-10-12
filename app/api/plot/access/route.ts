@@ -20,6 +20,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ canManage: allowed, role });
   } catch (err: any) {
     console.error('plot/access error', err);
-    return NextResponse.json({ error: err.message || 'Could not check access' }, { status: 500 });
+    return NextResponse.json({ error: 'Could not check access' }, { status: 500 });
   }
 }

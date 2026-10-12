@@ -37,6 +37,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ dataUrl: `data:${contentType};base64,${buf.toString('base64')}` });
   } catch (err: any) {
     console.error('plot/mark error', err);
-    return NextResponse.json({ error: err.message || 'Could not load mark' }, { status: 500 });
+    return NextResponse.json({ error: 'Could not load mark' }, { status: 500 });
   }
 }

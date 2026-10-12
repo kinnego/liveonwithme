@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('custody lookup error:', err);
     return NextResponse.json(
-      { error: err.message || 'Something went wrong loading this invitation.' },
+      { error: 'Something went wrong loading this invitation.' },
       { status: 500 }
     );
   }

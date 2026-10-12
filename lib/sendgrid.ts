@@ -1,4 +1,24 @@
 import sgMail from '@sendgrid/mail';
+import { PARTNER_TYPE_LABELS, PartnerType, SUPER_ADMIN_EMAIL } from './types';
+
+function formatMoney(amountMinor: number, currency: string): string {
+  const code = (currency || 'eur').toUpperCase();
+  const major = (amountMinor || 0) / 100;
+  try {
+    return new Intl.NumberFormat('en-IE', { style: 'currency', currency: code }).format(major);
+  } catch {
+    return `${code} ${major.toFixed(2)}`;
+  }
+}
+
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 let _initialized = false;
 
@@ -266,6 +286,86 @@ export async function sendContributionAlert(
   });
 }
 
+export async function sendMemorialWelcome(
+  to: string,
+  args: {
+    memorialSlug: string;
+    deceasedFullName: string;
+    kind: 'memorial' | 'legacy';
+    recipientName?: string;
+  },
+) {
+  const manageLink = `${siteUrl()}/memorial/${encodeURIComponent(args.memorialSlug)}/manage`;
+  const dashboardLink = `${siteUrl()}/dashboard`;
+  const resetLink = `${siteUrl()}/auth/action?mode=resetPassword`;
+  const hello = firstName(args.recipientName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const isLegacy = args.kind === 'legacy';
+
+  const subject = isLegacy
+    ? `Your page on LiveOnWith.me is ready`
+    : `${args.deceasedFullName}'s memorial is ready`;
+
+  const openingText = isLegacy
+    ? `You've started a page about yourself on LiveOnWith.me. There's no deadline — come back whenever you'd like to add a photograph, a story, or anything else you want remembered.`
+    : `You've started a memorial page for ${args.deceasedFullName} on LiveOnWith.me. There's no deadline. Come back whenever you'd like to add a photograph, write their story, or invite family to share their own memories.`;
+
+  const bookmarkLine = isLegacy
+    ? `We've saved it here on your dashboard so you can find it again easily:`
+    : `We've saved it here on your dashboard so you can find it again easily:`;
+
+  const text = [
+    greeting,
+    '',
+    openingText,
+    '',
+    bookmarkLine,
+    manageLink,
+    '',
+    'All your pages: ' + dashboardLink,
+    '',
+    `If you ever forget your password, you can request a reset here: ${resetLink}`,
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:26px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          ${isLegacy ? 'Your page is ready' : `A page for ${args.deceasedFullName}`}
+        </h1>
+        <p style="font-family:Inter,system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">
+          ${greeting}
+        </p>
+        <p style="font-family:Inter,system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 22px;">
+          ${openingText}
+        </p>
+        <p style="text-align:center;margin:32px 0;">
+          <a href="${manageLink}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open your page
+          </a>
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.6;color:#53635d;margin:0 0 10px;">
+          You can also find all your pages at any time from your dashboard:
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.6;margin:0 0 22px;">
+          <a href="${dashboardLink}" style="color:#2f5b48;text-decoration:underline;">${dashboardLink}</a>
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
+          If you ever forget your password, you can
+          <a href="${resetLink}" style="color:#688076;">request a reset here</a>.
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
 export async function sendClaimInvite(
   to: string,
   token: string,
@@ -314,6 +414,652 @@ export async function sendClaimInvite(
         </p>
         <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
           The link is private to you. If you weren't expecting this email, you can safely ignore it.
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+// ─── Partner application lifecycle ──────────────────────────────────────────
+
+export async function sendPartnerApplicationReceived(
+  to: string,
+  args: { contactName?: string; businessName: string; partnerType: PartnerType },
+) {
+  const hello = firstName(args.contactName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const typeLabel = PARTNER_TYPE_LABELS[args.partnerType] || 'partner';
+  const subject = `We've received your LiveOnWith.me partner application`;
+
+  const text = [
+    greeting,
+    '',
+    `Thanks for applying to join LiveOnWith.me as a ${typeLabel.toLowerCase()} — we've received your application for ${args.businessName}.`,
+    '',
+    `We review each one by hand so there's a short wait. We'll be in touch once we've had a look. If anything's time-sensitive, just reply to this email.`,
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:26px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          Thanks for applying
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">
+          Thanks for applying to join LiveOnWith.me as a ${typeLabel.toLowerCase()} — we've received your application for <strong>${escapeHtml(args.businessName)}</strong>.
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.6;color:#53635d;margin:0 0 22px;">
+          We review each one by hand so there's a short wait. We'll be in touch once we've had a look. If anything's time-sensitive, just reply to this email.
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+export async function sendPartnerApplicationAdminNotice(args: {
+  applicationId: string;
+  applicantEmail: string;
+  contactName: string;
+  contactPhone?: string;
+  website?: string;
+  businessName: string;
+  partnerType: PartnerType;
+  notes?: string;
+}) {
+  const typeLabel = PARTNER_TYPE_LABELS[args.partnerType] || args.partnerType;
+  const subject = `New partner application: ${args.businessName} (${typeLabel})`;
+  const link = `${siteUrl()}/admin/partners`;
+
+  const rows: Array<[string, string]> = [
+    ['Business', args.businessName],
+    ['Type', typeLabel],
+    ['Contact', args.contactName],
+    ['Email', args.applicantEmail],
+  ];
+  if (args.contactPhone) rows.push(['Phone', args.contactPhone]);
+  if (args.website) rows.push(['Website', args.website]);
+  if (args.notes?.trim()) rows.push(['Notes', args.notes.trim()]);
+
+  const text = [
+    'A new partner application has been submitted on LiveOnWith.me.',
+    '',
+    ...rows.map(([k, v]) => `${k}: ${v}`),
+    '',
+    `Review it: ${link}`,
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:24px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          New partner application
+        </h1>
+        <table cellpadding="0" cellspacing="0" style="font-family:Inter,system-ui,sans-serif;font-size:15px;color:#25312d;width:100%;margin:0 0 22px;">
+          ${rows
+            .map(
+              ([k, v]) => `<tr>
+                <td style="padding:6px 12px 6px 0;color:#6d7772;vertical-align:top;width:110px;">${escapeHtml(k)}</td>
+                <td style="padding:6px 0;">${escapeHtml(v)}</td>
+              </tr>`,
+            )
+            .join('')}
+        </table>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Review in admin
+          </a>
+        </p>
+  `);
+
+  await client().send({
+    to: SUPER_ADMIN_EMAIL,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+export async function sendPartnerApplicationApproved(
+  to: string,
+  args: { contactName?: string; businessName: string; partnerType: PartnerType },
+) {
+  const hello = firstName(args.contactName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const typeLabel = PARTNER_TYPE_LABELS[args.partnerType] || 'partner';
+  const link = `${siteUrl()}/partner`;
+  const subject = `You're approved — welcome to LiveOnWith.me`;
+
+  const text = [
+    greeting,
+    '',
+    `${args.businessName} is approved as a LiveOnWith.me ${typeLabel.toLowerCase()}.`,
+    '',
+    'You can now set up memorial pages for the families you work with and refer them in — they take over custody from there.',
+    '',
+    `Partner dashboard: ${link}`,
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:26px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          Welcome to LiveOnWith.me
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">
+          <strong>${escapeHtml(args.businessName)}</strong> is approved as a LiveOnWith.me ${typeLabel.toLowerCase()}. You can now set up memorial pages for the families you work with and refer them in — they take over custody from there.
+        </p>
+        <p style="text-align:center;margin:32px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open the partner dashboard
+          </a>
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+export async function sendPartnerApplicationRejected(
+  to: string,
+  args: { contactName?: string; businessName: string },
+) {
+  const hello = firstName(args.contactName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const subject = `Your LiveOnWith.me partner application`;
+
+  const text = [
+    greeting,
+    '',
+    `Thanks for your interest in LiveOnWith.me. We've reviewed your application for ${args.businessName} and we're not able to bring you on as a partner at this time.`,
+    '',
+    'If you think we should reconsider — different partner type, more context about your business, questions about our model — just reply to this email and a person will get back to you.',
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:26px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          About your application
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">
+          Thanks for your interest in LiveOnWith.me. We've reviewed your application for <strong>${escapeHtml(args.businessName)}</strong> and we're not able to bring you on as a partner at this time.
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.6;color:#53635d;margin:0 0 22px;">
+          If you think we should reconsider — different partner type, more context about your business, questions about our model — just reply to this email and a person will get back to you.
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+// ─── Receipts ───────────────────────────────────────────────────────────────
+
+export async function sendWholesaleReceipt(
+  to: string,
+  args: {
+    contactName?: string;
+    amountMinor: number;
+    currency: string;
+    deceasedFullName: string;
+    bereavedName?: string;
+    referralId: string;
+    sessionId: string;
+  },
+) {
+  const hello = firstName(args.contactName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const amount = formatMoney(args.amountMinor, args.currency);
+  const link = `${siteUrl()}/partner/referrals/${encodeURIComponent(args.referralId)}`;
+  const subject = `Receipt for ${args.deceasedFullName}'s memorial · ${amount}`;
+
+  const text = [
+    greeting,
+    '',
+    `This is your receipt for the LiveOnWith.me wholesale fee for ${args.deceasedFullName}'s memorial.`,
+    '',
+    `Amount: ${amount}`,
+    `Reference: ${args.sessionId}`,
+    args.bereavedName ? `Family contact: ${args.bereavedName}` : '',
+    '',
+    `Open the referral to send the invite: ${link}`,
+    '',
+    '— LiveOnWith.me',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:26px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          Receipt
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">
+          This is your receipt for the LiveOnWith.me wholesale fee for <strong>${escapeHtml(args.deceasedFullName)}</strong>'s memorial.
+        </p>
+        <table cellpadding="0" cellspacing="0" style="font-family:Inter,system-ui,sans-serif;font-size:15px;color:#25312d;width:100%;margin:0 0 22px;">
+          <tr><td style="padding:6px 12px 6px 0;color:#6d7772;width:120px;">Amount</td><td style="padding:6px 0;"><strong>${escapeHtml(amount)}</strong></td></tr>
+          <tr><td style="padding:6px 12px 6px 0;color:#6d7772;">Reference</td><td style="padding:6px 0;font-family:ui-monospace,monospace;font-size:13px;">${escapeHtml(args.sessionId)}</td></tr>
+          ${args.bereavedName ? `<tr><td style="padding:6px 12px 6px 0;color:#6d7772;">Family contact</td><td style="padding:6px 0;">${escapeHtml(args.bereavedName)}</td></tr>` : ''}
+        </table>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open the referral
+          </a>
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
+          Stripe will also send a payment receipt for the card charge itself. Keep both for your records.
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+export async function sendFamilyClaimedReferral(
+  to: string,
+  args: {
+    contactName?: string;
+    deceasedFullName: string;
+    bereavedName?: string;
+    referralId: string;
+  },
+) {
+  const hello = firstName(args.contactName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const bereaved = args.bereavedName?.trim() || 'The family';
+  const link = `${siteUrl()}/partner/referrals/${encodeURIComponent(args.referralId)}`;
+  const subject = `${bereaved} has claimed ${args.deceasedFullName}'s memorial`;
+
+  const text = [
+    greeting,
+    '',
+    `${bereaved} has taken over custody of ${args.deceasedFullName}'s memorial on LiveOnWith.me — you've done your part. From here, they manage the memorial themselves.`,
+    '',
+    `Open the referral: ${link}`,
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:26px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          The family took over
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 22px;">
+          <strong>${escapeHtml(bereaved)}</strong> has taken over custody of <strong>${escapeHtml(args.deceasedFullName)}</strong>'s memorial on LiveOnWith.me — you've done your part. From here, they manage the memorial themselves.
+        </p>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open the referral
+          </a>
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+export async function sendMemorialPaymentReceipt(
+  to: string,
+  args: {
+    recipientName?: string;
+    amountMinor: number;
+    currency: string;
+    deceasedFullName: string;
+    memorialSlug: string;
+    sessionId: string;
+  },
+) {
+  const hello = firstName(args.recipientName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const amount = formatMoney(args.amountMinor, args.currency);
+  const publicLink = `${siteUrl()}/m/${encodeURIComponent(args.memorialSlug)}`;
+  const manageLink = `${siteUrl()}/memorial/${encodeURIComponent(args.memorialSlug)}/manage`;
+  const subject = `${args.deceasedFullName}'s memorial is live · ${amount}`;
+
+  const text = [
+    greeting,
+    '',
+    `${args.deceasedFullName}'s memorial is now live on LiveOnWith.me — thank you.`,
+    '',
+    `Amount: ${amount}`,
+    `Reference: ${args.sessionId}`,
+    '',
+    `Share the memorial: ${publicLink}`,
+    `Manage it: ${manageLink}`,
+    '',
+    'The one-time fee covers hosting for life. Stripe will also send a payment receipt for the card charge itself.',
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:26px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          ${escapeHtml(args.deceasedFullName)}'s memorial is live
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">
+          Thank you for publishing — the memorial is now reachable at its link, so you can share it with family and friends.
+        </p>
+        <table cellpadding="0" cellspacing="0" style="font-family:Inter,system-ui,sans-serif;font-size:15px;color:#25312d;width:100%;margin:0 0 22px;">
+          <tr><td style="padding:6px 12px 6px 0;color:#6d7772;width:120px;">Amount</td><td style="padding:6px 0;"><strong>${escapeHtml(amount)}</strong></td></tr>
+          <tr><td style="padding:6px 12px 6px 0;color:#6d7772;">Reference</td><td style="padding:6px 0;font-family:ui-monospace,monospace;font-size:13px;">${escapeHtml(args.sessionId)}</td></tr>
+        </table>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${publicLink}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open the memorial
+          </a>
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
+          Manage it any time at <a href="${manageLink}" style="color:#688076;">${manageLink}</a>. The one-time fee covers hosting for life. Stripe will also send a payment receipt for the card charge itself.
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+// ─── Custody acceptance follow-ups ──────────────────────────────────────────
+
+export async function sendCoManagerAcceptedToOwner(
+  to: string,
+  args: {
+    ownerName?: string;
+    coManagerName?: string;
+    coManagerEmail: string;
+    memorialName: string;
+    memorialId: string;
+  },
+) {
+  const hello = firstName(args.ownerName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const who = args.coManagerName?.trim() || args.coManagerEmail;
+  const link = `${siteUrl()}/memorial/${encodeURIComponent(args.memorialId)}/manage`;
+  const subject = `${who} is now a co-manager on ${args.memorialName}'s memorial`;
+
+  const text = [
+    greeting,
+    '',
+    `${who} accepted your invitation and is now a co-manager on ${args.memorialName}'s memorial. They can approve memories, add photos, and edit the story alongside you. You stay in charge of publishing, succession and billing.`,
+    '',
+    `Open the memorial: ${link}`,
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:24px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          You've got a hand with ${escapeHtml(args.memorialName)}'s memorial
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 22px;">
+          <strong>${escapeHtml(who)}</strong> accepted your invitation and is now a co-manager. They can approve memories, add photos, and edit the story alongside you. You stay in charge of publishing, succession and billing.
+        </p>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open the memorial
+          </a>
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+export async function sendCoManagerConfirmation(
+  to: string,
+  args: { recipientName?: string; memorialName: string; memorialId: string },
+) {
+  const hello = firstName(args.recipientName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const link = `${siteUrl()}/memorial/${encodeURIComponent(args.memorialId)}/manage`;
+  const subject = `You're a co-manager on ${args.memorialName}'s memorial`;
+
+  const text = [
+    greeting,
+    '',
+    `You're now helping manage ${args.memorialName}'s memorial on LiveOnWith.me. You can approve memories, add photos, and edit the story.`,
+    '',
+    `Open the memorial: ${link}`,
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:24px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          You're a co-manager
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 22px;">
+          You're now helping manage <strong>${escapeHtml(args.memorialName)}</strong>'s memorial on LiveOnWith.me. You can approve memories, add photos, and edit the story.
+        </p>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open the memorial
+          </a>
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+export async function sendSuccessionCompletedToNewOwner(
+  to: string,
+  args: { recipientName?: string; memorialName: string; memorialId: string },
+) {
+  const hello = firstName(args.recipientName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const link = `${siteUrl()}/memorial/${encodeURIComponent(args.memorialId)}/manage`;
+  const subject = `You now look after ${args.memorialName}'s memorial`;
+
+  const text = [
+    greeting,
+    '',
+    `Custody of ${args.memorialName}'s memorial on LiveOnWith.me has moved to you. You can now manage everything — content, publishing, co-managers and succession. The memorial URL stays the same.`,
+    '',
+    `Open the memorial: ${link}`,
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:24px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          You now look after ${escapeHtml(args.memorialName)}'s memorial
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 22px;">
+          Custody has moved to you. You can now manage everything — content, publishing, co-managers and succession. The memorial URL stays the same.
+        </p>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Open the memorial
+          </a>
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+// ─── Account deletion (GDPR Article 17) ─────────────────────────────────────
+
+export async function sendAccountDeletedConfirmation(
+  to: string,
+  args: {
+    recipientName?: string;
+    orphanedMemorials: Array<{ fullName: string; restoreDeadline: string }>;
+  },
+) {
+  const hello = firstName(args.recipientName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const subject = `Your LiveOnWith.me account has been deleted`;
+
+  const orphanLines = args.orphanedMemorials.length
+    ? [
+        '',
+        `A few memorial pages you looked after had no one else assigned, so they've been taken offline. If this was a mistake, reply to this email before the date beside each one and we can restore it:`,
+        '',
+        ...args.orphanedMemorials.map(
+          (m) => `• ${m.fullName} — restorable until ${m.restoreDeadline}`,
+        ),
+      ]
+    : [];
+
+  const text = [
+    greeting,
+    '',
+    'Your LiveOnWith.me account has been deleted. Your sign-in, your profile, and the personal details on any memories you contributed on other pages have been removed.',
+    ...orphanLines,
+    '',
+    "If you didn't ask for this to happen, reply to this email as soon as possible.",
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const orphanHtml = args.orphanedMemorials.length
+    ? `
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.6;color:#25312d;margin:22px 0 10px;">
+          A few memorial pages you looked after had no one else assigned, so they've been taken offline. If this was a mistake, reply to this email before the date beside each one and we can restore it:
+        </p>
+        <ul style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.7;color:#25312d;padding-left:20px;margin:0 0 22px;">
+          ${args.orphanedMemorials
+            .map(
+              (m) =>
+                `<li><strong>${escapeHtml(m.fullName)}</strong> — restorable until ${escapeHtml(m.restoreDeadline)}</li>`,
+            )
+            .join('')}
+        </ul>`
+    : '';
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:26px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          Your account has been deleted
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">
+          Your LiveOnWith.me account has been deleted. Your sign-in, your profile, and the personal details on any memories you contributed on other pages have been removed.
+        </p>
+        ${orphanHtml}
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
+          If you didn't ask for this to happen, reply to this email as soon as possible and we'll help.
+        </p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+export async function sendSuccessionCompletedToPreviousOwner(
+  to: string,
+  args: {
+    recipientName?: string;
+    newOwnerName?: string;
+    newOwnerEmail: string;
+    memorialName: string;
+    memorialId: string;
+  },
+) {
+  const hello = firstName(args.recipientName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const who = args.newOwnerName?.trim() || args.newOwnerEmail;
+  const link = `${siteUrl()}/memorial/${encodeURIComponent(args.memorialId)}/manage`;
+  const subject = `${args.memorialName}'s memorial has passed to ${who}`;
+
+  const text = [
+    greeting,
+    '',
+    `Custody of ${args.memorialName}'s memorial has moved to ${who} on LiveOnWith.me. You're still listed as a backup custodian, so the memorial stays visible on your dashboard.`,
+    '',
+    `View the memorial: ${link}`,
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:24px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          Custody has passed to ${escapeHtml(who)}
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 22px;">
+          <strong>${escapeHtml(who)}</strong> now looks after <strong>${escapeHtml(args.memorialName)}</strong>'s memorial. You're still listed as a backup custodian, so the memorial stays visible on your dashboard.
+        </p>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${link}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            View the memorial
+          </a>
         </p>
   `);
 

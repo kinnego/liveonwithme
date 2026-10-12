@@ -7,6 +7,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import { writeAuditAdmin } from '@/lib/audit-admin';
 import { sendCustodyInvite } from '@/lib/sendgrid';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -15,6 +16,25 @@ const RESEND_COOLDOWN_MS = 30 * 1000;
 export async function POST(req: NextRequest) {
   try {
     const uid = await verifyIdToken(req.headers.get('Authorization'));
+
+    // Belt + braces on the 30s per-transfer cooldown below: a compromised
+    // account shouldn't be able to spray invites across many transfers.
+    const ip = clientIp(req.headers);
+    const perUser = await rateLimit(`custody-invite:uid:${uid}`, { max: 20, windowSec: 3600 });
+    if (!perUser.allowed) {
+      return NextResponse.json(
+        { error: 'Too many invitations. Please try again in a bit.' },
+        { status: 429, headers: { 'Retry-After': String(perUser.retryAfterSec) } },
+      );
+    }
+    const perIp = await rateLimit(`custody-invite:ip:${ip}`, { max: 60, windowSec: 3600 });
+    if (!perIp.allowed) {
+      return NextResponse.json(
+        { error: 'Too many invitations. Please try again in a bit.' },
+        { status: 429, headers: { 'Retry-After': String(perIp.retryAfterSec) } },
+      );
+    }
+
     const { transferId } = await req.json();
 
     if (!transferId || typeof transferId !== 'string') {
@@ -86,7 +106,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('custody send-invite error:', err);
     return NextResponse.json(
-      { error: err.message || 'Something went wrong sending the invitation email.' },
+      { error: 'Something went wrong sending the invitation email.' },
       { status: 500 }
     );
   }

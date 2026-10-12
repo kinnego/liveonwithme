@@ -60,7 +60,7 @@ async function loadPlotMemorials(plotId: string): Promise<Memorial[]> {
     const data = m.data() as any;
     if (data.status !== 'live') continue;
     if (data.offline === true) continue;
-    if (!['public', 'unlisted'].includes(data.visibility)) continue;
+    if (!['public', 'unlisted', 'private'].includes(data.visibility)) continue;
     results.push({ id: m.id, ...(data as Omit<Memorial, 'id'>) });
   }
   return results;

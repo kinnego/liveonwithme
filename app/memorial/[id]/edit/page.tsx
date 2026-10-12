@@ -79,7 +79,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
         ageAtDeath: calculateAgeAtDeath(born, died),
         epitaph: String(fd.get('epitaph') || ''),
         story: String(fd.get('story') || ''),
-        visibility: String(fd.get('visibility') || 'unlisted'),
+        visibility: String(fd.get('visibility') || 'public'),
         cemetery: cemetery ?? null,
         updatedAt: serverTimestamp(),
       };
@@ -234,10 +234,15 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
           <textarea id="story" name="story" defaultValue={m.story || ''} />
 
           <label htmlFor="visibility">Who can see it?</label>
-          <select id="visibility" name="visibility" defaultValue={m.visibility || 'unlisted'}>
-            <option value="unlisted">Only people with the link</option>
-            <option value="private">Family only</option>
-            <option value="public">Public</option>
+          <select
+            id="visibility"
+            name="visibility"
+            defaultValue={
+              m.visibility === 'unlisted' || m.visibility === 'private' ? 'unlisted' : 'public'
+            }
+          >
+            <option value="public">Public — anyone can find it</option>
+            <option value="unlisted">Only people with the link or QR</option>
           </select>
 
           {error && <p style={{ color: '#a94442', marginTop: 14, fontSize: 14 }}>{error}</p>}

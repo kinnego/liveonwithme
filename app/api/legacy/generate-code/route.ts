@@ -13,12 +13,25 @@ import { adminAuth, adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import { writeAuditAdmin } from '@/lib/audit-admin';
 import { generateLegacyCode, hashLegacyCode } from '@/lib/legacy-code-server';
 import { hintFromCode } from '@/lib/legacy-code';
+import { rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
     const uid = await verifyIdToken(req.headers.get('Authorization'));
+
+    // Low ceiling: generating a code invalidates the previous one, so a
+    // flood would effectively DoS the owner's own saved letter. 10/hr is
+    // plenty for any legitimate "I misplaced it, regenerate" burst.
+    const rl = await rateLimit(`legacy-generate:uid:${uid}`, { max: 10, windowSec: 3600 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } },
+      );
+    }
+
     const { memorialId } = await req.json();
 
     if (!memorialId || typeof memorialId !== 'string') {
@@ -69,7 +82,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('legacy generate-code error:', err);
     return NextResponse.json(
-      { error: err.message || 'Something went wrong generating the claim code.' },
+      { error: 'Something went wrong generating the claim code.' },
       { status: 500 }
     );
   }

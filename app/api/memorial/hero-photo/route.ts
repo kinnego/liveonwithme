@@ -46,6 +46,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ dataUrl: `data:${contentType};base64,${buf.toString('base64')}` });
   } catch (err: any) {
     console.error('memorial/hero-photo error', err);
-    return NextResponse.json({ error: err.message || 'Could not load photo' }, { status: 500 });
+    return NextResponse.json({ error: 'Could not load photo' }, { status: 500 });
   }
 }

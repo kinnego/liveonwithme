@@ -94,6 +94,25 @@ export default function AdminPartners() {
         actorEmail: auth.currentUser.email || undefined,
         details: { applicantUid: app.applicantUid },
       });
+
+      // Decision email for approved/rejected only — suspensions stay
+      // internal. Fire-and-forget: the admin console must not stall on
+      // SendGrid.
+      if (decision === 'approved' || decision === 'rejected') {
+        try {
+          const token = await auth.currentUser.getIdToken();
+          void fetch('/api/admin/partners/notify', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ applicationId: app.id, decision }),
+          });
+        } catch {
+          // ignored — the decision is already saved
+        }
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {

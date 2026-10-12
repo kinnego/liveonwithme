@@ -31,6 +31,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ plotId });
   } catch (err: any) {
     console.error('partner/referral-plot error', err);
-    return NextResponse.json({ error: err.message || 'Could not load plot' }, { status: 500 });
+    return NextResponse.json({ error: 'Could not load plot' }, { status: 500 });
   }
 }

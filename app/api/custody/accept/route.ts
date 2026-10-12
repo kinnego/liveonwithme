@@ -6,12 +6,39 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import { writeAuditAdmin } from '@/lib/audit-admin';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
+import {
+  sendCoManagerAcceptedToOwner,
+  sendCoManagerConfirmation,
+  sendSuccessionCompletedToNewOwner,
+  sendSuccessionCompletedToPreviousOwner,
+} from '@/lib/sendgrid';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
     const uid = await verifyIdToken(req.headers.get('Authorization'));
+
+    // Rate-limit per authenticated UID (not per token) to blunt a stolen
+    // token being hammered with ?decision=accept to beat a race, and
+    // per-IP as a second line against enumeration from one host.
+    const ip = clientIp(req.headers);
+    const perUser = await rateLimit(`custody-accept:uid:${uid}`, { max: 30, windowSec: 3600 });
+    if (!perUser.allowed) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(perUser.retryAfterSec) } },
+      );
+    }
+    const perIp = await rateLimit(`custody-accept:ip:${ip}`, { max: 60, windowSec: 3600 });
+    if (!perIp.allowed) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(perIp.retryAfterSec) } },
+      );
+    }
+
     const { token, decision } = await req.json();
 
     if (!token || typeof token !== 'string') {
@@ -128,6 +155,57 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Follow-up emails. All non-fatal — custody is already committed, we
+    // don't want a SendGrid blip to surface as an acceptance failure.
+    const memorialName = (memorial.fullName as string) || 'the memorial';
+    const memorialId = transfer.memorialId as string;
+    try {
+      if (transfer.nominationType === 'coManager') {
+        const previousOwnerAuth = await adminAuth()
+          .getUser(memorial.ownerId as string)
+          .catch(() => null);
+        if (previousOwnerAuth?.email) {
+          await sendCoManagerAcceptedToOwner(previousOwnerAuth.email, {
+            ownerName: previousOwnerAuth.displayName || undefined,
+            coManagerName: user.displayName || undefined,
+            coManagerEmail: userEmail,
+            memorialName,
+            memorialId,
+          });
+        }
+        if (user.email) {
+          await sendCoManagerConfirmation(user.email, {
+            recipientName: user.displayName || undefined,
+            memorialName,
+            memorialId,
+          });
+        }
+      } else if (transfer.nominationType === 'primary') {
+        const previousOwnerUid = memorial.ownerId as string;
+        const previousOwnerAuth = await adminAuth()
+          .getUser(previousOwnerUid)
+          .catch(() => null);
+        if (user.email) {
+          await sendSuccessionCompletedToNewOwner(user.email, {
+            recipientName: user.displayName || undefined,
+            memorialName,
+            memorialId,
+          });
+        }
+        if (previousOwnerAuth?.email) {
+          await sendSuccessionCompletedToPreviousOwner(previousOwnerAuth.email, {
+            recipientName: previousOwnerAuth.displayName || undefined,
+            newOwnerName: user.displayName || undefined,
+            newOwnerEmail: userEmail,
+            memorialName,
+            memorialId,
+          });
+        }
+      }
+    } catch (emailErr) {
+      console.error('custody accept follow-up email failed', emailErr);
+    }
+
     return NextResponse.json({
       success: true,
       decision: 'accepted',
@@ -137,7 +215,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('custody accept error:', err);
     return NextResponse.json(
-      { error: err.message || 'Something went wrong accepting the invitation.' },
+      { error: 'Something went wrong accepting the invitation.' },
       { status: 500 }
     );
   }

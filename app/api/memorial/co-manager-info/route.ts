@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('co-manager-info error:', err);
     return NextResponse.json(
-      { error: err.message || 'Could not load co-manager details' },
+      { error: 'Could not load co-manager details' },
       { status: 500 }
     );
   }

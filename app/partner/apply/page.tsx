@@ -72,6 +72,23 @@ export default function PartnerApply() {
         actorEmail: auth.currentUser.email || undefined,
       });
 
+      // Fire-and-forget the notify route (applicant confirmation + admin
+      // notice). Not awaited — a SendGrid blip must not block the "thanks"
+      // screen or leave the user wondering whether their application landed.
+      try {
+        const token = await auth.currentUser.getIdToken();
+        void fetch('/api/partner/application-notify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ applicationId: app.id }),
+        });
+      } catch {
+        // ignored — the application doc is already written
+      }
+
       setDone(true);
     } catch (err: any) {
       setError(err.message);

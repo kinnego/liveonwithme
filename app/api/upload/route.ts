@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readQuotasAdmin } from '@/lib/config-admin';
 import { summariseMemorialUsage } from '@/lib/quota-admin';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -179,10 +180,35 @@ export async function POST(req: NextRequest) {
         const isLive = memorial.status === 'live';
         const isOffline = memorial.offline === true;
         const visibility = memorial.visibility;
-        if (!isLive || isOffline || (visibility !== 'public' && visibility !== 'unlisted')) {
+        const isViewable = visibility === 'public' || visibility === 'unlisted' || visibility === 'private';
+        if (!isLive || isOffline || !isViewable) {
           return NextResponse.json(
             { error: 'This memorial isn\'t accepting contributions right now.' },
             { status: 403 }
+          );
+        }
+
+        // Anonymous contribution flood protection: 20 uploads per IP per hour
+        // across the whole site. Keepers (owner/co-manager) bypass this —
+        // they're authenticated and have their own 50MB file + total-quota
+        // ceilings below. Per-memorial bucket on top catches a brigade of
+        // IPs targeting one page.
+        const ip = clientIp(req.headers);
+        const perIp = await rateLimit(`upload:ip:${ip}`, { max: 20, windowSec: 3600 });
+        if (!perIp.allowed) {
+          return NextResponse.json(
+            { error: 'Too many uploads. Please try again later.' },
+            { status: 429, headers: { 'Retry-After': String(perIp.retryAfterSec) } },
+          );
+        }
+        const perMemorial = await rateLimit(`upload:mem:${memorialId}`, {
+          max: 60,
+          windowSec: 3600,
+        });
+        if (!perMemorial.allowed) {
+          return NextResponse.json(
+            { error: 'This memorial is receiving many uploads right now. Please try again later.' },
+            { status: 429, headers: { 'Retry-After': String(perMemorial.retryAfterSec) } },
           );
         }
       }

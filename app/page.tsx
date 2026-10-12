@@ -165,7 +165,7 @@ export default function Home() {
             borderColor: '#e6dfc9',
           }}
         >
-          <div className="eyebrow">For funeral directors</div>
+          <div className="eyebrow">For funeral directors &amp; Partners</div>
           <h2 style={{ marginTop: 6, marginBottom: 14 }}>
             Offer families a beautiful place for their loved one&rsquo;s memories
           </h2>

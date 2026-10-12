@@ -23,14 +23,14 @@ export async function GET(req: NextRequest) {
     if (!memSnap.exists) return NextResponse.json({ dataUrl: null });
     const memorial = { id: memSnap.id, ...(memSnap.data() as Omit<Memorial, 'id'>) };
 
-    // Public gate: must be live, not offline, and explicitly public/unlisted.
-    // A private memorial — even if live — must not leak its hero photo via
-    // this unauthenticated route. Keepers viewing drafts/private pages fall
-    // back to the authenticated /api/memorial/hero-photo route on the client.
+    // Public gate: must be live, not offline, and visible to link-holders.
+    // Legacy 'private' is aliased to unlisted (link-accessible). Drafts
+    // and offline memorials fall back to the authenticated hero-photo route
+    // on the client.
     const visibility = (memorial as any).visibility;
     if (memorial.status !== 'live') return NextResponse.json({ dataUrl: null });
     if ((memorial as any).offline === true) return NextResponse.json({ dataUrl: null });
-    if (visibility !== 'public' && visibility !== 'unlisted') {
+    if (visibility !== 'public' && visibility !== 'unlisted' && visibility !== 'private') {
       return NextResponse.json({ dataUrl: null });
     }
     if (!memorial.heroPhotoPath) return NextResponse.json({ dataUrl: null });
@@ -49,6 +49,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('memorial/public-hero-photo error', err);
-    return NextResponse.json({ error: err.message || 'Could not load photo' }, { status: 500 });
+    return NextResponse.json({ error: 'Could not load photo' }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { sendPasswordResetEmail } from '@/lib/sendgrid';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -12,6 +13,17 @@ const RESEND_COOLDOWN_MS = 60 * 1000;
 // which emails have accounts by watching status codes or response bodies.
 export async function POST(req: NextRequest) {
   try {
+    // IP-based rate limit: the per-uid cooldown below only kicks in once a
+    // valid email has been resolved. Without an IP cap, an attacker could
+    // enumerate accounts by firing thousands of requests and watching
+    // Firestore / SendGrid metrics via side channels. Keep returning 200
+    // on throttle so we don't leak the limit either.
+    const ip = clientIp(req.headers);
+    const rl = await rateLimit(`auth-reset:ip:${ip}`, { max: 10, windowSec: 3600 });
+    if (!rl.allowed) {
+      return NextResponse.json({ ok: true });
+    }
+
     const { email } = await req.json();
     if (typeof email !== 'string' || !email.includes('@')) {
       return NextResponse.json({ ok: true });
