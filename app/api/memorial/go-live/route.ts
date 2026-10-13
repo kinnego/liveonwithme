@@ -159,6 +159,11 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
+      // Lets Stripe render a "Have a promotion code?" field. Codes themselves
+      // live in the Stripe dashboard — a 100% off code is how we comp folks
+      // outside the family-and-friends path that goes through the admin
+      // override (`paid_via_gift`).
+      allow_promotion_codes: true,
       client_reference_id: memorialId,
       metadata: {
         memorialId,

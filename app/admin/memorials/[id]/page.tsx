@@ -87,6 +87,11 @@ export default function AdminMemorialInspector({
   const [transfers, setTransfers] = useState<CustodyTransfer[]>([]);
   const [audits, setAudits] = useState<AuditEvent[]>([]);
 
+  const [giftOpen, setGiftOpen] = useState(false);
+  const [giftNote, setGiftNote] = useState('');
+  const [giftBusy, setGiftBusy] = useState(false);
+  const [giftError, setGiftError] = useState<string | null>(null);
+
   useEffect(() => {
     params.then((p) => setId(p.id));
   }, [params]);
@@ -223,6 +228,39 @@ export default function AdminMemorialInspector({
     [transfers],
   );
 
+  async function handleMarkAsGift() {
+    if (!m || !auth?.currentUser) return;
+    setGiftBusy(true);
+    setGiftError(null);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`/api/admin/memorials/${m.id}/mark-paid-gift`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ note: giftNote.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setGiftError(data?.error || 'Could not publish as a gift.');
+        return;
+      }
+      setM({
+        ...m,
+        status: 'live',
+        paymentStatus: 'paid_via_gift',
+      });
+      setGiftOpen(false);
+      setGiftNote('');
+    } catch (err: any) {
+      setGiftError(err?.message || 'Could not publish as a gift.');
+    } finally {
+      setGiftBusy(false);
+    }
+  }
+
   const sortedContribs = useMemo(
     () =>
       [...contribs].sort((a, b) => {
@@ -290,10 +328,11 @@ export default function AdminMemorialInspector({
       </div>
 
       <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-        Read-only admin view. To act on this memorial (contact the family,
+        Mostly read-only. To act on this memorial (contact the family,
         resolve a payment, etc.), use the dedicated admin console tools —
-        actions taken here would be attributed to your account, not the
-        custodian&rsquo;s.
+        most actions taken here would be attributed to your account, not
+        the custodian&rsquo;s. The one exception is the gift override
+        below, which is explicitly logged as an admin action.
       </p>
 
       {/* Overview */}
@@ -366,6 +405,75 @@ export default function AdminMemorialInspector({
           </div>
         )}
       </div>
+
+      {/* Admin override: gift */}
+      {m.status !== 'live' && (
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="eyebrow">Admin override</div>
+          <h3 style={{ margin: '8px 0 4px' }}>Publish as a gift</h3>
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+            Publishes this memorial live without charging. Reserved for family
+            &amp; friends. The owner is not notified by email — tell them
+            yourself. All other comps should go through a Stripe promotion
+            code so the comp is tracked in the Stripe dashboard.
+          </p>
+          {!giftOpen ? (
+            <button
+              type="button"
+              className="button"
+              onClick={() => {
+                setGiftError(null);
+                setGiftOpen(true);
+              }}
+            >
+              Mark as paid (gift)
+            </button>
+          ) : (
+            <div style={{ marginTop: 10 }}>
+              <label className="fieldLabel" htmlFor="gift-note">
+                Note (optional — stored in the audit trail)
+              </label>
+              <textarea
+                id="gift-note"
+                value={giftNote}
+                onChange={(e) => setGiftNote(e.target.value)}
+                rows={3}
+                maxLength={500}
+                placeholder="e.g. For Mum's cousin Mary — approved by Cathal."
+                style={{ width: '100%', marginTop: 6 }}
+                disabled={giftBusy}
+              />
+              {giftError && (
+                <p style={{ color: 'crimson', fontSize: 13, marginTop: 8 }}>
+                  {giftError}
+                </p>
+              )}
+              <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={handleMarkAsGift}
+                  disabled={giftBusy}
+                >
+                  {giftBusy ? 'Publishing…' : 'Confirm — publish without charge'}
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => {
+                    setGiftOpen(false);
+                    setGiftNote('');
+                    setGiftError(null);
+                  }}
+                  disabled={giftBusy}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Ownership */}
       <div className="card" style={{ marginTop: 20 }}>

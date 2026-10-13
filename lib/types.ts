@@ -12,7 +12,11 @@ export type MemorialStatus = 'draft' | 'awaiting_payment' | 'live';
 
 export type MemorialKind = 'memorial' | 'legacy';
 
-export type PaymentStatus = 'unpaid' | 'paid' | 'paid_via_partner';
+// `paid_via_gift` is a super-admin override used to publish a memorial
+// without a charge — reserved for family & friends. See
+// `/api/admin/memorials/[id]/mark-paid-gift` for the write path and
+// the audit event `published_via_gift`.
+export type PaymentStatus = 'unpaid' | 'paid' | 'paid_via_partner' | 'paid_via_gift';
 
 export type SalesChannel = 'direct' | 'partner';
 
