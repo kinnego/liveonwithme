@@ -93,6 +93,27 @@ export interface CemeteryReport {
   decidedByUid?: string;
 }
 
+// A visitor-filed report against an approved contribution on a public
+// memorial. Reports are private (super admin only). The admin inbox lets
+// us hide the contribution (`actioned`) or dismiss as not-a-problem. We
+// deliberately don't tell the reporter the outcome — the family's privacy
+// matters more than closing the loop with a bystander.
+export type ContributionReportStatus = 'open' | 'dismissed' | 'actioned';
+
+export interface ContributionReport {
+  id: string;
+  memorialId: string;
+  contributionId: string;
+  reason: string;
+  reporterEmail?: string;
+  reporterUid?: string;
+  status: ContributionReportStatus;
+  createdAt?: unknown;
+  decidedAt?: unknown;
+  decidedByUid?: string;
+  resolutionNotes?: string;
+}
+
 export type ContributionSource = 'family' | 'visitor';
 export type ContributionAudience = 'public' | 'family_only';
 export type GalleryDisplayMode = 'square' | 'natural';

@@ -32,7 +32,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
-import { adminAuth, adminDb, verifyIdToken } from '@/lib/firebase-admin';
+import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import { writeAuditAdmin } from '@/lib/audit-admin';
 import { sendAccountDeletedConfirmation } from '@/lib/sendgrid';
@@ -42,10 +42,42 @@ import type { UserProfile } from '@/lib/types';
 export const runtime = 'nodejs';
 
 const SOFT_DELETE_DAYS = 30;
+// How recent "recent sign-in" means for destructive account actions. Short
+// enough that a session stolen from an idle machine can't be used to nuke
+// the account; long enough that the legitimate user has time to type their
+// email and click the button after signing in.
+const RECENT_LOGIN_WINDOW_SEC = 5 * 60;
 
 export async function POST(req: NextRequest) {
   try {
-    const uid = await verifyIdToken(req.headers.get('Authorization'));
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Missing or invalid Authorization header' },
+        { status: 401 },
+      );
+    }
+    const token = authHeader.slice('Bearer '.length);
+    const decoded = await adminAuth().verifyIdToken(token);
+    const uid = decoded.uid;
+
+    // auth_time is a unix seconds timestamp of the user's most recent sign-in
+    // (not of this token's issue — refreshes do not advance it). We require a
+    // recent sign-in for destructive account actions as a defence against a
+    // stolen session; the legitimate user just signed in to the dashboard,
+    // so this adds no friction for the happy path.
+    const authTimeSec = Number((decoded as any).auth_time) || 0;
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (!authTimeSec || nowSec - authTimeSec > RECENT_LOGIN_WINDOW_SEC) {
+      return NextResponse.json(
+        {
+          error:
+            'For your security, please sign out and sign back in, then try again.',
+          code: 'requires_recent_login',
+        },
+        { status: 401 },
+      );
+    }
 
     const ip = clientIp(req.headers);
     const rlIp = await rateLimit(`account-delete:ip:${ip}`, {

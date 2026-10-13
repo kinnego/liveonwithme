@@ -458,6 +458,26 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ─── contribution reports ────────────────────────────────────────────────
+    // A visitor flags a memory or photo on a public memorial. Any visitor
+    // can create (we throttle in the API route); only super admin can read
+    // or resolve. Reasons may contain the reporter's email, so public read
+    // is never allowed.
+    match /contributionReports/{id} {
+      allow create: if
+        request.resource.data.memorialId is string
+        && request.resource.data.memorialId.size() > 0
+        && request.resource.data.contributionId is string
+        && request.resource.data.contributionId.size() > 0
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() > 0
+        && request.resource.data.status == 'open';
+
+      allow get, list: if isSuperAdmin();
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
     // ─── password reset tokens (server-only) ─────────────────────────────────
     // Written and read exclusively via the Admin SDK from our API routes.
     // Never accessible from any client SDK.

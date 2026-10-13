@@ -6,6 +6,34 @@ Last updated: 2026-10-12, branch `claude/ubuntu-machine-or-phone-ovt1xa` (the Gi
 
 ### Shipped since last update
 
+- **Email address change flow.** New block inside the Account disclosure on `/dashboard` lets a signed-in user set a new email. Driven by Firebase Auth's `verifyBeforeUpdateEmail(user, next)` so the verification link lands in the NEW inbox; after they click it and sign back in, the auth state effect mirrors the fresh email into `users/{uid}.email` via `setDoc(..., { merge: true })`. In parallel, `/api/account/email-change-request` fires `sendEmailChangeNotice` to the OLD address with a mailto support link, so the previous owner has a trail if the request was fraudulent. Handles `auth/requires-recent-login` with a sign-out-and-back-in CTA; shows explicit errors for `auth/email-already-in-use` and `auth/invalid-email`.
+- **GDPR delete now requires fresh sign-in.** `/api/account/delete` reads `auth_time` off the verified ID token and rejects with `{ code: 'requires_recent_login' }` + 401 if the user signed in more than 5 minutes ago. The dashboard delete flow catches that code and surfaces a "Sign out & sign back in" button that preserves the account disclosure state across the round trip. Closes the stolen-session abuse window flagged in the previous handoff.
+- **Orphan sweep cron.** New `/api/cron/orphan-sweep` (Next.js API, `runtime=nodejs`, `maxDuration=300`) protected by a `x-cron-secret` header matched against `CRON_SECRET`. Queries memorials `where('pendingDeletionAt', '<=', now).limit(50)`, paginates each memorial's contributions (300/page), collects the hero + every contribution's photo/audio R2 keys, and hard-deletes: R2 objects (1000-key batches via `DeleteObjectsCommand`), contribution docs (400-doc batches), then the memorial doc; writes an `orphan_swept` audit event per memorial. Netlify scheduled function at `netlify/functions/orphan-sweep.mts` fires it at 03:15 UTC daily. 50-memorial cap keeps work inside Netlify's execution budget.
+- **Contribution reporting + admin inbox.** Visitors on a public memorial can now report a specific memory. "Report" button renders inline after each contribution author (hidden on the demo memorial); clicking opens a modal with a reason textarea (min 3 chars) + optional email. POST hits `/api/contribution/report`, rate-limited 5/hr per IP, validates that the contribution actually belongs to the stated memorial, tags with `reporterUid` if an auth header is present, writes a `contributionReports` doc, and emails `hello@freastar.com` via `sendContributionReportAdmin`. New `/admin/reports` page lists open reports with the memorial + contribution hydrated inline and offers three decide buttons: "Hide memory + mark actioned" (flips the contribution's `status` to `rejected` then marks the report `actioned`), "Mark actioned", "Dismiss". Linked from the admin console grid.
+- **Rate limit on `/api/user/exists`.** 30 requests per 300 seconds per IP via the existing `lib/rate-limit.ts` sliding window. Closes the bulk email-enumeration vector flagged in the 2026-10-02 handoff.
+
+### Required before anything else works in production
+
+- **`CRON_SECRET` env var required in Netlify** before the scheduled function will do anything. Generate with `openssl rand -base64 48` and set in both the Next.js runtime env and Netlify's env (same value). Without it the API route returns 503 (treated as fail-closed), and the scheduled function logs a non-match and bails. Documented in `.env.example`.
+- **Firestore rules pending deploy.** `firestore.rules` was updated this session to add a `contributionReports` block (public create under constraints, super-admin only for read/update/delete). Combined with last session's `pendingDeletionAt` additions, the rules file needs a single `firebase deploy --only firestore:rules` before contribution reporting works end-to-end from the client. Until then: public `/api/contribution/report` works (admin SDK bypasses rules), the admin inbox read requires rules to be deployed.
+- **No new SendGrid vars.** Reuses existing `SENDGRID_API_KEY` + `SENDGRID_FROM_EMAIL` + `SUPER_ADMIN_EMAIL` (= `hello@freastar.com`).
+
+### Smoke tests after each deploy (new this session)
+
+13. **Email change — happy path.** On `/dashboard`, open the Account disclosure, enter a new email you control, click Save. Firebase sends a verification link to the NEW address. Confirm the OLD address also gets a notice. Click the link in the new inbox → sign back in → `users/{uid}.email` in Firestore should match the new address.
+14. **Email change — requires recent login.** Sign in, wait >5 minutes, try to change email. UI should surface `auth/requires-recent-login` and prompt sign-out-and-back-in.
+15. **GDPR delete — requires fresh sign-in.** Sign in, wait >5 minutes, open the Account disclosure, type your email, click Delete. Expected: inline error with a "Sign out & sign back in" button. Click it → sign back in → retry → delete proceeds.
+16. **Contribution report — happy path.** From a signed-out browser on `/m/{slug}` (not the demo), click Report on any memory, submit a reason. Expect: `contributionReports` doc created, admin email at `hello@freastar.com`, success state in the modal. Sign in as super admin, visit `/admin/reports`, see the report hydrated with the memorial and the quoted memory. Click "Hide memory + mark actioned" → verify the contribution's `status` on Firestore is `rejected` and the report's `status` is `actioned`.
+17. **Contribution report — rate limit.** Fire 6 reports in a row from the same IP. The 6th should 429.
+18. **Orphan sweep — dry run.** With no memorials due (`pendingDeletionAt` all null or future), POST to `/api/cron/orphan-sweep` with the correct `x-cron-secret` header. Expect: `{ ok: true, swept: 0 }`. Flip one orphaned memorial's `pendingDeletionAt` to `Timestamp.fromDate(new Date(Date.now() - 1000))`, re-run — expect: memorial doc + all contribution docs + R2 photos gone, audit event `orphan_swept` written. Wrong/missing secret: 403 or 503.
+
+### Known limitations / unchanged
+
+- **Three nice-to-have emails now covered end-to-end:** contribution reports, email change notice, account deletion confirmation.
+- **Account deletion scrubs contributions keyed by email only.** Contribution docs don't carry a `contributorUid`; if the user contributed under a different email than the one on their account, those records won't be scrubbed. GDPR-wise, acceptable (we erased everything we could associate with them).
+
+### Shipped earlier same day
+
 - **Visibility simplified.** Removed the "Family only" option entirely. The dropdown on the edit page now has two choices: "Public — anyone can find it" and "Only people with the link or QR". New memorials default to `public` (previously `unlisted`). Legacy records still carrying `visibility: 'private'` are aliased to `unlisted` at read time by every gate (`app/m/[slug]/page.tsx`, `app/plot/[plotId]/page.tsx`, `app/api/upload/route.ts`, both hero-photo routes, `firestore.rules`), so no data migration is needed — old records keep working as if they were unlisted.
 - **"Next Steps" card on the manage page.** Draft, owner-only. Checklist for hero photo, story, cemetery. Each row deep-links to the right place to complete the step.
 - **Dedicated "The resting place" card.** Separate section promoted out of the checklist because it's a load-bearing piece of the jigsaw. Two states: pitch + CTA when no cemetery is set; summary + "Change cemetery" when one is attached. Appears for owner + not-yet-live memorials.
@@ -32,16 +60,6 @@ Last updated: 2026-10-12, branch `claude/ubuntu-machine-or-phone-ovt1xa` (the Gi
 10. **Account deletion — happy path with successor.** Create a draft memorial as user A, nominate user B as primary successor. From `/dashboard` scroll to the "Account" disclosure, type your email, click "Delete my account". After reload: Firestore shows ownerId flipped to user B, user A's auth row is gone, confirmation email arrived at the deleted address.
 11. **Account deletion — orphan path.** Same but with no successor and no co-manager. After deletion: the memorial has `offline: true`, `pendingDeletionAt` ~30 days ahead, `pendingDeletionReason: 'owner_deleted_account'`. Public `/m/{slug}` returns a not-found. The confirmation email lists the orphaned memorial with its restore deadline.
 12. **Account deletion — super admin block.** Sign in as `hello@freastar.com`, open the disclosure, try to delete — should see "Super admin accounts cannot be removed through this flow."
-
-### Known limitations / unchanged
-
-- **30-day orphan sweep not yet implemented.** `pendingDeletionAt` is set but no cron purges memorials when the deadline passes. For now orphaned memorials stay `offline: true` forever unless a super admin cleans them manually. A scheduled Cloud Function or Netlify scheduled function reading `where('pendingDeletionAt', '<=', now)` and hard-deleting the memorial + its contributions + R2 photos is the shape of the fix.
-- **Three more "nice to have" emails are blocked on feature plumbing**, not SendGrid work:
-  - *Contribution reported for moderation* — needs a "report" button on public memorial view + a `contributionReports` collection + an admin inbox.
-  - *Email change confirmation* — needs a profile page where the user can edit their email (none exists today).
-  - *Account deletion confirmation* — shipped this session as `sendAccountDeletedConfirmation`.
-- **Account deletion does not require password re-entry**, only typed email match + the user's existing session + the rate limit + the confirmation email after. Stolen-session abuse is possible in theory but low-risk; add Firebase `reauthenticateWithCredential` before `getIdToken()` if we want to tighten.
-- **Account deletion scrubs contributions keyed by email only.** Contribution docs don't carry a `contributorUid`; if the user contributed under a different email than the one on their account, those records won't be scrubbed. GDPR-wise, acceptable (we erased everything we could associate with them).
 
 ## 2026-10-04 session handoff
 
@@ -100,7 +118,7 @@ Last updated: 2026-10-12, branch `claude/ubuntu-machine-or-phone-ovt1xa` (the Gi
 ### Known limitations / unchanged
 
 - **Hotmail/Outlook routes new senders to junk** on first send (reputation). Marks "Not spam" + volume over time fix this. Gmail inboxes fine already.
-- **No rate limiting on `/api/user/exists` or `/api/custody/send-invite`.** The custody send has a 30s per-transfer cooldown but no per-IP throttle. Add a simple IP throttle if abuse appears.
+- **No rate limiting on `/api/custody/send-invite`.** The custody send has a 30s per-transfer cooldown but no per-IP throttle. `/api/user/exists` was throttled in the 2026-10-12 session. Add a simple IP throttle to the custody send if abuse appears.
 - **No Sentry / error monitoring.** Server logs via Netlify functions only. Add Sentry if you want proactive alerts.
 - **No Firestore rules regression suite.** `UAT.md` scenarios cover the ground manually. `@firebase/rules-unit-testing` is future work.
 - **Firebase Storage is not enabled on the project** (we moved to Cloudflare R2). `storage.rules` in the repo is dead code; keep for now in case Storage is ever re-enabled.

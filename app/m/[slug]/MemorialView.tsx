@@ -187,6 +187,15 @@ export default function Memorial({
   const [user, setUser] = useState<User | null>(null);
   const [isPreview, setIsPreview] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
+  // Report-a-memory modal state. We keep it local to the memorial view —
+  // reports are rare, and lifting it to a shared component would just
+  // mean more hydration overhead on every public memorial page.
+  const [reportingId, setReportingId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportEmail, setReportEmail] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [reportSent, setReportSent] = useState(false);
 
   // Auth state drives the "Manage" button visibility only — it never
   // triggers the data load, so sign-in/out doesn't refetch the memorial.
@@ -789,6 +798,34 @@ export default function Memorial({
               <p className="muted">
                 — {x.contributorName}
                 {x.relationship ? `, ${x.relationship}` : ''}
+                {memorial.id !== 'demo' && x.id && (
+                  <>
+                    {' · '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReportingId(x.id);
+                        setReportReason('');
+                        setReportEmail('');
+                        setReportError('');
+                        setReportSent(false);
+                      }}
+                      aria-label={`Report this memory`}
+                      style={{
+                        background: 'none',
+                        border: 0,
+                        padding: 0,
+                        color: '#8c948f',
+                        font: 'inherit',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      Report
+                    </button>
+                  </>
+                )}
               </p>
             </div>
           ))
@@ -1063,6 +1100,160 @@ export default function Memorial({
           <span aria-hidden>✎</span>
           <span>Manage memorial</span>
         </Link>
+      )}
+
+      {reportingId && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (!reportBusy) setReportingId(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(37, 49, 45, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+            zIndex: 2000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fffdf9',
+              padding: '28px 28px 24px',
+              borderRadius: 20,
+              maxWidth: 480,
+              width: '100%',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+            }}
+          >
+            {reportSent ? (
+              <>
+                <div className="eyebrow">Thank you</div>
+                <h3 style={{ marginTop: 10 }}>We&rsquo;ve received your report</h3>
+                <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                  A member of our team will review it. The family of this memorial
+                  is not notified about reports — we handle these quietly.
+                </p>
+                <div style={{ marginTop: 18 }}>
+                  <button
+                    className="button secondary"
+                    onClick={() => setReportingId(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="eyebrow">Report this memory</div>
+                <h3 style={{ marginTop: 10 }}>Let us know what&rsquo;s wrong</h3>
+                <p className="muted" style={{ fontSize: 13, lineHeight: 1.55 }}>
+                  Only our team sees this. The family isn&rsquo;t notified. We review
+                  reports and may remove the memory if it violates our guidelines.
+                </p>
+                <textarea
+                  value={reportReason}
+                  onChange={(e) => {
+                    setReportReason(e.target.value);
+                    setReportError('');
+                  }}
+                  placeholder="What should we look at?"
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d6d2cb',
+                    borderRadius: 10,
+                    fontFamily: 'inherit',
+                    fontSize: 14,
+                    background: '#fffdf9',
+                    marginTop: 10,
+                    resize: 'vertical',
+                  }}
+                />
+                <input
+                  type="email"
+                  value={reportEmail}
+                  onChange={(e) => setReportEmail(e.target.value)}
+                  placeholder="Your email (optional)"
+                  aria-label="Your email (optional)"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #d6d2cb',
+                    borderRadius: 10,
+                    fontFamily: 'inherit',
+                    fontSize: 13,
+                    background: '#fffdf9',
+                    marginTop: 8,
+                  }}
+                />
+                {reportError && (
+                  <p style={{ color: '#a94442', margin: '10px 0 0', fontSize: 12 }}>
+                    {reportError}
+                  </p>
+                )}
+                <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+                  <button
+                    className="button"
+                    disabled={reportBusy || reportReason.trim().length < 3}
+                    onClick={async () => {
+                      if (!reportingId || !memorial?.id) return;
+                      setReportBusy(true);
+                      setReportError('');
+                      try {
+                        const headers: Record<string, string> = {
+                          'Content-Type': 'application/json',
+                        };
+                        if (auth?.currentUser) {
+                          try {
+                            const token = await auth.currentUser.getIdToken();
+                            headers.Authorization = `Bearer ${token}`;
+                          } catch {
+                            // Signed-in but token refresh failed — carry on anonymously.
+                          }
+                        }
+                        const res = await fetch('/api/contribution/report', {
+                          method: 'POST',
+                          headers,
+                          body: JSON.stringify({
+                            memorialId: memorial.id,
+                            contributionId: reportingId,
+                            reason: reportReason.trim(),
+                            reporterEmail: reportEmail.trim() || undefined,
+                          }),
+                        });
+                        if (!res.ok) {
+                          const data = await res.json().catch(() => ({}));
+                          throw new Error(data?.error || 'Could not send the report.');
+                        }
+                        setReportSent(true);
+                      } catch (err: any) {
+                        setReportError(err?.message || 'Something went wrong.');
+                      } finally {
+                        setReportBusy(false);
+                      }
+                    }}
+                  >
+                    {reportBusy ? 'Sending…' : 'Send report'}
+                  </button>
+                  <button
+                    className="button secondary"
+                    disabled={reportBusy}
+                    onClick={() => setReportingId(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </main>
   );

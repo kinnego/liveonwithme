@@ -1072,3 +1072,129 @@ export async function sendSuccessionCompletedToPreviousOwner(
     ...TRANSACTIONAL_SETTINGS,
   });
 }
+
+export async function sendContributionReportAdmin(args: {
+  reportId: string;
+  memorialId: string;
+  memorialName: string;
+  memorialSlug?: string;
+  contributionId: string;
+  reason: string;
+  reporterEmail?: string;
+  reporterUid?: string;
+}) {
+  const inbox = `${siteUrl()}/admin/reports`;
+  const memorialLink = args.memorialSlug
+    ? `${siteUrl()}/m/${args.memorialSlug}`
+    : `${siteUrl()}/admin/memorials/${args.memorialId}`;
+
+  const subject = `Reported memory on ${args.memorialName}`;
+  const reporter = args.reporterEmail
+    ? args.reporterEmail
+    : args.reporterUid
+      ? `Signed-in user (uid ${args.reporterUid.slice(0, 8)}…)`
+      : 'Anonymous visitor';
+
+  const text = [
+    `A visitor reported a memory on ${args.memorialName}.`,
+    '',
+    `Memorial: ${memorialLink}`,
+    `Contribution id: ${args.contributionId}`,
+    `Reporter: ${reporter}`,
+    '',
+    'Reason:',
+    args.reason,
+    '',
+    `Resolve in admin: ${inbox}`,
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:24px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          Reported memory
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:15px;color:#25312d;line-height:1.55;margin:0 0 18px;">
+          A visitor flagged a memory on <strong>${escapeHtml(args.memorialName)}</strong> for review.
+        </p>
+        <table cellpadding="0" cellspacing="0" style="font-family:Inter,system-ui,sans-serif;font-size:14px;color:#25312d;width:100%;margin:0 0 22px;">
+          <tr>
+            <td style="padding:6px 12px 6px 0;color:#6d7772;vertical-align:top;width:120px;">Memorial</td>
+            <td style="padding:6px 0;"><a href="${memorialLink}" style="color:#25312d;">${escapeHtml(args.memorialName)}</a></td>
+          </tr>
+          <tr>
+            <td style="padding:6px 12px 6px 0;color:#6d7772;vertical-align:top;">Contribution id</td>
+            <td style="padding:6px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;">${escapeHtml(args.contributionId)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 12px 6px 0;color:#6d7772;vertical-align:top;">Reporter</td>
+            <td style="padding:6px 0;">${escapeHtml(reporter)}</td>
+          </tr>
+        </table>
+        <div style="background:#faf7f0;border:1px solid #e6dfc9;border-radius:12px;padding:14px 16px;font-family:Inter,system-ui,sans-serif;font-size:14px;color:#25312d;white-space:pre-wrap;margin:0 0 24px;">${escapeHtml(args.reason)}</div>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${inbox}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            Review in admin
+          </a>
+        </p>
+  `);
+
+  await client().send({
+    to: SUPER_ADMIN_EMAIL,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}
+
+export async function sendEmailChangeNotice(
+  to: string,
+  args: { newEmail: string; recipientName?: string },
+) {
+  const hello = firstName(args.recipientName);
+  const greeting = hello ? `Hi ${hello},` : 'Hello,';
+  const supportLink = `mailto:${SUPER_ADMIN_EMAIL}?subject=${encodeURIComponent('Suspicious email change on my LiveOnWith.me account')}`;
+  const subject = 'Your LiveOnWith.me email change request';
+
+  const text = [
+    greeting,
+    '',
+    `We received a request to change the email on your LiveOnWith.me account to ${args.newEmail}.`,
+    '',
+    `To complete the change, click the verification link we sent to ${args.newEmail}. Until that link is clicked, your email stays as ${to}.`,
+    '',
+    `If this wasn't you, email ${SUPER_ADMIN_EMAIL} straight away. We'll secure the account.`,
+    '',
+    '— LiveOnWith.me',
+  ].join('\n');
+
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:24px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          Email change requested
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">${greeting}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">
+          We received a request to change the email on your LiveOnWith.me account to
+          <strong>${escapeHtml(args.newEmail)}</strong>.
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.6;color:#25312d;margin:0 0 18px;">
+          A verification link has been sent to that address. Until the link is clicked, your email stays as
+          <strong>${escapeHtml(to)}</strong>.
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.6;color:#6d7772;margin:0 0 22px;">
+          If this wasn&rsquo;t you,
+          <a href="${supportLink}" style="color:#25312d;">email us straight away</a>
+          and we&rsquo;ll secure the account.
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;color:#6d7772;margin:28px 0 0;">— LiveOnWith.me</p>
+  `);
+
+  await client().send({
+    to,
+    from: fromAddress(),
+    subject,
+    text,
+    html,
+    ...TRANSACTIONAL_SETTINGS,
+  });
+}

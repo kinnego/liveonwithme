@@ -64,6 +64,10 @@ export default function AdminHome() {
           <h3>Cemetery reports</h3>
           <p className="muted">Review reported community-added cemetery listings.</p>
         </Link>
+        <Link href="/admin/reports" className="card" style={{ display: 'block' }}>
+          <h3>Reported memories</h3>
+          <p className="muted">Review visitor reports on contributions to public memorials.</p>
+        </Link>
         <Link href="/admin/config" className="card" style={{ display: 'block' }}>
           <h3>Pricing &amp; media quotas</h3>
           <p className="muted">Adjust configurable limits without redeploying.</p>
