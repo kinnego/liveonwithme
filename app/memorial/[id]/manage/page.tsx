@@ -32,7 +32,6 @@ import {
   PricingConfig,
 } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
-import PlotLocationEditor from '@/components/PlotLocationEditor';
 import SongEditor from '@/components/SongEditor';
 
 function humanBytes(n: number): string {
@@ -962,15 +961,6 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         currentSongLabel={m.songLabel}
       />
 
-      {isLive && m.plotId && m.cemetery && auth.currentUser && (
-        <PlotLocationEditor
-          plotId={m.plotId}
-          cemetery={m.cemetery}
-          actorUid={auth.currentUser.uid}
-          actorEmail={auth.currentUser.email || undefined}
-        />
-      )}
-
       {isLive && quotas.totalBytesPerMemorial > 0 && (
         <div className="card" style={{ marginBottom: 30, display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 260px' }}>
@@ -1521,44 +1511,30 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
       {isLive && (
         <div className="card" style={{ marginBottom: 30 }}>
           <div className="eyebrow">For the grave</div>
-          <h3 style={{ marginTop: 10 }}>A QR code for the resting place</h3>
+          <h3 style={{ marginTop: 10 }}>The resting place</h3>
           {m.plotId ? (
             <>
               <p className="muted">
-                This memorial is linked to a plot. The QR code sits with the plot, so anyone who
-                scans it sees everyone remembered at that resting place. A beautiful way to
-                honour a family grave.
+                The QR code, exact grave pin, plaque design and other names on this plot are all
+                managed together — one plot, many memorials.
               </p>
               <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-                <Link href={`/plot/${m.plotId}/plaque`} className="button">
-                  Get oval plaque (logo + QR)
-                </Link>
-                <Link href={`/plot/${m.plotId}/qr`} className="button secondary">
-                  QR code only
+                <Link href={`/plot/${m.plotId}/manage`} className="button">
+                  Manage this plot
                 </Link>
                 <Link href={`/plot/${m.plotId}`} className="button secondary">
-                  View plot page
-                </Link>
-                <Link
-                  href={`/create?plot=${encodeURIComponent(m.plotId)}`}
-                  className="button secondary"
-                >
-                  Add another memorial to this plot
+                  View public plot page
                 </Link>
               </div>
-              <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>
-                Additional names on this plot use the reduced rate. The QR is already engraved
-                on the stone, so nothing physical needs to change.
-              </p>
             </>
           ) : m.cemetery?.placeId ? (
             <>
               <p className="muted">
                 Create the plot for {m.fullName.split(' ')[0]}&rsquo;s resting place and we&rsquo;ll
                 generate an etchable QR code your engraver (e.g. stonemason or laser engraver) can
-                add to the headstone. The QR links
-                to a page listing everyone remembered at that plot, so future family members can
-                be added over time without ever changing the code on the stone.
+                add to the headstone. The QR links to a page listing everyone remembered at that
+                plot, so future family members can be added over time without ever changing the
+                code on the stone.
               </p>
               {plotError && (
                 <p style={{ color: '#a94442', marginTop: 12, fontSize: 14 }}>{plotError}</p>
