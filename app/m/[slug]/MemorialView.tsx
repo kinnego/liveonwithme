@@ -156,12 +156,22 @@ This is a place for all the pieces of Mary that live on in the people who knew h
 
 type LoadState = 'loading' | 'not_found' | 'draft_no_access' | 'ready';
 
+// Minimal shape for the "Also resting here" link — passed down from the
+// server page so first paint already has the sibling list.
+export interface SiblingMemorial {
+  id: string;
+  slug: string;
+  fullName: string;
+}
+
 export default function Memorial({
   params,
   initialMemorial,
+  initialSiblings = [],
 }: {
   params: Promise<{ slug: string }>;
   initialMemorial: Record<string, any> | null;
+  initialSiblings?: SiblingMemorial[];
 }) {
   // Seed state from the server-provided memorial so first paint has
   // everything it needs (title, hero URL, cemetery, etc.) without waiting
@@ -611,6 +621,35 @@ export default function Memorial({
               >
                 Directions to the grave →
               </a>
+            </p>
+          )}
+          {initialSiblings.length === 1 && (
+            <p style={{ marginTop: 8, fontSize: 14, opacity: 0.9 }}>
+              Also resting here:{' '}
+              <Link
+                href={`/m/${initialSiblings[0].slug}`}
+                style={{
+                  color: 'inherit',
+                  textDecoration: 'underline',
+                  fontWeight: 600,
+                }}
+              >
+                {initialSiblings[0].fullName} →
+              </Link>
+            </p>
+          )}
+          {initialSiblings.length > 1 && memorial.plotId && (
+            <p style={{ marginTop: 8, fontSize: 14, opacity: 0.9 }}>
+              <Link
+                href={`/plot/${memorial.plotId}`}
+                style={{
+                  color: 'inherit',
+                  textDecoration: 'underline',
+                  fontWeight: 600,
+                }}
+              >
+                Also resting here: {initialSiblings.length} others →
+              </Link>
             </p>
           )}
         </div>

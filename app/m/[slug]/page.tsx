@@ -7,7 +7,7 @@
 import { cache } from 'react';
 import type { Metadata } from 'next';
 import { adminDb } from '@/lib/firebase-admin';
-import MemorialView from './MemorialView';
+import MemorialView, { type SiblingMemorial } from './MemorialView';
 
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
@@ -42,6 +42,44 @@ const loadMemorial = cache(async (slug: string) => {
     return null;
   }
 });
+
+// Everyone else resting on the same plot — used to render the "Also resting
+// here" link so a visitor who followed a direct link to one memorial can
+// find the sibling without having to scan the stone's QR again.
+const loadSiblings = cache(
+  async (plotId: string, excludeMemorialId: string): Promise<SiblingMemorial[]> => {
+    try {
+      const mems = await adminDb()
+        .collection('plotMemberships')
+        .where('plotId', '==', plotId)
+        .where('status', '==', 'approved')
+        .get();
+
+      const memorialIds = mems.docs
+        .map((d) => d.data().memorialId as string | undefined)
+        .filter((id): id is string => !!id && id !== excludeMemorialId);
+      if (memorialIds.length === 0) return [];
+
+      const results: SiblingMemorial[] = [];
+      for (const id of memorialIds) {
+        const m = await adminDb().collection('memorials').doc(id).get();
+        if (!m.exists) continue;
+        const data = m.data() as any;
+        if (data.status !== 'live') continue;
+        if (data.offline === true) continue;
+        if (!['public', 'unlisted'].includes(data.visibility)) continue;
+        results.push({
+          id: m.id,
+          slug: data.slug || m.id,
+          fullName: data.fullName || '',
+        });
+      }
+      return results;
+    } catch {
+      return [];
+    }
+  },
+);
 
 export async function generateMetadata({
   params,
@@ -108,6 +146,9 @@ export default async function Page({
   const { slug } = await params;
   const m = await loadMemorial(slug);
 
+  const siblings =
+    m && m.plotId && m.id ? await loadSiblings(m.plotId, m.id) : [];
+
   const jsonLd = m
     ? {
         '@context': 'https://schema.org',
@@ -130,7 +171,7 @@ export default async function Page({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <MemorialView params={params} initialMemorial={m} />
+      <MemorialView params={params} initialMemorial={m} initialSiblings={siblings} />
     </>
   );
 }
