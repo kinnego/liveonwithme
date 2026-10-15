@@ -1,6 +1,16 @@
 'use client';
 import { FormEvent, Suspense, useEffect, useState } from 'react';
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -13,6 +23,17 @@ import { attachMemorialToExistingPlot, isPlotAdmin } from '@/lib/plot';
 import { isApprovedPartner } from '@/lib/roles';
 import type { MemorialKind, Plot, UserProfile } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
+
+// A plot the current user administers plus the names of memorials already
+// resting on it. Used to drive the "Is this person buried with someone
+// you've already set up a page for?" prompt — the biggest discoverability
+// gap in the current flow is that there was no path from "/create" to
+// "attach to an existing plot" without going through the first memorial's
+// manage page.
+interface OwnedPlotOption {
+  plot: Plot;
+  memorialNames: string[];
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -73,6 +94,11 @@ function CreateInner() {
   // secondary rate.
   const [presetPlot, setPresetPlot] = useState<Plot | null>(null);
   const [presetPlotError, setPresetPlotError] = useState('');
+  // Plots the signed-in user administers, discovered lazily once they pick
+  // memorial mode and we don't already have a `?plot=` preset. `null` means
+  // "not yet queried"; empty array means "queried, nothing to show".
+  const [ownerPlots, setOwnerPlots] = useState<OwnedPlotOption[] | null>(null);
+  const [plotStepSkipped, setPlotStepSkipped] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const presetPlotId = searchParams?.get('plot') || '';
@@ -143,6 +169,71 @@ function CreateInner() {
       }
     })();
   }, [user, presetPlotId]);
+
+  // Discover plots the user already administers so we can offer "is this
+  // person resting with someone you've already set up?" before they re-enter
+  // the cemetery. Only runs on the memorial path (legacy pages have no
+  // physical resting place), and only when we don't have a specific plot in
+  // the URL already. Legacy single-admin plot docs (plotAdminUid, not
+  // plotAdminUids) aren't returned by this array-contains query — those are
+  // old enough to be rare and the user can still add via the manage page.
+  useEffect(() => {
+    if (!user || !db) return;
+    if (mode !== 'memorial') return;
+    if (presetPlotId) return;
+    if (plotStepSkipped) return;
+    if (ownerPlots !== null) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const plotsSnap = await getDocs(
+          query(
+            collection(db, 'plots'),
+            where('plotAdminUids', 'array-contains', user.uid),
+          ),
+        );
+        if (cancelled) return;
+
+        const results: OwnedPlotOption[] = [];
+        for (const plotDoc of plotsSnap.docs) {
+          const plot = { id: plotDoc.id, ...(plotDoc.data() as any) } as Plot;
+          const memberSnap = await getDocs(
+            query(
+              collection(db, 'plotMemberships'),
+              where('plotId', '==', plot.id),
+              where('status', '==', 'approved'),
+            ),
+          );
+          if (cancelled) return;
+
+          const names: string[] = [];
+          for (const memDoc of memberSnap.docs) {
+            const memId = memDoc.data().memorialId as string | undefined;
+            if (!memId) continue;
+            try {
+              const memSnap = await getDoc(doc(db, 'memorials', memId));
+              if (!memSnap.exists()) continue;
+              const name = (memSnap.data() as any)?.fullName;
+              if (typeof name === 'string' && name) names.push(name);
+            } catch {
+              // Memorial may not be readable (e.g. private draft owned by
+              // someone else) — skip without failing the whole discovery.
+            }
+          }
+          results.push({ plot, memorialNames: names });
+        }
+        if (!cancelled) setOwnerPlots(results);
+      } catch (err) {
+        console.warn('could not load owner plots', err);
+        if (!cancelled) setOwnerPlots([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, mode, presetPlotId, plotStepSkipped, ownerPlots]);
 
   function persistDraft(next: Record<string, string>) {
     setDraft(next);
@@ -432,6 +523,120 @@ function CreateInner() {
             .pickerTitle {
               font-size: 24px;
             }
+          }
+        `}</style>
+      </main>
+    );
+  }
+
+  // Shared-plot discovery: on the memorial path, if the user administers at
+  // least one plot and hasn't been sent to a specific plot via `?plot=`,
+  // offer to attach this new memorial to one of them. Keeps the plot's
+  // existing QR code (already engraved on the stone) in play and uses the
+  // secondary-memorial price at Go Live.
+  const askingSharedPlot =
+    mode === 'memorial' && !presetPlotId && !plotStepSkipped && !!user;
+
+  if (askingSharedPlot && ownerPlots === null) {
+    return <PageSkeleton variant="default" label="Looking for resting places" />;
+  }
+
+  if (askingSharedPlot && ownerPlots && ownerPlots.length > 0) {
+    return (
+      <main className="shell">
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+          <div className="eyebrow">A memorial</div>
+          <h2 style={{ marginBottom: 10 }}>Is this person resting with someone already on LiveOnWith.me?</h2>
+          <p className="muted" style={{ maxWidth: 580 }}>
+            If they share a plot with a memorial you&rsquo;ve already set up, we&rsquo;ll keep the stone&rsquo;s QR code the same and simply add this new name to it.
+          </p>
+
+          <div style={{ display: 'grid', gap: 14, marginTop: 24 }}>
+            {ownerPlots.map(({ plot, memorialNames }) => (
+              <button
+                type="button"
+                key={plot.id}
+                className="plotTile"
+                onClick={() =>
+                  router.push(`/create?plot=${encodeURIComponent(plot.id)}`)
+                }
+              >
+                <div style={{ fontWeight: 700, fontSize: 17 }}>
+                  {plot.name || plot.cemetery?.name || 'Resting place'}
+                </div>
+                {plot.name && plot.cemetery?.name && (
+                  <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+                    {plot.cemetery.name}
+                  </div>
+                )}
+                {plot.cemetery?.address && (
+                  <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+                    {plot.cemetery.address}
+                  </div>
+                )}
+                {memorialNames.length > 0 && (
+                  <div style={{ fontSize: 14, marginTop: 12 }}>
+                    Already here: {memorialNames.slice(0, 3).join(', ')}
+                    {memorialNames.length > 3
+                      ? `, and ${memorialNames.length - 3} more`
+                      : ''}
+                  </div>
+                )}
+                <div
+                  style={{
+                    color: 'var(--sage)',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    marginTop: 12,
+                  }}
+                >
+                  Add this memorial here →
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setPlotStepSkipped(true)}
+            style={{
+              display: 'block',
+              margin: '28px auto 0',
+              background: 'none',
+              border: 'none',
+              color: 'var(--sage)',
+              textDecoration: 'underline',
+              cursor: 'pointer',
+              fontSize: 15,
+              padding: 6,
+            }}
+          >
+            No, this is a different resting place
+          </button>
+        </div>
+
+        <style jsx>{`
+          .plotTile {
+            background: var(--paper);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 20px 22px;
+            text-align: left;
+            cursor: pointer;
+            display: block;
+            width: 100%;
+            font: inherit;
+            color: inherit;
+            box-shadow: 0 6px 20px rgba(47, 57, 51, 0.04);
+            transition: transform 0.18s ease, border-color 0.18s ease,
+              box-shadow 0.18s ease;
+          }
+          .plotTile:hover,
+          .plotTile:focus-visible {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 32px rgba(47, 57, 51, 0.09);
+            border-color: #bcc9c2;
+            outline: none;
           }
         `}</style>
       </main>
