@@ -122,15 +122,26 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ received: true, alreadyProcessed: true });
         }
 
+        // Reconcile against the quoted price, not the final total. A
+        // legitimately applied Stripe promotion code reduces amount_total
+        // below amount_subtotal; the subtotal is what we quoted at Go
+        // Live and is the right ground truth for "did the customer get
+        // charged the right base price?". The discount itself is held by
+        // Stripe and can be audited there.
+        const quotedBase =
+          typeof session.amount_subtotal === 'number'
+            ? session.amount_subtotal
+            : session.amount_total;
         if (
           typeof payment.amount === 'number' &&
-          typeof session.amount_total === 'number' &&
-          payment.amount !== session.amount_total
+          typeof quotedBase === 'number' &&
+          payment.amount !== quotedBase
         ) {
           console.error('stripe webhook: amount mismatch', {
             session: session.id,
             expected: payment.amount,
-            got: session.amount_total,
+            got: quotedBase,
+            amountTotal: session.amount_total,
           });
           await paymentDoc.ref.update({
             status: 'rejected_amount_mismatch',
