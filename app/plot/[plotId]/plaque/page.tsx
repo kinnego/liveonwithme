@@ -362,11 +362,12 @@ export default function PlotPlaque({
   return (
     <main className="shell">
       <div className="formCard">
-        <div className="eyebrow">For the grave</div>
+        <div className="eyebrow">For the resting place</div>
         <h2>{plot.name || plot.cemetery?.name || 'Plot plaque'}</h2>
         <p className="muted">
-          The plaque that goes on the stone. The QR links to every memorial at this plot — present
-          and future — so there&rsquo;s nothing on the plaque that would need re-engraving later.
+          The plaque for the resting place — headstone, memorial bench, columbarium, tree marker or
+          anywhere a QR can live. It links to every memorial at this plot — present and future — so
+          there&rsquo;s nothing on the plaque that would need remaking later.
         </p>
         <p className="muted" style={{ fontSize: 13 }}>
           For a personal plaque for a single person — mantelpiece, prayer card, wake — use the{' '}
@@ -459,7 +460,7 @@ export default function PlotPlaque({
           <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
             By default we use the LiveOnWith.me mark. You can replace it with your own image — a
             family crest, a cross, a rose, anything that feels right. High-contrast silhouettes
-            engrave best.
+            reproduce best, whether etched, printed or cast.
           </p>
           <input
             ref={fileInputRef}
@@ -492,8 +493,8 @@ export default function PlotPlaque({
         <div style={{ marginTop: 24 }}>
           <label htmlFor="bottomText">Bottom text (optional)</label>
           <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
-            A short line engraved beneath the QR — a family name or similar. Keep it durable:
-            dates or a single person&rsquo;s name may feel out of place once others rest here.
+            A short line beneath the QR — a family name or similar. Keep it durable: dates or a
+            single person&rsquo;s name may feel out of place once others rest here.
           </p>
           <input
             id="bottomText"
@@ -510,7 +511,7 @@ export default function PlotPlaque({
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 30, flexWrap: 'wrap' }}>
           <button className="button" onClick={downloadSvg}>
-            Download SVG (for your engraver)
+            Download SVG (for your supplier)
           </button>
           <button className="button secondary" onClick={downloadPng}>
             Download PNG (for print)
@@ -518,10 +519,10 @@ export default function PlotPlaque({
         </div>
 
         <div style={{ textAlign: 'left', marginTop: 40, background: '#fffdf9', border: '1px solid var(--line)', borderRadius: 14, padding: '18px 22px' }}>
-          <h3 style={{ marginTop: 0 }}>For your engraver</h3>
+          <h3 style={{ marginTop: 0 }}>For whoever makes the plaque</h3>
           <p className="muted" style={{ marginBottom: 8 }}>
-            A few gentle suggestions for whoever does the engraving (e.g. a stonemason or laser
-            engraver):
+            A few gentle suggestions for your memorial supplier — stonemason, laser engraver, metal
+            shop, sign maker or whoever will produce the final piece:
           </p>
           <ul className="muted" style={{ marginTop: 0, paddingLeft: 22 }}>
             <li>
@@ -530,8 +531,8 @@ export default function PlotPlaque({
             </li>
             <li>
               The QR, border and text are pure vector. The brand mark (or your uploaded image) is
-              embedded as a high-resolution bitmap — fine for laser etching. For sandblast, supply
-              a vector mark separately if available.
+              embedded as a high-resolution bitmap — fine for laser etching, UV print or CNC. For
+              sandblast or cast metal, supply a vector mark separately if available.
             </li>
             <li>Keep the inner white space around the QR; the scanner relies on that quiet border.</li>
             <li>Test with a phone before finishing. It should scan from about half a metre away.</li>

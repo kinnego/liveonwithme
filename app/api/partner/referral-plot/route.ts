@@ -3,34 +3,46 @@ import { adminDb, verifyIdToken } from '@/lib/firebase-admin';
 
 export const runtime = 'nodejs';
 
-// Returns the plotId linked to a referral's memorial, if any, so the partner
-// referral page can surface a direct link into the plaque / QR designer.
-// Partners can read their own referral via Firestore rules but not the
-// memorial, so we proxy the one field they need.
+// Returns the plotId linked to each referral's memorial, if any, so the partner
+// dashboard and referral page can surface direct links into the plaque / QR
+// designer. Partners can read their own referrals via Firestore rules but not
+// the memorial, so we proxy the one field they need. Non-owned referrals are
+// silently skipped so the response leaks nothing.
 export async function GET(req: NextRequest) {
   try {
     const uid = await verifyIdToken(req.headers.get('Authorization'));
     const { searchParams } = new URL(req.url);
-    const referralId = searchParams.get('referralId') || '';
-    if (!referralId) return NextResponse.json({ error: 'referralId required' }, { status: 400 });
+    const raw = searchParams.get('referralIds') || '';
+    const ids = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (ids.length === 0) return NextResponse.json({ plots: {} });
 
     const db = adminDb();
-    const refSnap = await db.collection('referrals').doc(referralId).get();
-    if (!refSnap.exists) return NextResponse.json({ error: 'Referral not found' }, { status: 404 });
-    const referral = refSnap.data()!;
-    if (referral.partnerUid !== uid) {
-      return NextResponse.json({ error: 'Not your referral' }, { status: 403 });
+    const refSnaps = await Promise.all(ids.map((id) => db.collection('referrals').doc(id).get()));
+
+    const plots: Record<string, string | null> = {};
+    const memorialLookups: Array<{ refId: string; memorialId: string }> = [];
+
+    for (const snap of refSnaps) {
+      if (!snap.exists) continue;
+      const data = snap.data()!;
+      if (data.partnerUid !== uid) continue;
+      if (!data.memorialId) {
+        plots[snap.id] = null;
+        continue;
+      }
+      memorialLookups.push({ refId: snap.id, memorialId: data.memorialId });
     }
 
-    const memorialId: string | undefined = referral.memorialId;
-    if (!memorialId) return NextResponse.json({ plotId: null });
+    const memSnaps = await Promise.all(
+      memorialLookups.map((x) => db.collection('memorials').doc(x.memorialId).get()),
+    );
+    memorialLookups.forEach((x, i) => {
+      plots[x.refId] = memSnaps[i].exists ? memSnaps[i].data()?.plotId || null : null;
+    });
 
-    const memSnap = await db.collection('memorials').doc(memorialId).get();
-    if (!memSnap.exists) return NextResponse.json({ plotId: null });
-    const plotId = memSnap.data()?.plotId || null;
-    return NextResponse.json({ plotId });
+    return NextResponse.json({ plots });
   } catch (err: any) {
     console.error('partner/referral-plot error', err);
-    return NextResponse.json({ error: 'Could not load plot' }, { status: 500 });
+    return NextResponse.json({ error: 'Could not load plots' }, { status: 500 });
   }
 }

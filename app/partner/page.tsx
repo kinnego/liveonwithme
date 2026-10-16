@@ -34,6 +34,8 @@ export default function PartnerDashboard() {
   const [access, setAccess] = useState<Access>('checking');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [items, setItems] = useState<any[]>([]);
+  const [plotIds, setPlotIds] = useState<Record<string, string | null>>({});
+  const [search, setSearch] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -86,6 +88,38 @@ export default function PartnerDashboard() {
       stop?.();
     };
   }, [router]);
+
+  // Fetch plotIds for claimed referrals so each card can link straight into
+  // the plaque designer. Partners can't read memorials directly, so this goes
+  // through a scoped server endpoint.
+  useEffect(() => {
+    const claimedIds = items
+      .filter((r) => r.status === 'claimed' && r.memorialId)
+      .map((r) => r.id);
+    if (claimedIds.length === 0) {
+      setPlotIds({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!auth?.currentUser) return;
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(
+          `/api/partner/referral-plot?referralIds=${encodeURIComponent(claimedIds.join(','))}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setPlotIds(data.plots || {});
+      } catch {
+        /* best-effort — buttons just won't show */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   if (access === 'checking' || access === 'not_signed_in') {
     return <PageSkeleton variant="detail" label="Checking your access" />;
@@ -185,22 +219,78 @@ export default function PartnerDashboard() {
           <Link href="/partner/new" className="button" style={{ marginTop: 12 }}>Set up a new memorial</Link>
         </div>
       ) : (
-        <div className="featureGrid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-          {items.map((r) => (
-            <Link href={`/partner/referrals/${r.id}`} key={r.id} className="card" style={{ display: 'block' }}>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                <span className="status">{statusLabel(r.status)}</span>
-                <span className="status" style={{ background: r.wholesalePaymentStatus === 'paid' ? '#dde5df' : '#ffe8cc' }}>
-                  {wholesaleLabel(r.wholesalePaymentStatus)}
-                </span>
+        <>
+          <div style={{ marginBottom: 20 }}>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or family contact…"
+              aria-label="Search your memorials"
+              style={{ width: '100%' }}
+            />
+          </div>
+          {(() => {
+            const q = search.trim().toLowerCase();
+            const filtered = q
+              ? items.filter((r) =>
+                  (r.deceasedFullName || '').toLowerCase().includes(q) ||
+                  (r.bereavedName || '').toLowerCase().includes(q) ||
+                  (r.bereavedEmail || '').toLowerCase().includes(q),
+                )
+              : items;
+            if (filtered.length === 0) {
+              return (
+                <div className="card">
+                  <p className="muted" style={{ margin: 0 }}>
+                    No memorials match &ldquo;{search}&rdquo;.
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <div className="featureGrid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+                {filtered.map((r) => {
+                  const plotId = plotIds[r.id];
+                  return (
+                    <article key={r.id} className="card">
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                        <span className="status">{statusLabel(r.status)}</span>
+                        <span className="status" style={{ background: r.wholesalePaymentStatus === 'paid' ? '#dde5df' : '#ffe8cc' }}>
+                          {wholesaleLabel(r.wholesalePaymentStatus)}
+                        </span>
+                      </div>
+                      <h3 style={{ margin: 0 }}>{r.deceasedFullName}</h3>
+                      <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
+                        Contact: {r.bereavedName}
+                      </p>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+                        <Link href={`/partner/referrals/${r.id}`} className="button secondary small">
+                          Manage
+                        </Link>
+                        {r.status === 'claimed' && (
+                          <Link href={`/m/${r.memorialId}`} className="button secondary small">
+                            View memorial
+                          </Link>
+                        )}
+                        {r.status === 'claimed' && plotId && (
+                          <>
+                            <Link href={`/plot/${plotId}/qr`} className="button secondary small">
+                              QR code
+                            </Link>
+                            <Link href={`/plot/${plotId}/plaque`} className="button secondary small">
+                              Design plaque
+                            </Link>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
-              <h3 style={{ margin: 0 }}>{r.deceasedFullName}</h3>
-              <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
-                Contact: {r.bereavedName}
-              </p>
-            </Link>
-          ))}
-        </div>
+            );
+          })()}
+        </>
       )}
     </main>
   );

@@ -42,6 +42,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
 
+    // Skip gracefully in environments without a mail provider (typically local
+    // dev). The decision itself is already saved by the admin client — only
+    // the email delivery is deferred.
+    if (!process.env.SENDGRID_API_KEY) {
+      console.warn('admin/partners/notify: SENDGRID_API_KEY not set — skipping email');
+      return NextResponse.json({ ok: true, skipped: 'sendgrid-not-configured' });
+    }
+
     const { applicationId, decision } = await req.json();
     if (!applicationId || typeof applicationId !== 'string') {
       return NextResponse.json({ error: 'applicationId is required' }, { status: 400 });

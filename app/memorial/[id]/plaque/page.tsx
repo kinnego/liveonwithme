@@ -387,7 +387,7 @@ export default function MemorialPlaquePage({
         </p>
         {memorial.plotId && (
           <p className="muted" style={{ fontSize: 13 }}>
-            Looking for the QR that goes on the headstone? That&rsquo;s the{' '}
+            Looking for the QR for the resting place (headstone, bench, columbarium…)? That&rsquo;s the{' '}
             <Link
               href={`/plot/${memorial.plotId}/plaque`}
               style={{ color: 'var(--brand)', textDecoration: 'underline' }}
@@ -620,8 +620,8 @@ export default function MemorialPlaquePage({
             <label>Mark (top of the plaque)</label>
             <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
               By default we use the LiveOnWith.me mark. Replace it with your own image — a family
-              crest, a cross, a rose, anything that feels right. High-contrast silhouettes engrave
-              best.
+              crest, a cross, a rose, anything that feels right. High-contrast silhouettes
+              reproduce best, whether etched, printed or cast.
             </p>
             <input
               ref={markInputRef}
@@ -653,7 +653,7 @@ export default function MemorialPlaquePage({
         <div style={{ marginTop: 24 }}>
           <label htmlFor="bottomText">Bottom text (optional)</label>
           <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
-            A short line engraved beneath the QR. Leave blank for no text.
+            A short line beneath the QR. Leave blank for no text.
           </p>
           <input
             id="bottomText"

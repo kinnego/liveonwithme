@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
         },
       ],
       client_reference_id: referralId,
+      allow_promotion_codes: true,
       metadata: {
         referralId,
         customerId: uid,

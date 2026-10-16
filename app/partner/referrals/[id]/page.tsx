@@ -17,6 +17,7 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
   const [inviteState, setInviteState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [paying, setPaying] = useState(false);
   const [plotId, setPlotId] = useState<string | null>(null);
+  const [verifyState, setVerifyState] = useState<'idle' | 'checking' | 'notFound' | 'stillPending' | 'error'>('idle');
   const router = useRouter();
   const search = useSearchParams();
   const justPaid = search.get('paid') === '1';
@@ -76,12 +77,12 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
       try {
         if (!auth?.currentUser) return;
         const token = await auth.currentUser.getIdToken();
-        const res = await fetch(`/api/partner/referral-plot?referralId=${encodeURIComponent(r.id)}`, {
+        const res = await fetch(`/api/partner/referral-plot?referralIds=${encodeURIComponent(r.id)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled) setPlotId(data.plotId || null);
+        if (!cancelled) setPlotId(data.plots?.[r.id] || null);
       } catch {
         /* best-effort — the link just won't show */
       }
@@ -109,6 +110,71 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
       setInviteState('error');
     }
   }
+
+  async function verifyWholesale(): Promise<'paid' | 'pending' | 'no_session' | 'error'> {
+    if (!r || !auth?.currentUser) return 'error';
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/partner/verify-wholesale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ referralId: r.id }),
+      });
+      if (!res.ok) return 'error';
+      const data = await res.json();
+      if (data.status === 'paid') return 'paid';
+      if (data.status === 'no_session') return 'no_session';
+      return 'pending';
+    } catch {
+      return 'error';
+    }
+  }
+
+  async function manualVerify() {
+    setVerifyState('checking');
+    const result = await verifyWholesale();
+    if (result === 'paid') {
+      // onSnapshot will pick up the status flip and re-render.
+      setVerifyState('idle');
+    } else if (result === 'no_session') {
+      setVerifyState('notFound');
+    } else if (result === 'pending') {
+      setVerifyState('stillPending');
+    } else {
+      setVerifyState('error');
+    }
+  }
+
+  // After returning from Stripe (?paid=1), the webhook usually flips the
+  // referral within a second or two. In local dev (no `stripe listen`) and if
+  // a prod webhook is ever missed, that update never arrives — so poll the
+  // verify endpoint for a short window as a backstop. Stops as soon as the
+  // snapshot reports paid.
+  useEffect(() => {
+    if (!justPaid || !r || !uid) return;
+    if (r.partnerUid !== uid) return;
+    if (r.wholesalePaymentStatus === 'paid') return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 6; // ~18s at 3s intervals
+    const start = window.setTimeout(async function tick() {
+      if (cancelled) return;
+      attempts++;
+      const result = await verifyWholesale();
+      if (cancelled) return;
+      if (result === 'paid') return; // snapshot takes over
+      if (attempts >= maxAttempts) {
+        setVerifyState((s) => (s === 'idle' ? 'stillPending' : s));
+        return;
+      }
+      window.setTimeout(tick, 3000);
+    }, 3000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(start);
+    };
+  }, [justPaid, r, uid]);
 
   async function payWholesale() {
     if (!r || !auth?.currentUser) return;
@@ -164,39 +230,71 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
 
         <div className="card" style={{ marginTop: 20, background: paid ? '#dde5df' : '#f0e8d8', borderColor: paid ? '#a8bcae' : '#e0c890' }}>
           <div className="eyebrow" style={{ color: paid ? '#2f5b48' : '#8b6f30' }}>
-            {paid ? 'Wholesale paid' : 'Payment pending'}
+            {paid ? 'Wholesale paid' : justPaid ? 'Confirming payment' : 'Payment pending'}
           </div>
           <p style={{ margin: '8px 0' }}>
             {paid ? (
               <>You paid €{(r.wholesaleAmountCents / 100).toFixed(2)} for this memorial. You bill the family separately.</>
+            ) : justPaid && verifyState !== 'stillPending' && verifyState !== 'notFound' && verifyState !== 'error' ? (
+              <>Confirming your payment with Stripe… this usually takes a few seconds.</>
+            ) : justPaid && verifyState === 'notFound' ? (
+              <>We couldn&rsquo;t find a Stripe session for this referral. If you paid, try again — otherwise start a new payment below.</>
             ) : justPaid ? (
-              <>Confirming your payment with Stripe… this can take a few seconds.</>
+              <>Stripe hasn&rsquo;t confirmed this payment yet. If you completed checkout, click <strong>Check with Stripe now</strong>. If something went wrong, you can start a new payment below.</>
             ) : (
               <>You need to pay €{(r.wholesaleAmountCents / 100).toFixed(2)} wholesale before the family can be invited.</>
             )}
           </p>
           {!paid && (
-            <button className="button" onClick={payWholesale} disabled={paying}>
-              {paying ? 'Opening Stripe…' : `Pay €${(r.wholesaleAmountCents / 100).toFixed(2)} now`}
-            </button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {justPaid && (
+                <button className="button" onClick={manualVerify} disabled={verifyState === 'checking'}>
+                  {verifyState === 'checking' ? 'Checking Stripe…' : 'Check with Stripe now'}
+                </button>
+              )}
+              {(!justPaid || verifyState === 'stillPending' || verifyState === 'notFound' || verifyState === 'error') && (
+                <button
+                  className={justPaid ? 'button secondary' : 'button'}
+                  onClick={payWholesale}
+                  disabled={paying}
+                >
+                  {paying ? 'Opening Stripe…' : justPaid ? 'Start a new payment' : `Pay €${(r.wholesaleAmountCents / 100).toFixed(2)} now`}
+                </button>
+              )}
+            </div>
           )}
         </div>
 
-        {claimed && plotId && (
+        {claimed && (
           <div className="card" style={{ marginTop: 20 }}>
-            <h3 style={{ marginTop: 0 }}>Headstone artwork</h3>
+            <h3 style={{ marginTop: 0 }}>Memorial resources</h3>
             <p className="muted" style={{ marginTop: 0 }}>
-              The family&rsquo;s plot is set up. If you&rsquo;re handling the engraving, you can
-              design and download the plaque and QR here — any changes are logged against your
-              account.
+              {plotId ? (
+                <>
+                  The family&rsquo;s plot is set up. View the memorial, grab the QR, or
+                  design the plaque — plaque changes are logged against your account.
+                </>
+              ) : (
+                <>
+                  You can view the memorial any time. The QR and plaque become available
+                  once the family attaches a cemetery to the plot.
+                </>
+              )}
             </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
-              <Link href={`/plot/${plotId}/plaque`} className="button secondary small">
-                Design plaque
+              <Link href={`/m/${r.memorialId}`} className="button secondary small">
+                View memorial
               </Link>
-              <Link href={`/plot/${plotId}/qr`} className="button secondary small">
-                QR code
-              </Link>
+              {plotId && (
+                <>
+                  <Link href={`/plot/${plotId}/qr`} className="button secondary small">
+                    QR code
+                  </Link>
+                  <Link href={`/plot/${plotId}/plaque`} className="button secondary small">
+                    Design plaque
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -206,11 +304,7 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
             <h3 style={{ marginTop: 0 }}>Family invitation</h3>
             {claimed ? (
               <p className="muted">
-                {r.bereavedName} has taken over the memorial. You can{' '}
-                <Link href={`/m/${r.memorialId}`} style={{ color: 'var(--sage)', textDecoration: 'underline' }}>
-                  view it
-                </Link>{' '}
-                any time.
+                {r.bereavedName} has taken over the memorial.
               </p>
             ) : (
               <>

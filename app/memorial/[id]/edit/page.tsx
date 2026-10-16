@@ -7,9 +7,8 @@ import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { calculateAgeAtDeath } from '@/lib/age';
 import { resizeForMobile } from '@/lib/image';
-import type { Cemetery, Memorial } from '@/lib/types';
+import type { Memorial } from '@/lib/types';
 import { canEditMemorial } from '@/lib/roles';
-import CemeteryPicker from '@/components/CemeteryPicker';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +21,6 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
   const [error, setError] = useState('');
   const [born, setBorn] = useState('');
   const [died, setDied] = useState('');
-  const [cemetery, setCemetery] = useState<Cemetery | null>(null);
   const [showDiedField, setShowDiedField] = useState(false);
   const router = useRouter();
 
@@ -38,7 +36,6 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
         setM(data);
         setBorn(data.born || '');
         setDied(data.died || '');
-        setCemetery(data.cemetery || null);
         if (data.kind === 'legacy' && data.died) setShowDiedField(true);
       })
     );
@@ -80,7 +77,6 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
         epitaph: String(fd.get('epitaph') || ''),
         story: String(fd.get('story') || ''),
         visibility: String(fd.get('visibility') || 'public'),
-        cemetery: cemetery ?? null,
         updatedAt: serverTimestamp(),
       };
       // A legacy page transitions to a memorial the moment a died date is set.
@@ -202,9 +198,6 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
               )}
             </>
           )}
-
-          <span className="fieldLabel">Cemetery or resting place</span>
-          <CemeteryPicker value={cemetery} onChange={setCemetery} />
 
           <label htmlFor="photo" style={{ marginTop: 18 }}>A favourite photograph</label>
           {heroUrl && (
