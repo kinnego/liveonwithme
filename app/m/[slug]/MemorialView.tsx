@@ -290,7 +290,20 @@ export default function Memorial({
       });
       if (cancelled) return;
 
-      const s = await getDoc(doc(db, 'memorials', p.slug));
+      let s;
+      try {
+        s = await getDoc(doc(db, 'memorials', p.slug));
+      } catch (err: any) {
+        // Firestore denies draft/offline memorials to anyone who isn't the
+        // owner/successor/co-manager — partners, logged-out visitors, random
+        // signed-in users all land here. Not a bug; render the "no access"
+        // state the same way we would for a published-but-private memorial.
+        if (!cancelled) {
+          console.warn('memorial fallback read denied', err?.code || err?.message);
+          setLoadState('draft_no_access');
+        }
+        return;
+      }
       if (cancelled) return;
       if (!s.exists()) {
         setLoadState('not_found');

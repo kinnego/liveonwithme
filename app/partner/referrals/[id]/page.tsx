@@ -38,13 +38,22 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
         return;
       }
       setUid(u.uid);
-      stop = onSnapshot(doc(db, 'referrals', id), (snap) => {
-        if (!snap.exists()) {
-          setError('This memorial link is no longer available.');
-          return;
-        }
-        setR({ id: snap.id, ...snap.data() });
-      });
+      stop = onSnapshot(
+        doc(db, 'referrals', id),
+        (snap) => {
+          if (!snap.exists()) {
+            setError('This memorial link is no longer available.');
+            return;
+          }
+          setR({ id: snap.id, ...snap.data() });
+        },
+        (err) => {
+          // Swallow transient permission errors from sign-out / token refresh
+          // races; a true access problem will manifest as the referral never
+          // loading, which the UI already handles via the loading skeleton.
+          console.warn('partner referral snapshot error', err?.code || err?.message);
+        },
+      );
     });
     return () => {
       stopAuth();
@@ -269,32 +278,50 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
           <div className="card" style={{ marginTop: 20 }}>
             <h3 style={{ marginTop: 0 }}>Memorial resources</h3>
             <p className="muted" style={{ marginTop: 0 }}>
-              {plotId ? (
-                <>
-                  The family&rsquo;s plot is set up. View the memorial, grab the QR, or
-                  design the plaque — plaque changes are logged against your account.
-                </>
-              ) : (
-                <>
-                  You can view the memorial any time. The QR and plaque become available
-                  once the family attaches a cemetery to the plot.
-                </>
-              )}
+              View the memorial, or design one of two plaques for the family.
             </p>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
-              <Link href={`/m/${r.memorialId}`} className="button secondary small">
-                View memorial
-              </Link>
-              {plotId && (
-                <>
-                  <Link href={`/plot/${plotId}/qr`} className="button secondary small">
-                    QR code
+
+            <div style={{ marginTop: 18 }}>
+              <div className="eyebrow">The memorial page</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+                <Link href={`/m/${r.memorialId}`} className="button secondary small">
+                  View memorial
+                </Link>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
+              <div className="eyebrow">Headstone — for the grave</div>
+              <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
+                The QR and plaque for the resting place, shared across everyone buried on the
+                plot. One page covers the bare QR for engraving and the full designed plaque for
+                mounting.
+              </p>
+              {plotId ? (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+                  <Link href={`/plot/${plotId}/artwork`} className="button secondary small">
+                    Headstone artwork
                   </Link>
-                  <Link href={`/plot/${plotId}/plaque`} className="button secondary small">
-                    Design plaque
-                  </Link>
-                </>
+                </div>
+              ) : (
+                <p className="muted" style={{ margin: '10px 0 0', fontSize: 13 }}>
+                  Available once {r.bereavedName || 'the family'} attaches a cemetery to the plot.
+                </p>
               )}
+            </div>
+
+            <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
+              <div className="eyebrow">Keepsake — for an individual</div>
+              <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
+                A personal QR or plaque for one person — mantelpiece, prayer card, pendant,
+                memory box, or sold as a shop keepsake. One per memorial, not tied to the
+                headstone.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+                <Link href={`/memorial/${r.memorialId}/artwork`} className="button secondary small">
+                  Memorial artwork
+                </Link>
+              </div>
             </div>
           </div>
         )}
@@ -311,6 +338,10 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
                 <p className="muted">
                   A private link goes to <strong>{r.bereavedEmail}</strong>. When they open it and
                   confirm the same email, they become the memorial custodian.
+                </p>
+                <p className="muted" style={{ fontSize: 13 }}>
+                  The memorial and QR code become available once {r.bereavedName || 'the family'}{' '}
+                  claims and attaches a cemetery. Send the invite to get started.
                 </p>
                 {inviteState === 'sent' && (
                   <p style={{ color: '#2f5b48' }}>

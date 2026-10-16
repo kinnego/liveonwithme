@@ -30,6 +30,8 @@ import {
   MAX_CO_MANAGERS,
   MediaQuotasConfig,
   Memorial,
+  PARTNER_TYPE_LABELS,
+  PartnerType,
   PricingConfig,
 } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
@@ -124,6 +126,17 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
   const [pricing, setPricing] = useState<PricingConfig>(DEFAULT_PRICING);
   const [isSecondary, setIsSecondary] = useState(false);
   const [coManagerInfo, setCoManagerInfo] = useState<Record<string, { email?: string; displayName?: string }>>({});
+  const [partnerInfo, setPartnerInfo] = useState<{
+    uid: string;
+    displayName?: string;
+    email?: string;
+    partnerType?: string;
+    businessName?: string;
+    contactName?: string;
+    contactPhone?: string;
+    website?: string;
+  } | null>(null);
+  const [partnerContactOpen, setPartnerContactOpen] = useState(false);
   const [cemeteryDraft, setCemeteryDraft] = useState<Cemetery | null>(null);
   const [cemeterySaving, setCemeterySaving] = useState(false);
   const [cemeteryError, setCemeteryError] = useState('');
@@ -257,6 +270,37 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
       cancelled = true;
     };
   }, [m?.id, (m?.coManagerUids || []).join(',')]);
+
+  // Fetch partner provenance (which funeral director / stonemason / etc. set
+  // this memorial up for the family, if any). Clients can't read other users'
+  // profile docs so this goes through a scoped server endpoint.
+  useEffect(() => {
+    if (!m?.id || !m?.partnerUid) {
+      setPartnerInfo(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) return;
+        const res = await fetch('/api/memorial/partner-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ memorialId: m.id }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setPartnerInfo(data.partner || null);
+      } catch {
+        /* best-effort — card falls back to the plain provenance hint */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [m?.id, m?.partnerUid]);
 
   function showToast(text: string) {
     setToast({ text, key: Date.now() });
@@ -627,11 +671,6 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           <h2 style={{ marginBottom: 5 }}>{m.fullName}</h2>
           <p className="muted" style={{ margin: 0 }}>
             <StatusBadge status={m.status} />
-            {isPartnerPaid && (
-              <span style={{ marginLeft: 10, fontSize: 13 }}>
-                · Set up for you by a partner
-              </span>
-            )}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -643,6 +682,95 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           </Link>
         </div>
       </div>
+
+      {m.partnerUid && (
+        <div
+          className="card"
+          style={{ marginBottom: 24, background: '#fffdf9' }}
+        >
+          <div className="eyebrow">Set up by a partner</div>
+          {(() => {
+            const label = partnerInfo?.businessName
+              || partnerInfo?.displayName
+              || (partnerInfo?.email ? partnerInfo.email : 'A Live On With Me partner');
+            const typeLabel = partnerInfo?.partnerType
+              ? PARTNER_TYPE_LABELS[partnerInfo.partnerType as PartnerType]
+              : null;
+            return (
+              <>
+                <h3 style={{ margin: '6px 0 4px' }}>{label}</h3>
+                {typeLabel && (
+                  <p className="muted" style={{ margin: 0, fontSize: 14 }}>{typeLabel}</p>
+                )}
+                <p className="muted" style={{ margin: '10px 0 0', fontSize: 14 }}>
+                  This memorial was originally set up for your family by{' '}
+                  {partnerInfo?.businessName || 'a Live On With Me partner'}. You own and manage
+                  it from here — contact them below if you need to reach them about the service,
+                  headstone or anything else they&rsquo;re helping with.
+                </p>
+                {partnerInfo && (partnerInfo.email || partnerInfo.contactPhone || partnerInfo.website) && (
+                  <>
+                    <button
+                      type="button"
+                      className="button secondary small"
+                      style={{ marginTop: 14 }}
+                      onClick={() => setPartnerContactOpen((v) => !v)}
+                      aria-expanded={partnerContactOpen}
+                    >
+                      {partnerContactOpen ? 'Hide contact details' : 'Show contact details'}
+                    </button>
+                    {partnerContactOpen && (
+                      <dl
+                        style={{
+                          margin: '16px 0 0',
+                          display: 'grid',
+                          gridTemplateColumns: 'auto 1fr',
+                          columnGap: 16,
+                          rowGap: 8,
+                          fontSize: 14,
+                        }}
+                      >
+                        {partnerInfo.contactName && (
+                          <>
+                            <dt className="muted">Contact</dt>
+                            <dd style={{ margin: 0 }}>{partnerInfo.contactName}</dd>
+                          </>
+                        )}
+                        {partnerInfo.email && (
+                          <>
+                            <dt className="muted">Email</dt>
+                            <dd style={{ margin: 0 }}>
+                              <a href={`mailto:${partnerInfo.email}`}>{partnerInfo.email}</a>
+                            </dd>
+                          </>
+                        )}
+                        {partnerInfo.contactPhone && (
+                          <>
+                            <dt className="muted">Phone</dt>
+                            <dd style={{ margin: 0 }}>
+                              <a href={`tel:${partnerInfo.contactPhone}`}>{partnerInfo.contactPhone}</a>
+                            </dd>
+                          </>
+                        )}
+                        {partnerInfo.website && (
+                          <>
+                            <dt className="muted">Website</dt>
+                            <dd style={{ margin: 0 }}>
+                              <a href={partnerInfo.website} target="_blank" rel="noopener noreferrer">
+                                {partnerInfo.website.replace(/^https?:\/\//, '')}
+                              </a>
+                            </dd>
+                          </>
+                        )}
+                      </dl>
+                    )}
+                  </>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       {!isOwner && (
         <div
@@ -970,6 +1098,9 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                 <Link href={`/plot/${m.plotId}/manage`} className="button">
                   Manage this plot
                 </Link>
+                <Link href={`/plot/${m.plotId}/artwork`} className="button secondary">
+                  Headstone artwork
+                </Link>
                 <Link href={`/plot/${m.plotId}`} className="button secondary">
                   View public plot page
                 </Link>
@@ -1014,23 +1145,25 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         </div>
       )}
 
-      {isLive && (
-        <div className="card" style={{ marginBottom: 30 }}>
-          <div className="eyebrow">For a keepsake</div>
-          <h3 style={{ marginTop: 10 }}>A personal plaque for {m.fullName.split(' ')[0]}</h3>
-          <p className="muted">
-            A small plaque to keep, carry or hand out — for a mantelpiece, a prayer card, or a
-            wake remembrance. The QR links straight to {m.fullName.split(' ')[0]}&rsquo;s page
-            (not the plot). If you&rsquo;ve set a hero photo it can go in the centre of the QR;
-            otherwise the LiveOnWith.me mark steps in.
+      <div className="card" style={{ marginBottom: 30 }}>
+        <div className="eyebrow">For a keepsake</div>
+        <h3 style={{ marginTop: 10 }}>Personal artwork for {m.fullName.split(' ')[0]}</h3>
+        <p className="muted">
+          A plain QR or a full plaque for {m.fullName.split(' ')[0]} alone — mantelpiece,
+          prayer card, pendant or memory box. The code links straight to{' '}
+          {m.fullName.split(' ')[0]}&rsquo;s page, not the plot.
+        </p>
+        {!isLive && (
+          <p className="muted" style={{ fontSize: 13 }}>
+            Preview and design is open now. Downloads unlock once the memorial is paid for and live.
           </p>
-          <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-            <Link href={`/memorial/${m.id}/plaque`} className="button">
-              Design the plaque
-            </Link>
-          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+          <Link href={`/memorial/${m.id}/artwork`} className="button">
+            Open artwork
+          </Link>
         </div>
-      )}
+      </div>
 
       <div className="card" style={{ marginBottom: 30 }}>
         <h3 style={{ marginTop: 0 }}>{isLegacy ? 'Your own memories' : 'Keeper memories'}</h3>

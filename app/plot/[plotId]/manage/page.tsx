@@ -326,16 +326,15 @@ export default function PlotManagePage({
 
         <div className="card" style={{ marginBottom: 24 }}>
           <div className="eyebrow">For the stone</div>
-          <h3 style={{ marginTop: 10 }}>Plaque &amp; QR code</h3>
+          <h3 style={{ marginTop: 10 }}>Headstone artwork</h3>
           <p className="muted">
-            Generate an etchable QR code (and optional plaque design) your stonemason or engraver can place on the headstone. The code resolves to the plot page, which lists everyone remembered here.
+            Everything your stonemason or engraver needs — the bare QR for etching, or the full
+            designed plaque for mounting. The code resolves to the plot page, which lists
+            everyone remembered here.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-            <Link href={`/plot/${plot.id}/plaque`} className="button">
-              Design the plaque
-            </Link>
-            <Link href={`/plot/${plot.id}/qr`} className="button secondary">
-              QR code only
+            <Link href={`/plot/${plot.id}/artwork`} className="button">
+              Open artwork
             </Link>
             <Link href={`/plot/${plot.id}`} className="button secondary">
               View public plot page

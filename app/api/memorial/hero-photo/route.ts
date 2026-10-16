@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
     const allowed =
       canEditMemorial(uid, memorial) ||
       (memorial.successorUids || []).includes(uid) ||
+      memorial.partnerUid === uid ||
       isSuperAdmin(prof);
     if (!allowed) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
 

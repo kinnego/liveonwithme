@@ -529,11 +529,8 @@ export default function AdminMemorialInspector({
                 <Link href={`/plot/${plot.id}`} target="_blank" rel="noopener" className="button secondary small">
                   Open plot page ↗
                 </Link>
-                <Link href={`/plot/${plot.id}/plaque`} target="_blank" rel="noopener" className="button secondary small">
-                  Design plaque ↗
-                </Link>
-                <Link href={`/plot/${plot.id}/qr`} target="_blank" rel="noopener" className="button secondary small">
-                  QR code ↗
+                <Link href={`/plot/${plot.id}/artwork`} target="_blank" rel="noopener" className="button secondary small">
+                  Open artwork ↗
                 </Link>
               </div>
               <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>

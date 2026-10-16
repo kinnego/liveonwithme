@@ -102,12 +102,14 @@ service cloud.firestore {
         || (signedIn() && resource.data.ownerId == request.auth.uid)
         || (signedIn() && request.auth.uid in resource.data.get('successorUids', []))
         || (signedIn() && request.auth.uid in resource.data.get('coManagerUids', []))
+        || (signedIn() && resource.data.get('partnerUid', null) == request.auth.uid)
         || isSuperAdmin();
 
       allow list: if
         (signedIn() && resource.data.ownerId == request.auth.uid)
         || (signedIn() && request.auth.uid in resource.data.get('successorUids', []))
         || (signedIn() && request.auth.uid in resource.data.get('coManagerUids', []))
+        || (signedIn() && resource.data.get('partnerUid', null) == request.auth.uid)
         || (resource.data.status == 'live' && resource.data.get('offline', false) == false && resource.data.get('pendingDeletionAt', null) == null && resource.data.visibility == 'public')
         || isSuperAdmin();
 

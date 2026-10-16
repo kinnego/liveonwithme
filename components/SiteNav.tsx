@@ -122,6 +122,15 @@ export default function SiteNav() {
         {menuOpen ? '\u2715' : '\u2630'}
       </button>
       <div id="site-nav-menu" className={`navLinks${menuOpen ? ' open' : ''}`}>
+        {user && (
+          <span
+            className="navIdentity muted"
+            aria-label="Signed in as"
+            title={user.email || undefined}
+          >
+            {profile?.displayName || user.displayName || user.email}
+          </span>
+        )}
         <Link href="/dashboard" onClick={closeMenu}>
           My memorials
         </Link>

@@ -1,13 +1,11 @@
 'use client';
-// Legacy route — QR codes now live at the plot level. If this memorial is
-// already linked to a plot, take the user straight there; otherwise send them
-// to Manage where they can create/link the plot with a friendly explanation.
+// Legacy route — the memorial QR merged into /memorial/[id]/artwork with a
+// mode toggle. The old route redirected to the plot QR; the new memorial
+// artwork page offers both the memorial-level QR and (via a link) the plot
+// artwork so no one loses their way.
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -21,20 +19,9 @@ export default function MemorialQrRedirect({
 
   useEffect(() => {
     params.then(({ id }) => {
-      if (!auth) return;
-      return onAuthStateChanged(auth, async (u) => {
-        if (!u) return router.push('/auth');
-        const snap = await getDoc(doc(db, 'memorials', id));
-        if (!snap.exists()) return router.push('/dashboard');
-        const data = snap.data() as any;
-        if (data.plotId) {
-          router.replace(`/plot/${data.plotId}/qr`);
-        } else {
-          router.replace(`/memorial/${id}/manage`);
-        }
-      });
+      router.replace(`/memorial/${id}/artwork?mode=qr`);
     });
   }, [params, router]);
 
-  return <PageSkeleton variant="compact" label="Taking you to the QR code" />;
+  return <PageSkeleton variant="compact" label="Taking you to the artwork page" />;
 }

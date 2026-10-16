@@ -80,7 +80,13 @@ export default function PartnerDashboard() {
           where('partnerUid', '==', u.uid),
           orderBy('createdAt', 'desc')
         ),
-        (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() })))
+        (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        (err) => {
+          // Swallow transient permission errors — most often the listener
+          // re-evaluates during a sign-out or token-refresh race. The access
+          // gate above has already decided what the user can see.
+          console.warn('partner referrals snapshot error', err?.code || err?.message);
+        },
       );
     });
     return () => {
@@ -269,19 +275,19 @@ export default function PartnerDashboard() {
                           Manage
                         </Link>
                         {r.status === 'claimed' && (
-                          <Link href={`/m/${r.memorialId}`} className="button secondary small">
-                            View memorial
-                          </Link>
-                        )}
-                        {r.status === 'claimed' && plotId && (
                           <>
-                            <Link href={`/plot/${plotId}/qr`} className="button secondary small">
-                              QR code
+                            <Link href={`/m/${r.memorialId}`} className="button secondary small">
+                              View memorial
                             </Link>
-                            <Link href={`/plot/${plotId}/plaque`} className="button secondary small">
-                              Design plaque
+                            <Link href={`/memorial/${r.memorialId}/artwork`} className="button secondary small">
+                              Memorial artwork
                             </Link>
                           </>
+                        )}
+                        {r.status === 'claimed' && plotId && (
+                          <Link href={`/plot/${plotId}/artwork`} className="button secondary small">
+                            Headstone artwork
+                          </Link>
                         )}
                       </div>
                     </article>
