@@ -41,6 +41,22 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
     );
   }, [params, router]);
 
+  // Fields render only after the memorial loads, so the browser's initial
+  // hash scroll misses. Replay it once the DOM has the targeted field.
+  useEffect(() => {
+    if (!m) return;
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const el = document.getElementById(hash);
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        el.focus({ preventScroll: true });
+      }
+    });
+  }, [m]);
+
   const derivedAge = calculateAgeAtDeath(born, died);
 
   async function uploadToR2(file: File, kind: 'memorial-hero' | 'memorial-gallery' | 'memorial-memory', memorialId: string) {

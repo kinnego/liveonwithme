@@ -196,17 +196,29 @@ export default function PlotManagePage({
   return (
     <main className="shell">
       <div style={{ maxWidth: 820, margin: '0 auto' }}>
-        <div className="eyebrow">A resting place</div>
-        <h2 style={{ marginBottom: 6 }}>
-          {plot.name || cemetery?.name || 'This plot'}
-        </h2>
-        {cemetery?.name && (plot.name || cemetery?.address) && (
-          <p className="muted" style={{ marginTop: 0 }}>
-            {plot.name ? `${cemetery.name}` : ''}
-            {plot.name && cemetery.address ? ' · ' : ''}
-            {cemetery.address || ''}
-          </p>
-        )}
+        <div className="dashboardHead">
+          <div>
+            <div className="eyebrow">A resting place</div>
+            <h2 style={{ marginBottom: 6 }}>
+              {plot.name || cemetery?.name || 'This plot'}
+            </h2>
+            {cemetery?.name && (plot.name || cemetery?.address) && (
+              <p className="muted" style={{ marginTop: 0 }}>
+                {plot.name ? `${cemetery.name}` : ''}
+                {plot.name && cemetery.address ? ' · ' : ''}
+                {cemetery.address || ''}
+              </p>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <Link href="/dashboard" className="button secondary">
+              ← Dashboard
+            </Link>
+            <Link href={`/plot/${plot.id}`} className="button secondary">
+              View plot page
+            </Link>
+          </div>
+        </div>
 
         <div className="card" style={{ marginTop: 24, marginBottom: 24 }}>
           <div className="eyebrow">The plot</div>

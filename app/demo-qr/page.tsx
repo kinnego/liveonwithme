@@ -260,6 +260,9 @@ export default function DemoQrPage() {
 
   return (
     <main className="shell">
+      <div style={{ maxWidth: 690, margin: '0 auto 10px' }}>
+        <Link href="/partner" className="button secondary small">← Partner dashboard</Link>
+      </div>
       <div className="formCard">
         <div className="eyebrow">Demo QR designer</div>
         <h2>A sample memorial for you to display how it works</h2>

@@ -117,6 +117,9 @@ export default function PartnerApply() {
 
   return (
     <main className="shell">
+      <div style={{ maxWidth: 690, margin: '0 auto 10px' }}>
+        <a href="/dashboard" className="button secondary small">← Dashboard</a>
+      </div>
       <div className="formCard">
         <div className="eyebrow">Partner application</div>
         <h2>Join the partner network.</h2>

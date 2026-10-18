@@ -794,24 +794,29 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           {
             key: 'hero',
             done: !!m.heroPhotoPath,
-            label: 'Add a photograph',
+            label: 'Add a favourite photograph',
             hint: 'A main photo for the top of the page.',
-            href: '',
+            href: `/memorial/${m.id}/edit#photo`,
+            cta: 'Jump to photograph',
           },
           {
             key: 'story',
             done: !!m.story,
             label: isLegacy ? 'Share your story' : `Share ${firstName}'s story`,
             hint: 'A few paragraphs about their life. Write as little or as much as feels right.',
-            href: '',
+            href: `/memorial/${m.id}/edit#story`,
+            cta: 'Jump to story',
           },
-          {
-            key: 'cemetery',
-            done: !!m.cemetery?.placeId,
-            label: 'Add the cemetery',
-            hint: 'The dedicated section below walks you through finding it.',
-            href: `/memorial/${m.id}/manage#restingPlace`,
-          },
+          ...(isLegacy
+            ? []
+            : [{
+                key: 'cemetery',
+                done: !!m.cemetery?.placeId,
+                label: 'Add the cemetery',
+                hint: 'The dedicated section below walks you through finding it.',
+                href: '#restingPlace',
+                cta: 'Jump to resting place',
+              }]),
         ];
         const remaining = steps.filter((s) => !s.done).length;
         if (remaining === 0) return null;
@@ -842,17 +847,17 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                         width: 24,
                         height: 24,
                         borderRadius: '50%',
-                        background: step.done ? 'var(--sage)' : 'transparent',
-                        border: step.done ? 'none' : '1.5px solid #c8c0b2',
-                        color: 'white',
+                        background: step.done ? 'var(--sage)' : '#f0e8d8',
+                        color: step.done ? 'white' : '#8b6f30',
                         display: 'grid',
                         placeItems: 'center',
-                        fontSize: 13,
+                        fontSize: 14,
                         fontWeight: 700,
+                        lineHeight: 1,
                         marginTop: 3,
                       }}
                     >
-                      {step.done ? '✓' : ''}
+                      {step.done ? '✓' : '–'}
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
@@ -869,11 +874,9 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                           <p className="muted" style={{ margin: '4px 0 10px', fontSize: 13 }}>
                             {step.hint}
                           </p>
-                          {step.key === 'cemetery' && (
-                            <a href="#restingPlace" className="button soft small">
-                              Jump to resting place
-                            </a>
-                          )}
+                          <a href={step.href} className="button soft small">
+                            {step.cta}
+                          </a>
                         </>
                       )}
                     </div>
@@ -1147,7 +1150,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
 
       <div className="card" style={{ marginBottom: 30 }}>
         <div className="eyebrow">For a keepsake</div>
-        <h3 style={{ marginTop: 10 }}>Personal artwork for {m.fullName.split(' ')[0]}</h3>
+        <h3 style={{ marginTop: 10 }}>{m.fullName.split(' ')[0]}&rsquo;s own QR code and plaque</h3>
         <p className="muted">
           A plain QR or a full plaque for {m.fullName.split(' ')[0]} alone — mantelpiece,
           prayer card, pendant or memory box. The code links straight to{' '}

@@ -126,6 +126,9 @@ export default function NewPartnerCustomer() {
 
   return (
     <main className="shell">
+      <div style={{ maxWidth: 690, margin: '0 auto 10px' }}>
+        <a href="/partner" className="button secondary small">← Partner dashboard</a>
+      </div>
       <div className="formCard">
         <div className="eyebrow">Set up a new memorial</div>
         <h2>Start a memorial for a family.</h2>

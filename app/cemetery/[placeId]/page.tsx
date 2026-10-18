@@ -114,6 +114,9 @@ export default function CemeteryPage({
 
   return (
     <main className="shell">
+      <div style={{ marginBottom: 14 }}>
+        <Link href="/cemetery/nearby" className="button secondary small">← Cemeteries nearby</Link>
+      </div>
       <div className="eyebrow">Find someone</div>
       <h1 style={{ marginBottom: 8 }}>{cemeteryName}</h1>
       {cemeteryAddress && (
