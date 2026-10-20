@@ -188,8 +188,8 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
             memories are always visible.
           </p>
         </div>
-        <Link href={`/memorial/${m.id}/manage`} className="button secondary">
-          Back to manage
+        <Link href={`/memorial/${m.id}`} className="button secondary">
+          ← Back
         </Link>
       </div>
 

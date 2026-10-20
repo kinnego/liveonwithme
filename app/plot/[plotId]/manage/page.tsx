@@ -22,8 +22,9 @@ import {
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { isPlotAdmin } from '@/lib/plot';
-import type { Memorial, Plot } from '@/lib/types';
+import type { Cemetery, Memorial, Plot } from '@/lib/types';
 import PlotLocationEditor from '@/components/PlotLocationEditor';
+import CemeteryPicker from '@/components/CemeteryPicker';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,14 @@ export default function PlotManagePage({
   const [nameBusy, setNameBusy] = useState(false);
   const [nameError, setNameError] = useState('');
   const [nameSaved, setNameSaved] = useState(false);
+
+  // Cemetery editor — staged pick, only committed on confirm so a stray
+  // Places autocomplete click doesn't rewrite the plot's location.
+  const [cemeteryEditing, setCemeteryEditing] = useState(false);
+  const [cemeteryPick, setCemeteryPick] = useState<Cemetery | null>(null);
+  const [cemeteryBusy, setCemeteryBusy] = useState(false);
+  const [cemeteryError, setCemeteryError] = useState('');
+  const [cemeterySaved, setCemeterySaved] = useState(false);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
@@ -156,6 +165,36 @@ export default function PlotManagePage({
     }
   }
 
+  async function saveCemetery() {
+    if (!auth.currentUser || !cemeteryPick) return;
+    setCemeteryBusy(true);
+    setCemeteryError('');
+    setCemeterySaved(false);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/plot/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ plotId, cemetery: cemeteryPick }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || 'Could not change the cemetery.');
+      }
+      setCemeterySaved(true);
+      setCemeteryEditing(false);
+      setCemeteryPick(null);
+      setTimeout(() => setCemeterySaved(false), 2500);
+    } catch (err: any) {
+      setCemeteryError(err?.message || 'Could not change the cemetery.');
+    } finally {
+      setCemeteryBusy(false);
+    }
+  }
+
   if (user === undefined || loadState === 'loading') {
     return <PageSkeleton variant="default" label="Loading the plot" />;
   }
@@ -221,6 +260,76 @@ export default function PlotManagePage({
         </div>
 
         <div className="card" style={{ marginTop: 24, marginBottom: 24 }}>
+          <div className="eyebrow">The cemetery</div>
+          <h3 style={{ marginTop: 10 }}>
+            {cemetery?.name || 'Pick the cemetery'}
+          </h3>
+          {cemetery?.address && (
+            <p className="muted" style={{ marginTop: 0 }}>{cemetery.address}</p>
+          )}
+          <p className="muted">
+            This is where visitors will come. Changing it moves everyone remembered on this plot
+            to the new cemetery — the plot&rsquo;s QR and label stay the same.
+          </p>
+          {!cemeteryEditing ? (
+            <div style={{ display: 'flex', gap: 10, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => {
+                  setCemeteryEditing(true);
+                  setCemeteryError('');
+                  setCemeterySaved(false);
+                }}
+              >
+                Change cemetery
+              </button>
+              {cemeterySaved && (
+                <span className="muted" style={{ fontSize: 13 }}>Saved.</span>
+              )}
+            </div>
+          ) : (
+            <>
+              <div style={{ marginTop: 14 }}>
+                <CemeteryPicker
+                  value={cemeteryPick}
+                  onChange={(next) => setCemeteryPick(next)}
+                />
+              </div>
+              {cemeteryError && (
+                <p style={{ color: '#a94442', marginTop: 10, fontSize: 14 }}>{cemeteryError}</p>
+              )}
+              <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={saveCemetery}
+                  disabled={cemeteryBusy || !cemeteryPick}
+                >
+                  {cemeteryBusy
+                    ? 'Saving…'
+                    : cemeteryPick
+                      ? `Move to ${cemeteryPick.name || 'this cemetery'}`
+                      : 'Pick a cemetery first'}
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => {
+                    setCemeteryEditing(false);
+                    setCemeteryPick(null);
+                    setCemeteryError('');
+                  }}
+                  disabled={cemeteryBusy}
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="card" style={{ marginBottom: 24 }}>
           <div className="eyebrow">The plot</div>
           <h3 style={{ marginTop: 10 }}>An optional label</h3>
           <p className="muted">

@@ -171,7 +171,7 @@ export default async function Page({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <MemorialView params={params} initialMemorial={m} initialSiblings={siblings} />
+      <MemorialView params={params} initialMemorial={m} initialSiblings={siblings} mode="public" />
     </>
   );
 }

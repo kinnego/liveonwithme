@@ -28,13 +28,17 @@ type UploadKind =
   | 'memorial-hero'
   | 'memorial-gallery'
   | 'memorial-memory'
+  | 'memorial-clip'
   | 'contribution';
 
 const MEMORIAL_KINDS: readonly UploadKind[] = [
   'memorial-hero',
   'memorial-gallery',
   'memorial-memory',
+  'memorial-clip',
 ];
+
+const AUDIO_MIME_TYPES = new Set(['audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav']);
 
 interface Format {
   ext: string;
@@ -143,6 +147,7 @@ export async function POST(req: NextRequest) {
       kind !== 'memorial-hero' &&
       kind !== 'memorial-gallery' &&
       kind !== 'memorial-memory' &&
+      kind !== 'memorial-clip' &&
       kind !== 'contribution'
     ) {
       return NextResponse.json({ error: 'Invalid kind' }, { status: 400 });
@@ -244,6 +249,13 @@ export async function POST(req: NextRequest) {
     if (!detected) {
       return NextResponse.json(
         { error: 'That file type isn\'t supported. Try JPEG, PNG, WebP, GIF, or an MP3/M4A/OGG/WAV audio file.' },
+        { status: 400 }
+      );
+    }
+
+    if (kind === 'memorial-clip' && !AUDIO_MIME_TYPES.has(detected.mime)) {
+      return NextResponse.json(
+        { error: 'Clips must be audio. Supported formats: MP3, M4A, OGG, WAV.' },
         { status: 400 }
       );
     }

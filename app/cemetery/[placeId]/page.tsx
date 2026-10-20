@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import CemeterySearch from '@/components/CemeterySearch';
@@ -13,11 +13,20 @@ import {
   submitCemeteryReport,
   updateCustomCemeteryName,
 } from '@/lib/cemeteries';
-import type { CustomCemetery } from '@/lib/types';
+import type { Cemetery, CustomCemetery } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+
+// Firestore `in` filter supports up to 30 operands per query.
+const IN_CHUNK = 30;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
 
 type Memorial = {
   id: string;
@@ -26,8 +35,27 @@ type Memorial = {
   born?: string;
   died?: string;
   heroPhotoPath?: string;
-  cemetery?: { name?: string; address?: string; placeId?: string };
 };
+
+// Build a /create link that prefills the cemetery, so when the visitor
+// finishes the memorial form we can auto-attach a plot at this cemetery
+// without making them pick it again. Works whether or not they are signed in
+// — /create forwards the full query string through its /auth bounce.
+function buildCreateLinkForCemetery(c: {
+  name: string;
+  address: string | undefined;
+  placeId: string;
+  lat: number | null;
+  lng: number | null;
+}): string {
+  const q = new URLSearchParams();
+  q.set('cemeteryName', c.name);
+  if (c.address) q.set('cemeteryAddress', c.address);
+  q.set('cemeteryPlaceId', c.placeId);
+  if (typeof c.lat === 'number') q.set('cemeteryLat', String(c.lat));
+  if (typeof c.lng === 'number') q.set('cemeteryLng', String(c.lng));
+  return `/create?${q.toString()}`;
+}
 
 export default function CemeteryPage({
   params,
@@ -40,6 +68,7 @@ export default function CemeteryPage({
   const sp = use(searchParams);
   const isCustom = isCustomPlaceId(placeId);
   const [memorials, setMemorials] = useState<Memorial[] | null>(null);
+  const [plotCemetery, setPlotCemetery] = useState<Cemetery | null>(null);
   const [custom, setCustom] = useState<CustomCemetery | null>(null);
   const [customError, setCustomError] = useState('');
   const [error, setError] = useState('');
@@ -64,23 +93,90 @@ export default function CemeteryPage({
     })();
   }, [isCustom, placeId]);
 
+  // Memorials at a cemetery are discovered via the plots layer now:
+  //   plots (where cemetery.placeId == X) → plotMemberships (approved) → memorials
+  // Memorials no longer carry the cemetery field, so we can't query them
+  // directly by placeId. The plot is the canonical home for the location.
   useEffect(() => {
     (async () => {
       try {
         if (!db) throw new Error('Firestore not available');
-        const snap = await getDocs(
-          query(
-            collection(db, 'memorials'),
-            where('cemetery.placeId', '==', placeId),
-            where('status', '==', 'live'),
-            where('visibility', '==', 'public')
-          )
+
+        const plotsSnap = await getDocs(
+          query(collection(db, 'plots'), where('cemetery.placeId', '==', placeId)),
         );
-        setMemorials(
-          snap.docs
-            .map((d) => ({ id: d.id, ...d.data() } as Memorial))
-            .filter((m) => (m as any).offline !== true)
+        if (plotsSnap.empty) {
+          setMemorials([]);
+          return;
+        }
+
+        // Grab cemetery details off the first plot — all plots at this
+        // placeId share the same cemetery object.
+        const firstPlot = plotsSnap.docs[0].data() as any;
+        if (firstPlot?.cemetery) setPlotCemetery(firstPlot.cemetery as Cemetery);
+
+        const plotIds = plotsSnap.docs.map((d) => d.id);
+
+        // Approved memberships only. A plot may have many approved
+        // memberships (multi-generation family grave), so we batch.
+        const memorialIds: string[] = [];
+        for (const batch of chunk(plotIds, IN_CHUNK)) {
+          const memSnap = await getDocs(
+            query(
+              collection(db, 'plotMemberships'),
+              where('plotId', 'in', batch),
+              where('status', '==', 'approved'),
+            ),
+          );
+          for (const d of memSnap.docs) {
+            const data = d.data() as any;
+            if (data.memorialId) memorialIds.push(data.memorialId);
+          }
+        }
+
+        if (memorialIds.length === 0) {
+          setMemorials([]);
+          return;
+        }
+
+        // Dedupe (one memorial shouldn't appear twice on a plot but belt-and-
+        // braces) then fetch each memorial individually. We can't use an
+        // `in` list query here because the memorials `list` rule's public
+        // branch requires `offline == false` and `pendingDeletionAt == null`,
+        // which the client can't express as WHERE clauses (missing fields
+        // can't be matched with ==). Per-doc getDoc evaluates the rule for
+        // each specific doc — drafts/offline ones silently fail and are
+        // skipped, which is what we want.
+        const uniqueMemorialIds = Array.from(new Set(memorialIds));
+        const fetched: Memorial[] = [];
+        const results = await Promise.all(
+          uniqueMemorialIds.map(async (id) => {
+            try {
+              const snap = await getDoc(doc(db!, 'memorials', id));
+              if (!snap.exists()) return null;
+              return { id: snap.id, data: snap.data() as any };
+            } catch {
+              return null;
+            }
+          }),
         );
+        for (const row of results) {
+          if (!row) continue;
+          const { id, data } = row;
+          if (data.status !== 'live') continue;
+          if (data.visibility !== 'public') continue;
+          if (data.offline === true) continue;
+          if (data.pendingDeletionAt != null) continue;
+          fetched.push({
+            id,
+            slug: data.slug,
+            fullName: data.fullName,
+            born: data.born,
+            died: data.died,
+            heroPhotoPath: data.heroPhotoPath,
+          });
+        }
+        setMemorials(fetched);
       } catch (err: any) {
         console.error('Cemetery query failed:', err);
         setError(
@@ -93,23 +189,20 @@ export default function CemeteryPage({
     })();
   }, [placeId]);
 
-  const first = memorials?.[0]?.cemetery as
-    | { name?: string; address?: string; placeId?: string; lat?: number | null; lng?: number | null }
-    | undefined;
-  const cemeteryName =
-    custom?.name || first?.name || sp.name || 'This cemetery';
-  const cemeteryAddress = custom?.address || first?.address;
+  const knownCemeteryName = custom?.name || plotCemetery?.name || sp.name || '';
+  const cemeteryName = knownCemeteryName || 'This cemetery';
+  const cemeteryAddress = custom?.address || plotCemetery?.address;
   const cemeteryLat =
     typeof custom?.lat === 'number'
       ? custom.lat
-      : typeof first?.lat === 'number'
-        ? first.lat
+      : typeof plotCemetery?.lat === 'number'
+        ? plotCemetery.lat
         : null;
   const cemeteryLng =
     typeof custom?.lng === 'number'
       ? custom.lng
-      : typeof first?.lng === 'number'
-        ? first.lng
+      : typeof plotCemetery?.lng === 'number'
+        ? plotCemetery.lng
         : null;
 
   return (
@@ -144,7 +237,7 @@ export default function CemeteryPage({
         lng={cemeteryLng}
       />
 
-      <div style={{ maxWidth: 520, marginBottom: 40 }}>
+      <div style={{ maxWidth: 520, margin: '0 auto 40px', textAlign: 'center' }}>
         <label className="fieldLabel" htmlFor="cemetery-search">
           Search a different cemetery
         </label>
@@ -166,6 +259,22 @@ export default function CemeteryPage({
             When families choose to make their loved one&rsquo;s memorial public and link it to
             this cemetery, it will appear here.
           </p>
+          {knownCemeteryName && (
+            <div style={{ marginTop: 16 }}>
+              <Link
+                href={buildCreateLinkForCemetery({
+                  name: knownCemeteryName,
+                  address: cemeteryAddress,
+                  placeId,
+                  lat: cemeteryLat,
+                  lng: cemeteryLng,
+                })}
+                className="button"
+              >
+                Create one for a loved one here
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

@@ -176,31 +176,35 @@ export async function updatePlotLocation(
   await updateDoc(doc(db, 'plots', plotId), payload);
 }
 
-// Ensures a memorial with a `cemetery` set has a Plot. Idempotent: no-op if
-// the memorial already has a plotId or has no cemetery.
-export async function ensurePlotForMemorial(m: Memorial): Promise<string | null> {
-  if (!db) return null;
-  if (m.plotId) return m.plotId;
-  if (!m.cemetery?.placeId) return null;
+// Creates a Plot for a memorial that doesn't yet have one, with the given
+// cemetery. Idempotent on the memorial side: returns the existing plotId when
+// one is already set (callers must supply cemetery because the memorial no
+// longer stores it).
+export async function createPlotForMemorial(input: {
+  memorial: Pick<Memorial, 'id' | 'ownerId' | 'personId' | 'plotId'>;
+  cemetery: Cemetery;
+}): Promise<string> {
+  if (!db) throw new Error('Firestore not available');
+  if (input.memorial.plotId) return input.memorial.plotId;
 
   const plot = await createPlot({
-    cemetery: m.cemetery,
-    plotAdminUid: m.ownerId,
-    createdByUid: m.ownerId,
+    cemetery: input.cemetery,
+    plotAdminUid: input.memorial.ownerId,
+    createdByUid: input.memorial.ownerId,
   });
   await requestPlotMembership({
     plotId: plot.id,
-    memorialId: m.id,
-    personId: m.personId,
-    requestedByUid: m.ownerId,
+    memorialId: input.memorial.id,
+    personId: input.memorial.personId,
+    requestedByUid: input.memorial.ownerId,
     autoApprove: true,
   });
   return plot.id;
 }
 
 // Attaches a newly-created memorial to an existing plot the caller
-// administers. Copies the plot's cemetery onto the memorial so the memorial
-// page renders consistently, and creates an auto-approved PlotMembership.
+// administers. The plot owns the cemetery concept now; the memorial just gets
+// its plotId set when the caller is a plot admin.
 export async function attachMemorialToExistingPlot(input: {
   memorialId: string;
   personId?: string;
@@ -218,13 +222,4 @@ export async function attachMemorialToExistingPlot(input: {
     requestedByUid: input.requestedByUid,
     autoApprove: isAdmin,
   });
-  if (isAdmin) {
-    await (
-      await import('firebase/firestore')
-    ).updateDoc(doc(db, 'memorials', input.memorialId), {
-      plotId: input.plotId,
-      cemetery: plot.cemetery,
-      updatedAt: serverTimestamp(),
-    });
-  }
 }

@@ -1,5 +1,5 @@
 'use client';
-import { FormEvent, Suspense, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import {
   collection,
   doc,
@@ -19,9 +19,9 @@ import { resizeForMobile } from '@/lib/image';
 import { createPerson } from '@/lib/person';
 import { slugify } from '@/lib/ids';
 import { writeAudit } from '@/lib/audit';
-import { attachMemorialToExistingPlot, isPlotAdmin } from '@/lib/plot';
+import { attachMemorialToExistingPlot, createPlotForMemorial, isPlotAdmin } from '@/lib/plot';
 import { isApprovedPartner } from '@/lib/roles';
-import type { MemorialKind, Plot, UserProfile } from '@/lib/types';
+import type { Cemetery, MemorialKind, Plot, UserProfile } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
 // A plot the current user administers plus the names of memorials already
@@ -103,6 +103,39 @@ function CreateInner() {
   const searchParams = useSearchParams();
   const presetPlotId = searchParams?.get('plot') || '';
 
+  // Cemetery prefill: arriving from /cemetery/[placeId]'s empty-state CTA.
+  // These params tell us the family wants their new memorial attached to a
+  // plot at this specific cemetery, so after creating the memorial we create
+  // the plot for them with no extra picker step.
+  const presetCemeteryName = searchParams?.get('cemeteryName') || '';
+  const presetCemeteryAddress = searchParams?.get('cemeteryAddress') || '';
+  const presetCemeteryPlaceId = searchParams?.get('cemeteryPlaceId') || '';
+  const presetCemeteryLatRaw = searchParams?.get('cemeteryLat');
+  const presetCemeteryLngRaw = searchParams?.get('cemeteryLng');
+  const presetCemeteryLatParsed =
+    presetCemeteryLatRaw != null ? Number(presetCemeteryLatRaw) : NaN;
+  const presetCemeteryLngParsed =
+    presetCemeteryLngRaw != null ? Number(presetCemeteryLngRaw) : NaN;
+  const presetCemetery: Cemetery | null = useMemo(
+    () =>
+      presetCemeteryName && presetCemeteryPlaceId
+        ? {
+            name: presetCemeteryName,
+            address: presetCemeteryAddress,
+            placeId: presetCemeteryPlaceId,
+            lat: Number.isFinite(presetCemeteryLatParsed) ? presetCemeteryLatParsed : null,
+            lng: Number.isFinite(presetCemeteryLngParsed) ? presetCemeteryLngParsed : null,
+          }
+        : null,
+    [
+      presetCemeteryName,
+      presetCemeteryAddress,
+      presetCemeteryPlaceId,
+      presetCemeteryLatParsed,
+      presetCemeteryLngParsed,
+    ],
+  );
+
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => setUser(u));
   }, []);
@@ -139,9 +172,10 @@ function CreateInner() {
 
   useEffect(() => {
     // Force memorial mode as soon as we know we're attaching to a plot — a
-    // legacy (pre-death) page isn't a physical resting place.
-    if (presetPlotId) setMode('memorial');
-  }, [presetPlotId]);
+    // legacy (pre-death) page isn't a physical resting place. Same applies
+    // when arriving with a cemetery prefill.
+    if (presetPlotId || presetCemetery) setMode('memorial');
+  }, [presetPlotId, presetCemetery]);
 
   useEffect(() => {
     // Partners never see the picker — they're setting up pages for families
@@ -247,9 +281,10 @@ function CreateInner() {
       window.localStorage.setItem('createMode', next);
     } catch {}
     if (!user) {
-      const nextPath = presetPlotId
-        ? `/create?plot=${encodeURIComponent(presetPlotId)}`
-        : '/create';
+      // Preserve the full query string (plot=, cemetery*=) through the auth
+      // bounce so the prefill survives sign-in / sign-up.
+      const qs = searchParams?.toString() || '';
+      const nextPath = qs ? `/create?${qs}` : '/create';
       router.push(`/auth?next=${encodeURIComponent(nextPath)}`);
       return;
     }
@@ -286,6 +321,11 @@ function CreateInner() {
 
       const born = String(fd.get('born') || '');
       const died = mode === 'legacy' ? '' : String(fd.get('died') || '');
+      const gender = String(fd.get('gender') || 'unspecified') as
+        | 'male'
+        | 'female'
+        | 'nonbinary'
+        | 'unspecified';
 
       const personId = await createPerson({
         fullName,
@@ -305,10 +345,10 @@ function CreateInner() {
         fullName,
         fullNameLower: fullName.toLowerCase(),
         kind: mode,
+        gender,
         born,
         died,
         ageAtDeath: died ? calculateAgeAtDeath(born, died) : null,
-        cemetery: presetPlot?.cemetery ?? null,
         featuredContributionIds: [],
         epitaph: '',
         story: '',
@@ -332,6 +372,20 @@ function CreateInner() {
           plotId: presetPlot.id,
           requestedByUid: auth.currentUser.uid,
         });
+      } else if (presetCemetery) {
+        // No existing plot to attach to, but the family arrived here from a
+        // specific cemetery — create the plot now so they land on the plot
+        // manager (pin + QR) immediately, no extra picker step.
+        setProgress('Setting up the resting place…');
+        await createPlotForMemorial({
+          memorial: {
+            id: slug,
+            ownerId: auth.currentUser.uid,
+            personId,
+            plotId: null,
+          },
+          cemetery: presetCemetery,
+        });
       }
 
       const photo = fd.get('photo') as File;
@@ -352,7 +406,7 @@ function CreateInner() {
         action: 'created',
         actorUid: auth.currentUser.uid,
         actorEmail: auth.currentUser.email || undefined,
-        details: { kind: mode, hasCemetery: false },
+        details: { kind: mode, hasCemetery: !!presetCemetery || !!presetPlot },
       });
 
       try {
@@ -533,15 +587,21 @@ function CreateInner() {
   // least one plot and hasn't been sent to a specific plot via `?plot=`,
   // offer to attach this new memorial to one of them. Keeps the plot's
   // existing QR code (already engraved on the stone) in play and uses the
-  // secondary-memorial price at Go Live.
+  // secondary-memorial price at Go Live. When a cemetery is preset, only
+  // plots at THAT cemetery are relevant.
   const askingSharedPlot =
     mode === 'memorial' && !presetPlotId && !plotStepSkipped && !!user;
+  const relevantOwnerPlots = ownerPlots
+    ? presetCemetery
+      ? ownerPlots.filter((p) => p.plot.cemetery?.placeId === presetCemetery.placeId)
+      : ownerPlots
+    : null;
 
   if (askingSharedPlot && ownerPlots === null) {
     return <PageSkeleton variant="default" label="Looking for resting places" />;
   }
 
-  if (askingSharedPlot && ownerPlots && ownerPlots.length > 0) {
+  if (askingSharedPlot && relevantOwnerPlots && relevantOwnerPlots.length > 0) {
     return (
       <main className="shell">
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -552,7 +612,7 @@ function CreateInner() {
           </p>
 
           <div style={{ display: 'grid', gap: 14, marginTop: 24 }}>
-            {ownerPlots.map(({ plot, memorialNames }) => (
+            {relevantOwnerPlots.map(({ plot, memorialNames }) => (
               <button
                 type="button"
                 key={plot.id}
@@ -646,6 +706,7 @@ function CreateInner() {
   const c = COPY[mode];
   const attachingToPlot = !!presetPlotId;
   const presetPlotReady = attachingToPlot ? !!presetPlot && !presetPlotError : true;
+  const attachingToCemetery = !attachingToPlot && !!presetCemetery;
 
   return (
     <main className="shell">
@@ -683,7 +744,6 @@ function CreateInner() {
             </p>
           </div>
         )}
-
         {!attachingToPlot && !isPartner && (
           <p style={{ fontSize: 13, marginTop: -6 }}>
             <button
@@ -699,9 +759,34 @@ function CreateInner() {
                 fontSize: 13,
               }}
             >
-              ← This is actually a different kind of page
+              ← Pick a different page type
             </button>
           </p>
+        )}
+
+        {attachingToCemetery && presetCemetery && (
+          <div
+            style={{
+              marginTop: 16,
+              padding: '12px 14px',
+              background: 'var(--sage2)',
+              borderRadius: 12,
+              display: 'flex',
+              gap: 10,
+              alignItems: 'flex-start',
+              fontSize: 14,
+              lineHeight: 1.5,
+            }}
+          >
+            <span aria-hidden style={{ fontSize: 16, lineHeight: '20px' }}>📍</span>
+            <div>
+              Resting at <strong>{presetCemetery.name}</strong>
+              {presetCemetery.address && (
+                <span className="muted"> · {presetCemetery.address}</span>
+              )}
+              . You&rsquo;ll drop the exact pin on the next step.
+            </div>
+          </div>
         )}
 
         <form onSubmit={submit}>
@@ -715,6 +800,21 @@ function CreateInner() {
             defaultValue={draft.fullName || ''}
             onChange={(e) => persistDraft({ ...draft, fullName: e.target.value })}
           />
+
+          <label htmlFor="gender">
+            Pronouns <span className="muted" style={{ fontWeight: 400 }}>(so the page reads naturally)</span>
+          </label>
+          <select
+            id="gender"
+            name="gender"
+            defaultValue={draft.gender || 'unspecified'}
+            onChange={(e) => persistDraft({ ...draft, gender: e.target.value })}
+          >
+            <option value="unspecified">Prefer not to say — "they/them"</option>
+            <option value="female">She / her</option>
+            <option value="male">He / him</option>
+            <option value="nonbinary">They / them</option>
+          </select>
 
           {mode === 'memorial' ? (
             <>

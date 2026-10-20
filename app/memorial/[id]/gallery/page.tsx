@@ -196,7 +196,7 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
   return (
     <main className="shell">
       <Link
-        href={`/memorial/${m.id}/manage`}
+        href={`/memorial/${m.id}`}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -210,7 +210,7 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
         ← Back to {m.fullName.split(' ')[0]}&rsquo;s page
       </Link>
       <div>
-        <div className="eyebrow">Photographs</div>
+        <div className="eyebrow">Photos</div>
         <h2 style={{ marginBottom: 0 }}>{m.fullName}</h2>
         <p className="muted" style={{ marginTop: 8 }}>
           Star up to {MAX_FEATURED} favourites. They appear in a highlighted strip on the

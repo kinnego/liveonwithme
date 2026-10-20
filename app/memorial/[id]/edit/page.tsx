@@ -9,6 +9,7 @@ import { calculateAgeAtDeath } from '@/lib/age';
 import { resizeForMobile } from '@/lib/image';
 import type { Memorial } from '@/lib/types';
 import { canEditMemorial } from '@/lib/roles';
+import { pronounsFor, capitalize } from '@/lib/pronouns';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -41,22 +42,6 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
     );
   }, [params, router]);
 
-  // Fields render only after the memorial loads, so the browser's initial
-  // hash scroll misses. Replay it once the DOM has the targeted field.
-  useEffect(() => {
-    if (!m) return;
-    const hash = window.location.hash.slice(1);
-    if (!hash) return;
-    const el = document.getElementById(hash);
-    if (!el) return;
-    requestAnimationFrame(() => {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-        el.focus({ preventScroll: true });
-      }
-    });
-  }, [m]);
-
   const derivedAge = calculateAgeAtDeath(born, died);
 
   async function uploadToR2(file: File, kind: 'memorial-hero' | 'memorial-gallery' | 'memorial-memory', memorialId: string) {
@@ -87,6 +72,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
       const updates: Record<string, unknown> = {
         fullName: nextFullName,
         fullNameLower: nextFullName.toLowerCase(),
+        gender: String(fd.get('gender') || 'unspecified'),
         born,
         died,
         ageAtDeath: calculateAgeAtDeath(born, died),
@@ -120,7 +106,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
       }
 
       await updateDoc(doc(db, 'memorials', m.id), updates);
-      router.push(`/memorial/${m.id}/manage`);
+      router.push(`/memorial/${m.id}`);
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -133,18 +119,19 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
   const heroUrl = m.heroPhotoPath ? `${R2_PUBLIC_URL}/${m.heroPhotoPath}` : '';
   const isLegacy = m.kind === 'legacy';
   const pageWord = isLegacy ? 'page' : 'memorial';
-  const nameLabel = isLegacy ? 'Full name' : 'Their full name';
+  const pronouns = pronounsFor(m.gender);
+  const nameLabel = isLegacy ? 'Full name' : `${capitalize(pronouns.possessive)} full name`;
   const epitaphLabel = isLegacy
     ? 'A few words beneath the name (less is more here)'
-    : 'A few words beneath their name (less is more here)';
-  const storyLabel = isLegacy ? 'The story' : 'Their story';
+    : `A few words beneath ${pronouns.possessive} name (less is more here)`;
+  const storyLabel = isLegacy ? 'The story' : `${capitalize(pronouns.possessive)} story`;
 
   return (
     <main className="shell">
       <div className="formCard">
         <div style={{ marginBottom: 14 }}>
-          <Link href={`/memorial/${m.id}/manage`} className="button secondary small">
-            ← Back to manage
+          <Link href={`/memorial/${m.id}`} className="button secondary small">
+            ← Back
           </Link>
         </div>
         <div className="eyebrow">Edit {pageWord}</div>
@@ -154,6 +141,20 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
         <form onSubmit={submit}>
           <label htmlFor="fullName">{nameLabel}</label>
           <input id="fullName" name="fullName" defaultValue={m.fullName} required />
+
+          <label htmlFor="gender">
+            Pronouns <span className="muted" style={{ fontWeight: 400 }}>(so the page reads naturally)</span>
+          </label>
+          <select
+            id="gender"
+            name="gender"
+            defaultValue={m.gender || 'unspecified'}
+          >
+            <option value="unspecified">Prefer not to say — "they/them"</option>
+            <option value="female">She / her</option>
+            <option value="male">He / him</option>
+            <option value="nonbinary">They / them</option>
+          </select>
 
           {isLegacy && !showDiedField ? (
             <>
@@ -260,12 +261,13 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
             <button disabled={saving} className="button">
               {saving ? 'Saving…' : 'Save changes'}
             </button>
-            <Link href={`/memorial/${m.id}/manage`} className="button secondary">
+            <Link href={`/memorial/${m.id}`} className="button secondary">
               Cancel
             </Link>
           </div>
         </form>
       </div>
+
     </main>
   );
 }

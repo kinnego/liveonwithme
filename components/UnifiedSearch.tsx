@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   collection,
+  documentId,
   getDocs,
   limit as fsLimit,
   orderBy,
@@ -119,20 +120,35 @@ export default function UnifiedSearch() {
         fsLimit(6),
       ),
     );
-    return snap.docs
+    const rows = snap.docs
       .filter((d) => (d.data() as any).offline !== true)
-      .map((d) => {
-        const data = d.data() as any;
-        return {
-          kind: 'person' as const,
-          id: d.id,
-          fullName: data.fullName || '',
-          nickname: data.nickname || undefined,
-          born: data.born,
-          died: data.died,
-          cemeteryName: data.cemetery?.name,
-        };
-      });
+      .map((d) => ({ id: d.id, data: d.data() as any }));
+
+    // Cemetery name lives on the linked plot — one `in` query covers up to
+    // 30 memorials, more than the 6-result cap on this search.
+    const plotIds = Array.from(
+      new Set(rows.map((r) => r.data.plotId).filter((v): v is string => typeof v === 'string')),
+    );
+    const cemeteryByPlotId = new Map<string, string>();
+    if (plotIds.length > 0 && db) {
+      const plotsSnap = await getDocs(
+        query(collection(db, 'plots'), where(documentId(), 'in', plotIds)),
+      );
+      for (const p of plotsSnap.docs) {
+        const pd = p.data() as any;
+        if (pd.cemetery?.name) cemeteryByPlotId.set(p.id, pd.cemetery.name);
+      }
+    }
+
+    return rows.map(({ id, data }) => ({
+      kind: 'person' as const,
+      id,
+      fullName: data.fullName || '',
+      nickname: data.nickname || undefined,
+      born: data.born,
+      died: data.died,
+      cemeteryName: data.plotId ? cemeteryByPlotId.get(data.plotId) : undefined,
+    }));
   }
 
   async function fetchGoogleCemeteries(q: string): Promise<GoogleCemeteryHit[]> {

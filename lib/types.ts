@@ -118,6 +118,13 @@ export interface ContributionReport {
   resolutionNotes?: string;
 }
 
+// Collected on /create and /edit so the UI can use correct pronouns in
+// generated copy ("his story" / "her story" instead of the awkward
+// generic "their story"). 'unspecified' falls through to they/them —
+// also used as the default for existing memorials written before this
+// field was added.
+export type Gender = 'male' | 'female' | 'nonbinary' | 'unspecified';
+
 export type ContributionSource = 'family' | 'visitor';
 export type ContributionAudience = 'public' | 'family_only';
 export type GalleryDisplayMode = 'square' | 'natural';
@@ -169,13 +176,13 @@ export interface Memorial {
   born?: string;
   died?: string;
   ageAtDeath?: number | null;
-  cemetery?: Cemetery | null;
   featuredContributionIds?: string[];
   galleryDisplayMode?: GalleryDisplayMode;
   heroPhotoUrl?: string;
   heroPhotoPath?: string;
   epitaph?: string;
   story?: string;
+  gender?: Gender;
   // Optional YouTube URL for the deceased's favourite song. Visitors see a
   // subtle button in the hero — browsers block autoplay by default and we
   // don't want to force music on grieving readers anyway.
@@ -242,6 +249,21 @@ export interface Contribution {
   mediaType?: ContributionMediaType;
   focalX?: number;
   focalY?: number;
+  createdAt?: unknown;
+}
+
+// Audio clip OF the deceased — a voicemail, a recording of them singing, a
+// clip of them playing an instrument. Stored in a per-memorial subcollection
+// so a keeper can add, label, re-order, or remove them without re-reading
+// the whole memorial doc. Distinct from Contribution.audioPath (which lives
+// alongside a written memory from the family).
+export interface MemorialClip {
+  id: string;
+  memorialId: string;
+  path: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  label: string;
   createdAt?: unknown;
 }
 

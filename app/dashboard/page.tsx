@@ -251,7 +251,7 @@ export default function Dashboard() {
         <div className="featureGrid">
           {owned.map((m) => (
             <Link
-              href={`/memorial/${m.id}/manage`}
+              href={`/memorial/${m.id}`}
               className="card"
               key={m.id}
             >
@@ -304,7 +304,7 @@ export default function Dashboard() {
           </p>
           <div className="featureGrid">
             {coManaging.map((m) => (
-              <Link href={`/memorial/${m.id}/manage`} className="card" key={m.id}>
+              <Link href={`/memorial/${m.id}`} className="card" key={m.id}>
                 <StatusBadge status={m.status} />
                 <h3 style={{ marginTop: 18 }}>{m.fullName}</h3>
                 <p className="muted">

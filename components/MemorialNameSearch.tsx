@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   collection,
+  documentId,
   getDocs,
   limit as fsLimit,
   orderBy,
@@ -67,20 +68,35 @@ export default function MemorialNameSearch() {
           ),
         );
         if (cancelled) return;
-        const rows: Result[] = snap.docs
+        const raw = snap.docs
           .filter((d) => (d.data() as any).offline !== true)
-          .map((d) => {
-            const data = d.data() as any;
-            return {
-              id: d.id,
-              fullName: data.fullName || '',
-              nickname: data.nickname || undefined,
-              born: data.born,
-              died: data.died,
-              cemeteryName: data.cemetery?.name,
-              address: data.address || undefined,
-            };
-          });
+          .map((d) => ({ id: d.id, data: d.data() as any }));
+
+        // Cemetery name lives on the linked plot — batch-fetch in one `in`
+        // query (max 30 ids; fsLimit above is 8 so we're comfortably under).
+        const plotIds = Array.from(
+          new Set(raw.map((r) => r.data.plotId).filter((v): v is string => typeof v === 'string')),
+        );
+        const cemeteryByPlotId = new Map<string, string>();
+        if (plotIds.length > 0 && db) {
+          const plotsSnap = await getDocs(
+            query(collection(db, 'plots'), where(documentId(), 'in', plotIds)),
+          );
+          for (const p of plotsSnap.docs) {
+            const pd = p.data() as any;
+            if (pd.cemetery?.name) cemeteryByPlotId.set(p.id, pd.cemetery.name);
+          }
+        }
+
+        const rows: Result[] = raw.map(({ id, data }) => ({
+          id,
+          fullName: data.fullName || '',
+          nickname: data.nickname || undefined,
+          born: data.born,
+          died: data.died,
+          cemeteryName: data.plotId ? cemeteryByPlotId.get(data.plotId) : undefined,
+          address: data.address || undefined,
+        }));
         setResults(rows);
         setStatus('ready');
       } catch (err) {

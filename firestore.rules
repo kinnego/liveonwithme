@@ -154,6 +154,16 @@ service cloud.firestore {
       allow update, delete: if isSuperAdmin();
 
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid && resource.data.status != 'live';
+
+      // Audio recordings of the deceased (voicemails, singing, instrument,
+      // etc.). Public read when the parent memorial is live+visible, same as
+      // approved contributions. Owner/co-manager fully controls writes.
+      match /clips/{clipId} {
+        allow read: if canEditMemorialDoc(id)
+          || memorialIsLiveAndVisible(id)
+          || isSuperAdmin();
+        allow create, update, delete: if canEditMemorialDoc(id) || isSuperAdmin();
+      }
     }
 
     // ─── contributions ───────────────────────────────────────────────────────

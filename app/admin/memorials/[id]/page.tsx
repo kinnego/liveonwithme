@@ -497,48 +497,46 @@ export default function AdminMemorialInspector({
       </div>
 
       {/* Location */}
-      {(m.cemetery || plot) && (
+      {plot && (
         <div className="card" style={{ marginTop: 20 }}>
           <div className="eyebrow">Location</div>
-          {m.cemetery && (
+          {plot.cemetery && (
             <>
-              <FieldRow label="Cemetery" value={m.cemetery.name} />
-              <FieldRow label="Address" value={m.cemetery.address} />
-              <FieldRow label="Place ID" value={m.cemetery.placeId} mono />
+              <FieldRow label="Cemetery" value={plot.cemetery.name} />
+              <FieldRow label="Address" value={plot.cemetery.address} />
+              <FieldRow label="Place ID" value={plot.cemetery.placeId} mono />
               <FieldRow
                 label="Coords"
                 value={
-                  m.cemetery.lat != null && m.cemetery.lng != null
-                    ? `${m.cemetery.lat}, ${m.cemetery.lng}`
+                  plot.cemetery.lat != null && plot.cemetery.lng != null
+                    ? `${plot.cemetery.lat}, ${plot.cemetery.lng}`
                     : '—'
                 }
               />
             </>
           )}
-          {plot && (
-            <div style={{ marginTop: 12 }}>
-              <FieldRow label="Plot ID" value={plot.id} mono />
-              <FieldRow label="Plot name" value={plot.name || '—'} />
-              <FieldRow label="Plot short id" value={plot.shortId} mono />
-              <FieldRow
-                label={plotAdmins(plot).length > 1 ? 'Plot admins' : 'Plot admin'}
-                value={plotAdmins(plot).join(', ') || '—'}
-                mono
-              />
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-                <Link href={`/plot/${plot.id}`} target="_blank" rel="noopener" className="button secondary small">
-                  Open plot page ↗
-                </Link>
-                <Link href={`/plot/${plot.id}/artwork`} target="_blank" rel="noopener" className="button secondary small">
-                  Open artwork ↗
-                </Link>
-              </div>
-              <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
-                Opens the same tools the custodian uses. Changes you make (shape, custom mark,
-                bottom text) are logged against your account in the audit trail.
-              </p>
+          <div style={{ marginTop: 12 }}>
+            <FieldRow label="Plot ID" value={plot.id} mono />
+            <FieldRow label="Plot name" value={plot.name || '—'} />
+            <FieldRow label="Plot short id" value={plot.shortId} mono />
+            <FieldRow
+              label={plotAdmins(plot).length > 1 ? 'Plot admins' : 'Plot admin'}
+              value={plotAdmins(plot).join(', ') || '—'}
+              mono
+            />
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+              <Link href={`/plot/${plot.id}`} target="_blank" rel="noopener" className="button secondary small">
+                Open plot page ↗
+              </Link>
+              <Link href={`/plot/${plot.id}/artwork`} target="_blank" rel="noopener" className="button secondary small">
+                Open artwork ↗
+              </Link>
             </div>
-          )}
+            <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+              Opens the same tools the custodian uses. Changes you make (shape, custom mark,
+              bottom text) are logged against your account in the audit trail.
+            </p>
+          </div>
         </div>
       )}
 
