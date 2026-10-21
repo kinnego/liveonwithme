@@ -251,7 +251,7 @@ export default function PlotManagePage({
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <Link href="/dashboard" className="button secondary">
-              ← Dashboard
+              Dashboard
             </Link>
             <Link href={`/plot/${plot.id}`} className="button secondary">
               View plot page

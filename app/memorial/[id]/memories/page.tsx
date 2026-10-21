@@ -189,7 +189,7 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
           </p>
         </div>
         <Link href={`/memorial/${m.id}`} className="button secondary">
-          ← Back
+          Back
         </Link>
       </div>
 

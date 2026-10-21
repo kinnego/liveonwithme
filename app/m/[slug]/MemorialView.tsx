@@ -682,12 +682,46 @@ export default function Memorial({
           {(() => {
             const videoId = memorial.songUrl ? parseYoutubeVideoId(memorial.songUrl) : null;
             const label = (memorial.songLabel || '').trim() || DEFAULT_SONG_LABEL;
-            if (!videoId) {
-              return asKeeper ? (
-                <p style={{ marginTop: 12 }}>
+            if (videoId) {
+              return (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                    marginTop: 10,
+                  }}
+                >
+                  <SongPlayer videoId={videoId} label={label} />
+                  {asKeeper && (
+                    <Link
+                      href={`/memorial/${memorial.id}/song`}
+                      className="button soft small"
+                      aria-label="Edit the song"
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: 13,
+                        background: 'rgba(255,255,255,.9)',
+                        color: 'var(--ink)',
+                      }}
+                    >
+                      ✎ Edit
+                    </Link>
+                  )}
+                </div>
+              );
+            }
+            if (asKeeper) {
+              return (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ marginTop: 18 }}
+                >
                   <Link
                     href={`/memorial/${memorial.id}/song`}
-                    onClick={(e) => e.stopPropagation()}
                     className="button soft small"
                     style={{
                       background: 'rgba(255,255,255,.9)',
@@ -696,139 +730,125 @@ export default function Memorial({
                   >
                     ✎ Add a song
                   </Link>
-                </p>
-              ) : null;
+                </div>
+              );
             }
-            return (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 10,
-                  flexWrap: 'wrap',
-                }}
-              >
-                <SongPlayer videoId={videoId} label={label} />
+            return null;
+          })()}
+        </div>
+      </section>
+
+      {(() => {
+        const hasCemetery = !!cemetery?.name;
+        const hasAnything =
+          hasCemetery ||
+          !!plotCoords ||
+          initialSiblings.length > 0 ||
+          asKeeper;
+        if (!hasAnything) return null;
+        return (
+          <section
+            className="heroMeta"
+            style={{
+              maxWidth: 760,
+              margin: '0 auto',
+              padding: '22px 24px 6px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 14,
+            }}
+          >
+            {hasCemetery ? (
+              <p style={{ margin: 0, fontSize: 15, color: 'var(--muted)' }}>
+                Resting at{' '}
+                {cemetery!.placeId ? (
+                  <Link
+                    href={`/cemetery/${encodeURIComponent(cemetery!.placeId!)}?name=${encodeURIComponent(cemetery!.name!)}`}
+                    style={{ textDecoration: 'underline', color: 'var(--ink)' }}
+                  >
+                    {cemetery!.name}
+                  </Link>
+                ) : (
+                  <span style={{ color: 'var(--ink)' }}>{cemetery!.name}</span>
+                )}
                 {asKeeper && (
                   <Link
-                    href={`/memorial/${memorial.id}/song`}
-                    onClick={(e) => e.stopPropagation()}
+                    href={
+                      memorial.plotId
+                        ? `/plot/${memorial.plotId}/manage`
+                        : `/memorial/${memorial.id}/plot/new`
+                    }
                     className="button soft small"
-                    aria-label="Edit the song"
+                    aria-label="Edit the resting place"
                     style={{
-                      marginTop: 16,
+                      marginLeft: 10,
                       padding: '4px 10px',
                       fontSize: 13,
-                      background: 'rgba(255,255,255,.9)',
-                      color: 'var(--ink)',
+                      verticalAlign: 'middle',
                     }}
                   >
                     ✎ Edit
                   </Link>
                 )}
-              </div>
-            );
-          })()}
-          {cemetery?.name ? (
-            <p style={{ marginTop: 12, fontSize: 15, opacity: 0.9 }}>
-              Resting at{' '}
-              {cemetery.placeId ? (
-                <Link
-                  href={`/cemetery/${encodeURIComponent(cemetery.placeId)}?name=${encodeURIComponent(cemetery.name)}`}
-                  style={{ textDecoration: 'underline', color: 'inherit' }}
-                >
-                  {cemetery.name}
-                </Link>
-              ) : (
-                cemetery.name
-              )}
-              {asKeeper && (
-                <Link
-                  href={
-                    memorial.plotId
-                      ? `/plot/${memorial.plotId}/manage`
-                      : `/memorial/${memorial.id}/plot/new`
-                  }
-                  onClick={(e) => e.stopPropagation()}
-                  className="button soft small"
-                  aria-label="Edit the resting place"
-                  style={{
-                    marginLeft: 10,
-                    padding: '4px 10px',
-                    fontSize: 13,
-                    background: 'rgba(255,255,255,.9)',
-                    color: 'var(--ink)',
-                    verticalAlign: 'middle',
-                  }}
-                >
-                  ✎ Edit
-                </Link>
-              )}
-            </p>
-          ) : asKeeper && !memorial.plotId ? (
-            <p style={{ marginTop: 12 }}>
+              </p>
+            ) : asKeeper && !memorial.plotId ? (
               <Link
                 href={`/memorial/${memorial.id}/plot/new`}
-                onClick={(e) => e.stopPropagation()}
                 className="button soft small"
-                style={{
-                  background: 'rgba(255,255,255,.9)',
-                  color: 'var(--ink)',
-                }}
               >
                 ✎ Add a resting place
               </Link>
-            </p>
-          ) : null}
-          {plotCoords && (
-            <p style={{ marginTop: 8, fontSize: 14, opacity: 0.9 }}>
-              <a
-                href={walkingDirectionsUrl(plotCoords)}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  color: 'inherit',
-                  textDecoration: 'underline',
-                  fontWeight: 600,
-                }}
-              >
-                Directions to the grave →
-              </a>
-            </p>
-          )}
-          {initialSiblings.length === 1 && (
-            <p style={{ marginTop: 8, fontSize: 14, opacity: 0.9 }}>
-              Also resting here:{' '}
-              <Link
-                href={`/m/${initialSiblings[0].slug}`}
-                style={{
-                  color: 'inherit',
-                  textDecoration: 'underline',
-                  fontWeight: 600,
-                }}
-              >
-                {initialSiblings[0].fullName} →
-              </Link>
-            </p>
-          )}
-          {initialSiblings.length > 1 && memorial.plotId && (
-            <p style={{ marginTop: 8, fontSize: 14, opacity: 0.9 }}>
-              <Link
-                href={`/plot/${memorial.plotId}`}
-                style={{
-                  color: 'inherit',
-                  textDecoration: 'underline',
-                  fontWeight: 600,
-                }}
-              >
-                Also resting here: {initialSiblings.length} others →
-              </Link>
-            </p>
-          )}
-        </div>
-      </section>
+            ) : null}
+            {plotCoords && (
+              <p style={{ margin: 0, fontSize: 14 }}>
+                <a
+                  href={walkingDirectionsUrl(plotCoords)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: 'var(--sage)',
+                    textDecoration: 'underline',
+                    fontWeight: 600,
+                  }}
+                >
+                  Directions to the grave →
+                </a>
+              </p>
+            )}
+            {initialSiblings.length === 1 && (
+              <p style={{ margin: 0, fontSize: 14, color: 'var(--muted)' }}>
+                Also resting here:{' '}
+                <Link
+                  href={`/m/${initialSiblings[0].slug}`}
+                  style={{
+                    color: 'var(--ink)',
+                    textDecoration: 'underline',
+                    fontWeight: 600,
+                  }}
+                >
+                  {initialSiblings[0].fullName} →
+                </Link>
+              </p>
+            )}
+            {initialSiblings.length > 1 && memorial.plotId && (
+              <p style={{ margin: 0, fontSize: 14 }}>
+                <Link
+                  href={`/plot/${memorial.plotId}`}
+                  style={{
+                    color: 'var(--sage)',
+                    textDecoration: 'underline',
+                    fontWeight: 600,
+                  }}
+                >
+                  Also resting here: {initialSiblings.length} others →
+                </Link>
+              </p>
+            )}
+          </section>
+        );
+      })()}
 
       <nav className="memorialNav" aria-label="Memorial sections">
         <a href="#story">
@@ -856,6 +876,14 @@ export default function Memorial({
             <span>Recordings</span>
           </a>
         )}
+        {hasMemories && (
+          <a href="#memories">
+            <svg className="navIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+            </svg>
+            <span>Memories</span>
+          </a>
+        )}
         {hasPhotos && (
           <a href="#photos">
             <svg className="navIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -863,14 +891,6 @@ export default function Memorial({
               <circle cx="12" cy="13" r="3.5" />
             </svg>
             <span>Photos</span>
-          </a>
-        )}
-        {hasMemories && (
-          <a href="#memories">
-            <svg className="navIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
-            </svg>
-            <span>Memories</span>
           </a>
         )}
         {!isPreview && (
@@ -1012,70 +1032,6 @@ export default function Memorial({
         </section>
       )}
 
-      {showPhotos && (
-        <section id="photos" className="section">
-          <div className="eyebrow center">Photos</div>
-          <h2 className="center">Moments worth keeping</h2>
-          <div className={`gallery ${memorial.galleryDisplayMode === 'natural' ? 'natural' : ''}`}>
-            {photos.length ? (
-              photos.map((x) => (
-                <button
-                  type="button"
-                  className="photo"
-                  key={x.id}
-                  onClick={() => openLightboxByKey(x.id)}
-                  aria-label={x.caption || `Open photograph of ${memorial.fullName}`}
-                  style={{ padding: 0, border: 0, cursor: 'pointer' }}
-                >
-                  {photoUrls[x.id] && (
-                    <img
-                      src={photoUrls[x.id]}
-                      alt={x.caption || `A memory of ${memorial.fullName}`}
-                      style={{
-                        objectPosition: `${(x.focalX ?? 0.5) * 100}% ${(x.focalY ?? 0.5) * 100}%`,
-                      }}
-                    />
-                  )}
-                </button>
-              ))
-            ) : (
-              <>
-                <div className="photo"></div>
-                <div className="photo"></div>
-                <div className="photo"></div>
-              </>
-            )}
-          </div>
-          {photos.length === 0 && asKeeper ? (
-            <div className="center" style={{ marginTop: 24 }}>
-              <p className="muted">
-                No photographs yet. This is where family favourites will live.
-              </p>
-              <Link
-                href={`/memorial/${memorial.id}/gallery`}
-                className="button secondary small"
-                style={{ marginTop: 10 }}
-              >
-                Open gallery
-              </Link>
-            </div>
-          ) : (
-            <>
-              <p className="muted center">
-                Photographs shared by family and friends only appear here after family approval.
-              </p>
-              {asKeeper && photos.length > 0 && (
-                <div style={{ textAlign: 'center', marginTop: 16 }}>
-                  <Link href={`/memorial/${memorial.id}/gallery`} className="button soft small">
-                    ✎ Open gallery
-                  </Link>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-      )}
-
       {showMemories && (
       <section id="memories" className="section center">
         <div className="eyebrow">{memoriesEyebrow}</div>
@@ -1178,6 +1134,64 @@ export default function Memorial({
           </div>
         )}
       </section>
+      )}
+
+      {showPhotos && (
+        <section id="photos" className="section">
+          <div className="eyebrow center">Photos</div>
+          <h2 className="center">Moments worth keeping</h2>
+          {photos.length > 0 && (
+            <div className={`gallery ${memorial.galleryDisplayMode === 'natural' ? 'natural' : ''}`}>
+              {photos.map((x) => (
+                <button
+                  type="button"
+                  className="photo"
+                  key={x.id}
+                  onClick={() => openLightboxByKey(x.id)}
+                  aria-label={x.caption || `Open photograph of ${memorial.fullName}`}
+                  style={{ padding: 0, border: 0, cursor: 'pointer' }}
+                >
+                  {photoUrls[x.id] && (
+                    <img
+                      src={photoUrls[x.id]}
+                      alt={x.caption || `A memory of ${memorial.fullName}`}
+                      style={{
+                        objectPosition: `${(x.focalX ?? 0.5) * 100}% ${(x.focalY ?? 0.5) * 100}%`,
+                      }}
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          {photos.length === 0 && asKeeper ? (
+            <div className="center" style={{ marginTop: 24 }}>
+              <p className="muted">
+                No photographs yet. This is where family favourites will live.
+              </p>
+              <Link
+                href={`/memorial/${memorial.id}/gallery`}
+                className="button secondary small"
+                style={{ marginTop: 10 }}
+              >
+                Add photos
+              </Link>
+            </div>
+          ) : (
+            <>
+              <p className="muted center">
+                Photographs shared by family and friends only appear here after family approval.
+              </p>
+              {asKeeper && photos.length > 0 && (
+                <div style={{ textAlign: 'center', marginTop: 16 }}>
+                  <Link href={`/memorial/${memorial.id}/gallery`} className="button soft small">
+                    ✎ Open gallery
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+        </section>
       )}
 
       {!isPreview && memorial.id === 'demo' && (
@@ -1423,7 +1437,7 @@ export default function Memorial({
           href={`/m/${memorial.id}`}
           style={{
             position: 'fixed',
-            left: 20,
+            right: 20,
             bottom: 76,
             zIndex: 60,
             display: 'inline-flex',
@@ -1453,11 +1467,38 @@ export default function Memorial({
               ? `/memorial/${memorial.id}/manage`
               : `/memorial/${memorial.id}`
           }
-          aria-label={mode === 'keeper' ? 'Advanced settings' : 'Open draft'}
+          aria-label={mode === 'keeper' ? 'Advanced settings' : 'Edit memorial'}
           style={{ left: 'auto', right: 20 }}
         >
           <span aria-hidden>✎</span>
-          <span>{mode === 'keeper' ? 'Advanced settings' : 'Open draft'}</span>
+          <span>{mode === 'keeper' ? 'Advanced settings' : 'Edit memorial'}</span>
+        </Link>
+      )}
+
+      {isKeeper && mode !== 'keeper' && memorial.status !== 'live' && (
+        <Link
+          href={`/memorial/${memorial.id}/manage#go-live`}
+          aria-label="Go live"
+          style={{
+            position: 'fixed',
+            left: 20,
+            bottom: 20,
+            zIndex: 60,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            background: 'var(--sage)',
+            color: 'white',
+            padding: '12px 20px',
+            borderRadius: 999,
+            boxShadow: 'var(--shadow)',
+            fontSize: 15,
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          <span aria-hidden>✦</span>
+          <span>Go live</span>
         </Link>
       )}
 

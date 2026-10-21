@@ -47,7 +47,6 @@ export default function Dashboard() {
   const [owned, setOwned] = useState<any[]>([]);
   const [nominated, setNominated] = useState<any[]>([]);
   const [coManaging, setCoManaging] = useState<any[]>([]);
-  const [plots, setPlots] = useState<any[]>([]);
   const [userEmail, setUserEmail] = useState<string>('');
   const [deleteInput, setDeleteInput] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -65,16 +64,13 @@ export default function Dashboard() {
     let stopOwned: (() => void) | undefined;
     let stopNominated: (() => void) | undefined;
     let stopCoManaging: (() => void) | undefined;
-    let stopPlots: (() => void) | undefined;
     const teardownListeners = () => {
       stopOwned?.();
       stopNominated?.();
       stopCoManaging?.();
-      stopPlots?.();
       stopOwned = undefined;
       stopNominated = undefined;
       stopCoManaging = undefined;
-      stopPlots = undefined;
     };
     const stopAuth = onAuthStateChanged(auth, (u) => {
       // Always tear down first: on signout the old listeners would re-evaluate
@@ -84,7 +80,6 @@ export default function Dashboard() {
         setOwned([]);
         setNominated([]);
         setCoManaging([]);
-        setPlots([]);
         setUserEmail('');
         router.push('/auth');
         return;
@@ -116,16 +111,6 @@ export default function Dashboard() {
         query(collection(db, 'memorials'), where('coManagerUids', 'array-contains', u.uid)),
         (s) => setCoManaging(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => setCoManaging([])
-      );
-      // Plots the user administers. Legacy single-admin plot docs
-      // (plotAdminUid, not plotAdminUids) aren't returned by this
-      // array-contains query — rare in practice; those still work via the
-      // memorial manage page's "Manage this plot" link once the memorial
-      // doc is open.
-      stopPlots = onSnapshot(
-        query(collection(db, 'plots'), where('plotAdminUids', 'array-contains', u.uid)),
-        (s) => setPlots(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
-        () => setPlots([]),
       );
     });
     return () => {
@@ -250,11 +235,7 @@ export default function Dashboard() {
       ) : (
         <div className="featureGrid">
           {owned.map((m) => (
-            <Link
-              href={`/memorial/${m.id}`}
-              className="card"
-              key={m.id}
-            >
+            <article className="card" key={m.id}>
               <StatusBadge status={m.status} />
               <h3 style={{ marginTop: 18 }}>{m.fullName}</h3>
               <p className="muted">
@@ -262,37 +243,19 @@ export default function Dashboard() {
                   ? m.born?.slice(0, 4) || 'A legacy page'
                   : `${m.born?.slice(0, 4) || ''}${m.died ? ` — ${m.died.slice(0, 4)}` : ''}`}
               </p>
-              <span>Manage {m.kind === 'legacy' ? 'page' : 'memorial'} →</span>
-            </Link>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+                <Link href={`/memorial/${m.id}`} className="button secondary small">
+                  Manage {m.kind === 'legacy' ? 'page' : 'memorial'}
+                </Link>
+                {m.plotId && (
+                  <Link href={`/plot/${m.plotId}/manage`} className="button secondary small">
+                    Resting place
+                  </Link>
+                )}
+              </div>
+            </article>
           ))}
         </div>
-      )}
-
-      {plots.length > 0 && (
-        <section style={{ marginTop: 40 }}>
-          <div className="eyebrow">Resting places</div>
-          <h3 style={{ marginTop: 6 }}>Plots you look after</h3>
-          <p className="muted" style={{ marginBottom: 20 }}>
-            The physical grave — one QR code, many memorials. Manage the plaque, the grave pin, and who&rsquo;s remembered here.
-          </p>
-          <div className="featureGrid">
-            {plots.map((p) => (
-              <Link
-                href={`/plot/${p.id}/manage`}
-                className="card"
-                key={p.id}
-              >
-                <h3 style={{ marginTop: 0 }}>
-                  {p.name || p.cemetery?.name || 'A resting place'}
-                </h3>
-                <p className="muted">
-                  {p.name && p.cemetery?.name ? p.cemetery.name : p.cemetery?.address || ''}
-                </p>
-                <span>Manage plot →</span>
-              </Link>
-            ))}
-          </div>
-        </section>
       )}
 
       {coManaging.length > 0 && (

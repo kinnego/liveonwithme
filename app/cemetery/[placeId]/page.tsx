@@ -13,7 +13,8 @@ import {
   submitCemeteryReport,
   updateCustomCemeteryName,
 } from '@/lib/cemeteries';
-import type { Cemetery, CustomCemetery } from '@/lib/types';
+import { isApprovedPartner, isSuperAdmin } from '@/lib/roles';
+import type { Cemetery, CustomCemetery, UserProfile } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,8 +74,28 @@ export default function CemeteryPage({
   const [customError, setCustomError] = useState('');
   const [error, setError] = useState('');
   const [user, setUser] = useState<User | null>(null);
+  const [canSeeArtwork, setCanSeeArtwork] = useState(false);
 
   useEffect(() => onAuthStateChanged(auth, (u) => setUser(u)), []);
+
+  // Partners and super admins get a cemetery-level artwork link. Non-signed-in
+  // visitors and ordinary keepers don't see it — the artwork is a cemetery
+  // operator tool, not a public download.
+  useEffect(() => {
+    if (!user || !db) {
+      setCanSeeArtwork(false);
+      return;
+    }
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        const prof = snap.exists() ? (snap.data() as UserProfile) : null;
+        setCanSeeArtwork(isSuperAdmin(prof) || isApprovedPartner(prof));
+      } catch {
+        setCanSeeArtwork(false);
+      }
+    })();
+  }, [user]);
 
   useEffect(() => {
     if (!isCustom) return;
@@ -208,7 +229,7 @@ export default function CemeteryPage({
   return (
     <main className="shell">
       <div style={{ marginBottom: 14 }}>
-        <Link href="/cemetery/nearby" className="button secondary small">← Cemeteries nearby</Link>
+        <Link href="/cemetery/nearby" className="button secondary small">Cemeteries nearby</Link>
       </div>
       <div className="eyebrow">Find someone</div>
       <h1 style={{ marginBottom: 8 }}>{cemeteryName}</h1>
@@ -216,6 +237,23 @@ export default function CemeteryPage({
         <p className="muted" style={{ marginTop: 0, marginBottom: 24 }}>
           {cemeteryAddress}
         </p>
+      )}
+
+      {canSeeArtwork && (
+        <div style={{ marginBottom: 24 }}>
+          <Link
+            href={`/cemetery/${placeId}/artwork${
+              cemeteryName
+                ? `?name=${encodeURIComponent(cemeteryName)}${
+                    cemeteryAddress ? `&address=${encodeURIComponent(cemeteryAddress)}` : ''
+                  }`
+                : ''
+            }`}
+            className="button secondary small"
+          >
+            Download cemetery artwork
+          </Link>
+        </div>
       )}
 
       {isCustom && custom && (

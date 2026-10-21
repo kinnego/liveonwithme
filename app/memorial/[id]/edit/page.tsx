@@ -131,7 +131,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
       <div className="formCard">
         <div style={{ marginBottom: 14 }}>
           <Link href={`/memorial/${m.id}`} className="button secondary small">
-            ← Back
+            Back
           </Link>
         </div>
         <div className="eyebrow">Edit {pageWord}</div>

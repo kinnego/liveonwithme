@@ -630,7 +630,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <Link href="/dashboard" className="button secondary">
-            ← Dashboard
+            Dashboard
           </Link>
           <Link href={`/m/${m.slug}`} className="button secondary">
             {isLive ? `View ${pageWord}` : 'Preview'}
@@ -847,11 +847,13 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
       {/* Go Live section */}
       {isOwner && !isLive && (
         <div
+          id="go-live"
           className="card"
           style={{
             marginBottom: 30,
             background: 'linear-gradient(135deg, #fffdf9, #f0e8d8)',
             borderColor: '#e0c890',
+            scrollMarginTop: 80,
           }}
         >
           <div className="eyebrow">Ready when you are</div>

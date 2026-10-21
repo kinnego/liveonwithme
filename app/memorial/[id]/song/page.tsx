@@ -48,7 +48,7 @@ export default function MemorialSongPage({ params }: { params: Promise<{ id: str
           </p>
         </div>
         <Link href={`/memorial/${m.id}`} className="button secondary">
-          ← Back
+          Back
         </Link>
       </div>
 

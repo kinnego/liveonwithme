@@ -101,7 +101,7 @@ export default function NewPlotForMemorial({
       <div className="formCard">
         <div style={{ marginBottom: 14 }}>
           <Link href={`/memorial/${m.id}`} className="button secondary small">
-            ← Back
+            Back
           </Link>
         </div>
         <div className="eyebrow">The resting place</div>

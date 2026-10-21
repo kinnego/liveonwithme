@@ -95,7 +95,7 @@ export default function SuccessionRequest() {
   return (
     <main className="shell">
       <div style={{ maxWidth: 690, margin: '0 auto 10px' }}>
-        <a href="/dashboard" className="button secondary small">← Dashboard</a>
+        <a href="/dashboard" className="button secondary small">Dashboard</a>
       </div>
       <div className="formCard">
         <div className="eyebrow">Need help</div>

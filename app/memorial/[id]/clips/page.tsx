@@ -148,7 +148,7 @@ export default function MemorialClipsPage({ params }: { params: Promise<{ id: st
           </p>
         </div>
         <Link href={`/memorial/${m.id}`} className="button secondary">
-          ← Back
+          Back
         </Link>
       </div>
 
