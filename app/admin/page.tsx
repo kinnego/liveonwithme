@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default function AdminHome() {
   const [state, setState] = useState<'checking' | 'ok' | 'denied'>('checking');
+  const [orphanCount, setOrphanCount] = useState<{ total: number; due: number } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -21,7 +22,25 @@ export default function AdminHome() {
       if (!u) return router.push('/auth');
       const snap = await getDoc(doc(db, 'users', u.uid));
       const prof = snap.exists() ? (snap.data() as UserProfile) : null;
-      setState(isSuperAdmin(prof) ? 'ok' : 'denied');
+      const admin = isSuperAdmin(prof);
+      setState(admin ? 'ok' : 'denied');
+      if (!admin) return;
+      try {
+        const token = await u.getIdToken();
+        const res = await fetch('/api/admin/orphans/list', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const now = Date.now();
+          const due = (data.orphans || []).filter(
+            (o: any) => o.pendingDeletionAt && new Date(o.pendingDeletionAt).getTime() <= now,
+          ).length;
+          setOrphanCount({ total: data.orphans?.length || 0, due });
+        }
+      } catch {
+        // non-blocking; the orphan card still renders without a count
+      }
     });
   }, [router]);
 
@@ -37,6 +56,15 @@ export default function AdminHome() {
       </main>
     );
   }
+
+  const orphanBlurb =
+    orphanCount === null
+      ? 'Orphans awaiting review after an owner deletes their account.'
+      : orphanCount.due > 0
+        ? `${orphanCount.due} due for review${orphanCount.total > orphanCount.due ? ` · ${orphanCount.total - orphanCount.due} snoozed` : ''}.`
+        : orphanCount.total > 0
+          ? `${orphanCount.total} snoozed, none due yet.`
+          : 'No orphans awaiting review.';
 
   return (
     <main className="shell">
@@ -67,6 +95,29 @@ export default function AdminHome() {
         <Link href="/admin/reports" className="card" style={{ display: 'block' }}>
           <h3>Reported memories</h3>
           <p className="muted">Review visitor reports on contributions to public memorials.</p>
+        </Link>
+        <Link href="/admin/orphans" className="card" style={{ display: 'block', position: 'relative' }}>
+          <h3>
+            Orphaned memorials
+            {orphanCount && orphanCount.due > 0 && (
+              <span
+                style={{
+                  display: 'inline-block',
+                  marginLeft: 8,
+                  background: '#b2432b',
+                  color: 'white',
+                  borderRadius: 999,
+                  padding: '2px 10px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  verticalAlign: 'middle',
+                }}
+              >
+                {orphanCount.due}
+              </span>
+            )}
+          </h3>
+          <p className="muted">{orphanBlurb}</p>
         </Link>
         <Link href="/admin/config" className="card" style={{ display: 'block' }}>
           <h3>Pricing &amp; media quotas</h3>

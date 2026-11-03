@@ -11,6 +11,7 @@ import type { Memorial } from '@/lib/types';
 import { canEditMemorial } from '@/lib/roles';
 import { pronounsFor, capitalize } from '@/lib/pronouns';
 import { PageSkeleton } from '@/components/Skeleton';
+import GalleryManager from '@/components/GalleryManager';
 
 export const dynamic = 'force-dynamic';
 
@@ -269,6 +270,14 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
             </Link>
           </div>
         </form>
+      </div>
+
+      <div className="formCard" style={{ marginTop: 20 }}>
+        <h3 style={{ marginTop: 0 }}>Photographs</h3>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Add a batch of photographs and star up to four favourites to highlight on the {pageWord}.
+        </p>
+        <GalleryManager memorialId={m.id} variant="inline" />
       </div>
 
     </main>
