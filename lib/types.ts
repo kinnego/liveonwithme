@@ -180,6 +180,11 @@ export interface Memorial {
   galleryDisplayMode?: GalleryDisplayMode;
   heroPhotoUrl?: string;
   heroPhotoPath?: string;
+  // True when the upload pipeline has written .400.webp + .800.webp variants
+  // alongside the original. Lets the public page serve a right-sized image
+  // via srcset instead of the full-resolution original.
+  heroPhotoVariants?: boolean;
+  heroPhotoSize?: number;
   epitaph?: string;
   story?: string;
   gender?: Gender;
@@ -240,6 +245,7 @@ export interface Contribution {
   memory?: string;
   photoUrl?: string;
   photoPath?: string;
+  photoVariants?: boolean;
   audioPath?: string;
   audioMimeType?: string;
   caption?: string;

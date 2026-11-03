@@ -304,7 +304,7 @@ function CreateInner() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Upload failed');
-    return data as { path: string; sizeBytes: number };
+    return data as { path: string; variants: boolean; sizeBytes: number };
   }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -395,6 +395,7 @@ function CreateInner() {
         const uploaded = await uploadToR2(optimised, 'memorial-hero', slug);
         await updateDoc(memorialRef, {
           heroPhotoPath: uploaded.path,
+          heroPhotoVariants: uploaded.variants,
           heroPhotoSize: uploaded.sizeBytes,
           updatedAt: serverTimestamp(),
         });

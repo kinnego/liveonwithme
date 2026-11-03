@@ -88,7 +88,7 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Upload failed');
-    return data as { path: string; sizeBytes: number };
+    return data as { path: string; variants: boolean; sizeBytes: number };
   }
 
   async function refreshMemorial() {
@@ -117,6 +117,7 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
           relationship: '',
           memory: '',
           photoPath: uploaded.path,
+          photoVariants: uploaded.variants,
           caption: '',
           status: 'approved',
           source: 'family',
@@ -313,6 +314,8 @@ export default function Gallery({ params }: { params: Promise<{ id: string }> })
                   <img
                     src={`${R2_PUBLIC_URL}/${p.photoPath}`}
                     alt={p.caption || 'Memory photograph'}
+                    loading="lazy"
+                    decoding="async"
                     style={{
                       display: 'block',
                       width: '100%',

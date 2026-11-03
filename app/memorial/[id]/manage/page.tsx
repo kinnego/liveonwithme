@@ -67,7 +67,7 @@ function ContributionPhoto({ path }: { path: string }) {
       title="Open photo in a new tab"
       style={{ display: 'block', cursor: 'zoom-in' }}
     >
-      <img src={url} alt="Submitted photo" />
+      <img src={url} alt="Submitted photo" loading="lazy" decoding="async" />
     </a>
   );
 }

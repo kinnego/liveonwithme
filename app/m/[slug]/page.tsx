@@ -149,6 +149,14 @@ export default async function Page({
   const siblings =
     m && m.plotId && m.id ? await loadSiblings(m.plotId, m.id) : [];
 
+  const heroUrl =
+    m?.heroPhotoUrl ||
+    (m?.heroPhotoPath && R2_PUBLIC_URL
+      ? m.heroPhotoVariants
+        ? `${R2_PUBLIC_URL}/${m.heroPhotoPath}.800.webp`
+        : `${R2_PUBLIC_URL}/${m.heroPhotoPath}`
+      : undefined);
+
   const jsonLd = m
     ? {
         '@context': 'https://schema.org',
@@ -158,12 +166,18 @@ export default async function Page({
         birthDate: m.born || undefined,
         deathDate: m.died || undefined,
         url: `${SITE_URL}/m/${slug}`,
-        image: m.heroPhotoUrl || (m.heroPhotoPath ? `${R2_PUBLIC_URL}/${m.heroPhotoPath}` : undefined),
+        image: heroUrl,
       }
     : null;
 
   return (
     <>
+      {heroUrl && (
+        // React 19 hoists this <link> into <head>; the browser fetches the
+        // hero at high priority instead of waiting for the CSS background
+        // to be discovered.
+        <link rel="preload" as="image" href={heroUrl} fetchPriority="high" />
+      )}
       {jsonLd && (
         <script
           type="application/ld+json"

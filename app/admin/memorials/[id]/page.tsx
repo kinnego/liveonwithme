@@ -379,6 +379,8 @@ export default function AdminMemorialInspector({
             <img
               src={heroUrl}
               alt=""
+              loading="lazy"
+              decoding="async"
               style={{
                 width: 180,
                 height: 180,

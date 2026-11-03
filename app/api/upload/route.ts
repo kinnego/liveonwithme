@@ -21,6 +21,7 @@ import { readQuotasAdmin } from '@/lib/config-admin';
 import { summariseMemorialUsage } from '@/lib/quota-admin';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
+import { generateImageVariants } from '@/lib/image-variants';
 
 export const runtime = 'nodejs';
 
@@ -276,9 +277,16 @@ export async function POST(req: NextRequest) {
       })
     );
 
+    const variants = await generateImageVariants({
+      originalKey: key,
+      buffer,
+      mimeType: detected.mime,
+    });
+
     return NextResponse.json({
       success: true,
       path: key,
+      variants,
       sizeBytes: file.size,
       contentType: detected.mime,
     });

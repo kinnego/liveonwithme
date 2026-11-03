@@ -17,6 +17,7 @@ import { auth, db } from '@/lib/firebase';
 import { walkingDirectionsUrl } from '@/lib/plot';
 import { parseYoutubeVideoId, DEFAULT_SONG_LABEL } from '@/lib/song';
 import { resizeForMobile } from '@/lib/image';
+import { photoSrc, photoSrcSet } from '@/lib/images';
 import { canEditMemorial } from '@/lib/roles';
 import { pronounsFor, capitalize } from '@/lib/pronouns';
 import { PageSkeleton } from '@/components/Skeleton';
@@ -199,7 +200,11 @@ export default function Memorial({
     if (!initialMemorial) return '';
     if (initialMemorial.heroPhotoUrl) return initialMemorial.heroPhotoUrl;
     if (initialMemorial.heroPhotoPath && R2_PUBLIC_URL) {
-      return `${R2_PUBLIC_URL}/${initialMemorial.heroPhotoPath}`;
+      return photoSrc(
+        initialMemorial.heroPhotoPath,
+        initialMemorial.heroPhotoVariants,
+        800,
+      );
     }
     return '';
   });
@@ -355,7 +360,7 @@ export default function Memorial({
       setMemorial(data);
       setIsPreview((!isLive || isOffline) && isOwner);
       if (data.heroPhotoPath) {
-        setHero(`${R2_PUBLIC_URL}/${data.heroPhotoPath}`);
+        setHero(photoSrc(data.heroPhotoPath, data.heroPhotoVariants, 800));
       }
 
       if (data.plotId) {
@@ -467,7 +472,7 @@ export default function Memorial({
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Upload failed');
-    return data as { path: string; sizeBytes: number };
+    return data as { path: string; variants: boolean; sizeBytes: number };
   }
 
   async function contribute(e: FormEvent<HTMLFormElement>) {
@@ -480,6 +485,7 @@ export default function Memorial({
     const fd = new FormData(e.currentTarget);
     const photo = fd.get('photo') as File;
     let photoPath = '';
+    let photoVariants = false;
     let sizeBytes = 0;
 
     if (photo?.size) {
@@ -487,6 +493,7 @@ export default function Memorial({
       try {
         const uploaded = await uploadContribution(optimised, memorial.id);
         photoPath = uploaded.path;
+        photoVariants = uploaded.variants;
         sizeBytes = uploaded.sizeBytes;
       } catch (err: any) {
         alert(err.message || 'We couldn\u2019t save that photo. Please try again.');
@@ -503,6 +510,7 @@ export default function Memorial({
       memory: String(fd.get('memory') || ''),
       caption: String(fd.get('caption') || ''),
       photoPath,
+      photoVariants,
       status: 'pending',
       audience,
       mediaType: photoPath ? 'photo' : 'text',
@@ -1010,7 +1018,11 @@ export default function Memorial({
                 {photoUrls[x.id] && (
                   <img
                     src={photoUrls[x.id]}
+                    srcSet={photoSrcSet((x as any).photoPath, (x as any).photoVariants)}
+                    sizes="(max-width: 800px) 50vw, 260px"
                     alt={x.caption || `A memory of ${memorial.fullName}`}
+                    loading="lazy"
+                    decoding="async"
                     style={{
                       width: '100%',
                       height: '100%',
@@ -1060,7 +1072,11 @@ export default function Memorial({
                 >
                   <img
                     src={photoUrls[x.id]}
+                    srcSet={photoSrcSet((x as any).photoPath, (x as any).photoVariants)}
+                    sizes="(max-width: 520px) 100vw, 520px"
                     alt={`A memory shared by ${x.contributorName}`}
+                    loading="lazy"
+                    decoding="async"
                     style={{ width: '100%', height: 'auto', display: 'block' }}
                   />
                 </button>
@@ -1154,7 +1170,11 @@ export default function Memorial({
                   {photoUrls[x.id] && (
                     <img
                       src={photoUrls[x.id]}
+                      srcSet={photoSrcSet((x as any).photoPath, (x as any).photoVariants)}
+                      sizes="(max-width: 800px) 100vw, 343px"
                       alt={x.caption || `A memory of ${memorial.fullName}`}
+                      loading="lazy"
+                      decoding="async"
                       style={{
                         objectPosition: `${(x.focalX ?? 0.5) * 100}% ${(x.focalY ?? 0.5) * 100}%`,
                       }}

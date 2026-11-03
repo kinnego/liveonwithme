@@ -57,7 +57,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Photo upload failed');
-    return data as { path: string; sizeBytes: number };
+    return data as { path: string; variants: boolean; sizeBytes: number };
   }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -102,6 +102,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
         const optimised = await resizeForMobile(photo);
         const uploaded = await uploadToR2(optimised, 'memorial-hero', m.id);
         updates.heroPhotoPath = uploaded.path;
+        updates.heroPhotoVariants = uploaded.variants;
         updates.heroPhotoSize = uploaded.sizeBytes;
       }
 
@@ -222,6 +223,8 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
               <img
                 src={heroUrl}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 style={{
                   width: 140,
                   height: 140,

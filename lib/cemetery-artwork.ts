@@ -161,7 +161,7 @@ export function buildCemeteryPosterSvg(input: CemeteryArtworkInput): string {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">` +
       `<rect x="0" y="0" width="${W}" height="${H}" fill="#fffdf9"/>` +
       `<rect x="24" y="24" width="${W - 48}" height="${H - 48}" rx="18" ry="18" fill="none" stroke="#e8e1d7" stroke-width="2"/>` +
-      `<text x="${W / 2}" y="110" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="12" letter-spacing="4" fill="#688076">RESTING HERE</text>` +
+      `<text x="${W / 2}" y="110" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="12" letter-spacing="4" fill="#688076">REMEMBERED HERE</text>` +
       `<text x="${W / 2}" y="160" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="38" fill="#25312d">${escapeXml(name)}</text>` +
       addrSvg +
       `<svg x="${qrX}" y="${qrY}" width="${qrSize}" height="${qrSize}" viewBox="${qrVb}" preserveAspectRatio="xMidYMid meet">${qrInnerNodes}</svg>` +
@@ -199,7 +199,7 @@ export function buildCemeteryCardSvg(input: CemeteryArtworkInput): string {
       `<rect x="0" y="0" width="${W}" height="${H}" rx="12" ry="12" fill="#fffdf9"/>` +
       `<rect x="6" y="6" width="${W - 12}" height="${H - 12}" rx="8" ry="8" fill="none" stroke="#e8e1d7" stroke-width="1.5"/>` +
       `<svg x="${qrX}" y="${qrY}" width="${qrSize}" height="${qrSize}" viewBox="${qrVb}" preserveAspectRatio="xMidYMid meet">${qrInnerNodes}</svg>` +
-      `<text x="${textX}" y="${eyebrowY}" font-family="Georgia, 'Times New Roman', serif" font-size="10" letter-spacing="2" fill="#688076">RESTING HERE</text>` +
+      `<text x="${textX}" y="${eyebrowY}" font-family="Georgia, 'Times New Roman', serif" font-size="10" letter-spacing="2" fill="#688076">REMEMBERED HERE</text>` +
       `<text x="${textX}" y="${nameFirstY}" font-family="Georgia, 'Times New Roman', serif" font-size="18" fill="#25312d">${multilineTspans(textX, nameLineHeight, nameLines)}</text>` +
       `<text x="${textX}" y="${taglineFirstY}" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#6d7772">${multilineTspans(textX, taglineLineHeight, taglineLines)}</text>` +
       `<text x="${textX}" y="${H - 18}" font-family="Georgia, serif" font-size="12" font-style="italic" fill="#688076">liveonwith.me</text>` +
