@@ -20,7 +20,7 @@ const csp = [
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob: https:",
   "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com",
-  "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.firebaseapp.com https://accounts.google.com",
+  "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.firebaseapp.com https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com",
   "form-action 'self' https://checkout.stripe.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",

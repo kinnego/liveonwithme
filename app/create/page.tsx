@@ -811,7 +811,7 @@ function CreateInner() {
             defaultValue={draft.gender || 'unspecified'}
             onChange={(e) => persistDraft({ ...draft, gender: e.target.value })}
           >
-            <option value="unspecified">Prefer not to say — "they/them"</option>
+            <option value="unspecified">Prefer not to say</option>
             <option value="female">She / her</option>
             <option value="male">He / him</option>
             <option value="nonbinary">They / them</option>

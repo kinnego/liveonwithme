@@ -1435,6 +1435,27 @@ export default function Memorial({
         </section>
       )}
 
+      {!user && (
+        <section
+          style={{
+            marginTop: 32,
+            padding: '28px 20px',
+            background: 'var(--paper)',
+            border: '1px solid var(--line)',
+            borderRadius: 20,
+            textAlign: 'center',
+          }}
+        >
+          <h3 style={{ marginTop: 0 }}>Start a memorial for someone you love</h3>
+          <p className="muted" style={{ maxWidth: 420, margin: '8px auto 18px' }}>
+            A quiet place to share their story, gather photos and memories, and keep them close.
+          </p>
+          <Link href="/create" className="button">
+            Start a memorial
+          </Link>
+        </section>
+      )}
+
       <Lightbox
         open={lightboxIndex >= 0}
         close={() => setLightboxIndex(-1)}
