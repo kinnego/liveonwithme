@@ -31,6 +31,7 @@
 // super admin (or via Firebase console) if genuinely needed.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
@@ -179,6 +180,8 @@ export async function POST(req: NextRequest) {
           pendingDeletionReason: 'owner_deleted_account',
           updatedAt: FieldValue.serverTimestamp(),
         });
+        revalidatePath(`/m/${docSnap.id}`);
+        revalidateTag(`memorial:${docSnap.id}`, { expire: 0 });
         orphaned.push({
           fullName: m.fullName || 'A memorial',
           restoreDeadline: restoreDeadline.toLocaleDateString('en-IE', {

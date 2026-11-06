@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import { getStripe, siteUrl } from '@/lib/stripe';
@@ -85,6 +86,9 @@ export async function POST(req: NextRequest) {
         actorUid: uid,
         details: { referralId },
       });
+
+      revalidatePath(`/m/${memorialId}`);
+      revalidateTag(`memorial:${memorialId}`, { expire: 0 });
 
       return NextResponse.json({ success: true, live: true });
     }

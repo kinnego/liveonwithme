@@ -1,6 +1,27 @@
 # Status & next steps
 
-Last updated: 2026-10-12, branch `claude/ubuntu-machine-or-phone-ovt1xa` (the GitHub default — there is no separate `main`).
+Last updated: 2026-11-05, branch `claude/ubuntu-machine-or-phone-ovt1xa` (the GitHub default — there is no separate `main`).
+
+## 2026-11-05 session handoff
+
+### Shipped since last update
+
+- **Image variants pipeline.** Uploads now auto-generate `.400.webp` and `.800.webp` siblings in R2 (via `sharp`); public pages serve them through `srcset` + `sizes` and preload the 800px hero for LCP. Records carry `heroPhotoVariants` / `photoVariants` flags so older uploads fall back to the original URL. Admin endpoint + one-off script at `scripts/backfill-image-variants.mjs` cover pre-existing memorials; already run against prod on 2026-11-03 (34/36 backfilled; 2 flagged false for a format/size edge case and will stay on originals).
+- **Orphan sweep is now a manual admin review.** The Netlify scheduled function + `/api/cron/orphan-sweep` + `CRON_SECRET` are all gone. A super admin reviews each stuck memorial by hand at `/admin/orphans` once its 30-day grace window elapses — Delete button is disabled until `pendingDeletionAt` has passed; Snooze pushes the review 30 days further out. The admin console surface shows a red badge with the count due. The hard-delete codepath also removes `.400.webp` / `.800.webp` R2 keys that the old cron didn't.
+- **Gallery embedded on edit page.** The upload + favourites + framing UI now lives in `components/GalleryManager.tsx` and is embedded inline on `/memorial/[id]/edit` (new "Photographs" card) so keepers don't have to navigate to advanced settings to add photos. The dedicated `/memorial/[id]/gallery` page still works and now shares the same component.
+- **Logged-out visitor CTA.** A soft inline card ("Start a memorial for someone you love") appears at the end of a live memorial page for signed-out viewers, routing them to `/create`. No FAB — tone matters more here than conversion.
+- **Auth page tone.** Google button now uses a monochrome glyph so it blends into the brand palette, and adds a reassurance line ("No Google account? Just use your email below — it's just as quick.") so older users don't feel pushed off email.
+- **Security + housekeeping fixes.** `isSuperAdmin()` in `lib/roles.ts` no longer falls back to the user-writable `email` field — it only trusts `role === 'super_admin'`, preventing self-elevation via profile edit. The referrals `create` rule in `firestore.rules` now requires `wholesalePaymentStatus == 'unpaid'` for partner-created rows, closing a wholesale-skip revenue leak (super admins can still seed paid, for gifts). CSP `frame-src` now allows `youtube.com` + `youtube-nocookie.com` so `/song` embeds render.
+
+### Required before anything else works in production
+
+- **Firestore rules pending deploy.** `firestore.rules` was updated this session (referrals-create wholesale guard). Needs `firebase deploy --only firestore:rules` before the rule change takes effect. The TypeScript `isSuperAdmin()` fix in `lib/roles.ts` ships with any Netlify build.
+- **`CRON_SECRET` can be removed from Netlify env.** It is no longer read anywhere.
+
+### Known limitations / unchanged
+
+- The one-off `scripts/backfill-image-variants.mjs` is kept in the tree for the next time a format assumption changes. Already-flagged docs are skipped so re-runs are safe.
+- Two source images (one < 400px wide, one HEIC) were left on their originals during the 2026-11-03 backfill — intentional; `heroPhotoVariants: false` prevents retries.
 
 ## 2026-10-12 session handoff
 

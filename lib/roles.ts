@@ -5,10 +5,14 @@ export function isSuperAdminEmail(email?: string | null): boolean {
   return email.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
 }
 
-export function isSuperAdmin(profile?: Pick<UserProfile, 'role' | 'email'> | null): boolean {
-  if (!profile) return false;
-  if (profile.role === 'super_admin') return true;
-  return isSuperAdminEmail(profile.email);
+// Trust only the role field — the email on the profile doc is user-writable
+// (Firestore rules only lock role + partnerStatus), so falling back to the
+// email would let anyone grant themselves admin by overwriting the field.
+// At signup `ensureUserProfile` seeds role from the verified Auth token,
+// and the rules only allow a `super_admin` role on creation when the Auth
+// token's email matches and is verified — see firestore.rules.
+export function isSuperAdmin(profile?: Pick<UserProfile, 'role'> | null): boolean {
+  return profile?.role === 'super_admin';
 }
 
 export function isApprovedPartner(profile?: Pick<UserProfile, 'role' | 'partnerStatus'> | null): boolean {

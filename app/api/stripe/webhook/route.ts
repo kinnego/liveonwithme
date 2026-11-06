@@ -13,6 +13,7 @@
 // where the session points at the wrong entity.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { getStripe, STRIPE_WEBHOOK_SECRET } from '@/lib/stripe';
@@ -223,6 +224,8 @@ export async function POST(req: NextRequest) {
             actorUid: customerId || 'stripe',
             details: { session: session.id, amount: session.amount_total },
           });
+          revalidatePath(`/m/${memorialId}`);
+          revalidateTag(`memorial:${memorialId}`, { expire: 0 });
 
           // Memorial-owner receipt. Non-fatal if it fails.
           try {

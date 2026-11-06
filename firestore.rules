@@ -367,7 +367,15 @@ service cloud.firestore {
 
     // ─── referrals (partner → family setup) ──────────────────────────────────
     match /referrals/{id} {
-      allow create: if (isApprovedPartner() || isSuperAdmin())
+      // A partner-created referral must start unpaid — the Stripe webhook is
+      // the only path that flips wholesalePaymentStatus to 'paid'. Allowing a
+      // partner to seed it as paid at creation would skip the wholesale
+      // charge entirely. Super admins can create a paid referral (for gifts).
+      allow create: if (
+        (isApprovedPartner()
+          && request.resource.data.get('wholesalePaymentStatus', 'unpaid') == 'unpaid')
+        || isSuperAdmin()
+      )
         && request.resource.data.partnerUid == request.auth.uid
         && request.resource.data.status == 'pending';
 

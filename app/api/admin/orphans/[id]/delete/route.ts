@@ -3,6 +3,7 @@
 // path is identical to what the retired nightly cron used.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import { isSuperAdmin } from '@/lib/roles';
 import { deleteOrphanedMemorial } from '@/lib/orphan-admin';
@@ -47,6 +48,8 @@ export async function POST(
     }
 
     const result = await deleteOrphanedMemorial(id, uid, prof?.email);
+    revalidatePath(`/m/${id}`);
+    revalidateTag(`memorial:${id}`, { expire: 0 });
     return NextResponse.json({ ok: true, ...result });
   } catch (err: any) {
     console.error('admin/orphans/delete error', err);

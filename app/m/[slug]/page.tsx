@@ -5,6 +5,7 @@
 // state, so the public view paints without a second Firestore round-trip.
 
 import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
 import type { Metadata } from 'next';
 import { adminDb } from '@/lib/firebase-admin';
 import MemorialView, { type SiblingMemorial } from './MemorialView';
@@ -12,9 +13,19 @@ import MemorialView, { type SiblingMemorial } from './MemorialView';
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
 
-// Wrapped in React cache() so generateMetadata() and Page() dedupe into a
-// single Firestore read per request.
-const loadMemorial = cache(async (slug: string) => {
+// Cache the rendered HTML for a minute. Public memorial pages are read-heavy
+// and rarely change: visitors scanning a QR code or opening a shared link get
+// a CDN hit, not a Firestore round-trip + cold function boot. Handlers that
+// change what's visible (go-live, hero change, orphan delete, account delete)
+// call `revalidatePath('/m/{id}')` to bust early. Within the 60s window a
+// stale page may show briefly, which is acceptable for freshness-insensitive
+// content and bounded below the TTL regardless.
+export const revalidate = 60;
+
+// Raw Firestore reader — wrapped below in unstable_cache so visitors share
+// one Firestore round-trip per slug per revalidation window. Mutating
+// handlers call `revalidateTag('memorial:<id>')` to bust early.
+async function fetchMemorial(slug: string) {
   if (slug === 'mary-demo') {
     return {
       fullName: "Mary O'Donnell",
@@ -41,44 +52,64 @@ const loadMemorial = cache(async (slug: string) => {
   } catch {
     return null;
   }
-});
+}
 
-// Everyone else resting on the same plot — used to render the "Also resting
-// here" link so a visitor who followed a direct link to one memorial can
-// find the sibling without having to scan the stone's QR again.
-const loadSiblings = cache(
-  async (plotId: string, excludeMemorialId: string): Promise<SiblingMemorial[]> => {
-    try {
-      const mems = await adminDb()
-        .collection('plotMemberships')
-        .where('plotId', '==', plotId)
-        .where('status', '==', 'approved')
-        .get();
+async function fetchSiblings(
+  plotId: string,
+  excludeMemorialId: string,
+): Promise<SiblingMemorial[]> {
+  try {
+    const mems = await adminDb()
+      .collection('plotMemberships')
+      .where('plotId', '==', plotId)
+      .where('status', '==', 'approved')
+      .get();
 
-      const memorialIds = mems.docs
-        .map((d) => d.data().memorialId as string | undefined)
-        .filter((id): id is string => !!id && id !== excludeMemorialId);
-      if (memorialIds.length === 0) return [];
+    const memorialIds = mems.docs
+      .map((d) => d.data().memorialId as string | undefined)
+      .filter((id): id is string => !!id && id !== excludeMemorialId);
+    if (memorialIds.length === 0) return [];
 
-      const results: SiblingMemorial[] = [];
-      for (const id of memorialIds) {
-        const m = await adminDb().collection('memorials').doc(id).get();
-        if (!m.exists) continue;
-        const data = m.data() as any;
-        if (data.status !== 'live') continue;
-        if (data.offline === true) continue;
-        if (!['public', 'unlisted'].includes(data.visibility)) continue;
-        results.push({
-          id: m.id,
-          slug: data.slug || m.id,
-          fullName: data.fullName || '',
-        });
-      }
-      return results;
-    } catch {
-      return [];
+    const results: SiblingMemorial[] = [];
+    for (const id of memorialIds) {
+      const m = await adminDb().collection('memorials').doc(id).get();
+      if (!m.exists) continue;
+      const data = m.data() as any;
+      if (data.status !== 'live') continue;
+      if (data.offline === true) continue;
+      if (!['public', 'unlisted'].includes(data.visibility)) continue;
+      results.push({
+        id: m.id,
+        slug: data.slug || m.id,
+        fullName: data.fullName || '',
+      });
     }
-  },
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+// `unstable_cache` persists across requests (Netlify's Next.js runtime keeps
+// it in the shared cache). `cache()` on top dedupes within a single request so
+// generateMetadata() and Page() share one call. Tags are per-slug so busting
+// one memorial doesn't invalidate the others.
+const loadMemorial = cache((slug: string) =>
+  unstable_cache(() => fetchMemorial(slug), ['memorial', slug], {
+    revalidate: 60,
+    tags: [`memorial:${slug}`],
+  })(),
+);
+
+const loadSiblings = cache((plotId: string, excludeMemorialId: string) =>
+  unstable_cache(
+    () => fetchSiblings(plotId, excludeMemorialId),
+    ['siblings', plotId, excludeMemorialId],
+    {
+      revalidate: 60,
+      tags: [`plot:${plotId}`, `memorial:${excludeMemorialId}`],
+    },
+  )(),
 );
 
 export async function generateMetadata({
