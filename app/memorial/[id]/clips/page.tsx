@@ -109,6 +109,7 @@ export default function MemorialClipsPage({ params }: { params: Promise<{ id: st
         createdAt: serverTimestamp(),
       });
       revalidatePublicMemorial(m.id);
+      router.refresh();
       (e.target as HTMLFormElement).reset();
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
@@ -123,6 +124,7 @@ export default function MemorialClipsPage({ params }: { params: Promise<{ id: st
     if (!next || !m) return;
     await updateDoc(doc(db, 'memorials', m.id, 'clips', id), { label: next });
     revalidatePublicMemorial(m.id);
+    router.refresh();
     setEditingId(null);
     setEditingLabel('');
   }
@@ -132,6 +134,7 @@ export default function MemorialClipsPage({ params }: { params: Promise<{ id: st
     if (!confirm('Remove this recording from the memorial?')) return;
     await deleteDoc(doc(db, 'memorials', m.id, 'clips', id));
     revalidatePublicMemorial(m.id);
+    router.refresh();
   }
 
   if (!m) return <PageSkeleton variant="detail" label="Loading recordings" />;

@@ -126,6 +126,7 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
         }
         await updateDoc(doc(db, 'contributions', editingId), update);
         revalidatePublicMemorial(m.id);
+        router.refresh();
         setEditingItem(null);
       } else {
         const docData: Record<string, unknown> = {
@@ -145,6 +146,7 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
         }
         await addDoc(collection(db, 'contributions'), docData);
         revalidatePublicMemorial(m.id);
+        router.refresh();
       }
       (e.target as HTMLFormElement).reset();
     } catch (err: any) {
@@ -171,7 +173,10 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
   async function remove(id: string) {
     if (!confirm('Delete this memory?')) return;
     await deleteDoc(doc(db, 'contributions', id));
-    if (m) revalidatePublicMemorial(m.id);
+    if (m) {
+      revalidatePublicMemorial(m.id);
+      router.refresh();
+    }
     if (editingId === id) setEditingItem(null);
   }
 

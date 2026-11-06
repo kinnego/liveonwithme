@@ -110,6 +110,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
 
       await updateDoc(doc(db, 'memorials', m.id), updates);
       revalidatePublicMemorial(m.id);
+      router.refresh();
       router.push(`/memorial/${m.id}`);
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');

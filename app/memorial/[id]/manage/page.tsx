@@ -382,13 +382,19 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
 
   async function contribStatus(id: string, value: string) {
     await updateDoc(doc(db, 'contributions', id), { status: value });
-    if (m) revalidatePublicMemorial(m.id);
+    if (m) {
+      revalidatePublicMemorial(m.id);
+      router.refresh();
+    }
   }
 
   async function contribDelete(id: string) {
     if (!confirm('Delete this permanently? This cannot be undone.')) return;
     await deleteDoc(doc(db, 'contributions', id));
-    if (m) revalidatePublicMemorial(m.id);
+    if (m) {
+      revalidatePublicMemorial(m.id);
+      router.refresh();
+    }
   }
 
   async function toggleOffline(nextOffline: boolean) {
@@ -403,6 +409,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         updatedAt: serverTimestamp(),
       });
       revalidatePublicMemorial(m.id);
+      router.refresh();
       await refreshMemorial();
       showToast(nextOffline ? 'Memorial taken offline' : 'Memorial is back online');
     } catch (err: any) {
