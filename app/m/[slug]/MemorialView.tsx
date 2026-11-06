@@ -1,32 +1,27 @@
 'use client';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-  collection,
-  addDoc,
-  getDoc,
-  getDocs,
-  doc,
-  orderBy,
-  query,
-  serverTimestamp,
-  where,
-} from 'firebase/firestore';
+import nextDynamic from 'next/dynamic';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { walkingDirectionsUrl } from '@/lib/plot';
+import { auth } from '@/lib/firebase-auth';
+import { walkingDirectionsUrl } from '@/lib/directions';
 import { parseYoutubeVideoId, DEFAULT_SONG_LABEL } from '@/lib/song';
 import { resizeForMobile } from '@/lib/image';
 import { photoSrc, photoSrcSet } from '@/lib/images';
 import { canEditMemorial } from '@/lib/roles';
 import { pronounsFor, capitalize } from '@/lib/pronouns';
 import { PageSkeleton } from '@/components/Skeleton';
-import SongPlayer from '@/components/SongPlayer';
-import Lightbox from 'yet-another-react-lightbox';
-import Zoom from 'yet-another-react-lightbox/plugins/zoom';
-import Captions from 'yet-another-react-lightbox/plugins/captions';
-import 'yet-another-react-lightbox/styles.css';
-import 'yet-another-react-lightbox/plugins/captions.css';
+
+// yet-another-react-lightbox is ~77 KB JS + ~6 KB CSS and most visitors never
+// open a photo — pay for it only once they do. Same for SongPlayer: trivial on
+// its own, but the YouTube iframe embed script it triggers is not. Dynamic
+// import keeps both out of the initial /m/[slug] bundle.
+const MemorialLightbox = nextDynamic(() => import('@/components/MemorialLightbox'), {
+  ssr: false,
+});
+const SongPlayer = nextDynamic(() => import('@/components/SongPlayer'), {
+  ssr: false,
+});
 
 export const dynamic = 'force-dynamic';
 
@@ -34,14 +29,14 @@ const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
 
 const demoPhotoUrls: Record<string, string> = {
-  'demo-hero': '/demo/liveonwithme_lifestyle_01.jpg',
-  'demo-1': '/demo/liveonwithme_lifestyle_02.jpg',
-  'demo-2': '/demo/liveonwithme_lifestyle_04.jpg',
-  'demo-3': '/demo/liveonwithme_lifestyle_07.jpg',
-  'demo-4': '/demo/liveonwithme_lifestyle_08.jpg',
-  'demo-5': '/demo/liveonwithme_lifestyle_11.jpg',
-  'demo-mem-photo-1': '/demo/liveonwithme_lifestyle_05.jpg',
-  'demo-mem-photo-3': '/demo/liveonwithme_lifestyle_10.jpg',
+  'demo-hero': '/demo/liveonwithme_lifestyle_01.webp',
+  'demo-1': '/demo/liveonwithme_lifestyle_02.webp',
+  'demo-2': '/demo/liveonwithme_lifestyle_04.webp',
+  'demo-3': '/demo/liveonwithme_lifestyle_07.webp',
+  'demo-4': '/demo/liveonwithme_lifestyle_08.webp',
+  'demo-5': '/demo/liveonwithme_lifestyle_11.webp',
+  'demo-mem-photo-1': '/demo/liveonwithme_lifestyle_05.webp',
+  'demo-mem-photo-3': '/demo/liveonwithme_lifestyle_10.webp',
 };
 
 const demoContributions = [
@@ -167,15 +162,34 @@ export interface SiblingMemorial {
   fullName: string;
 }
 
+// Plot subset the memorial page cares about (lat/lng for directions,
+// cemetery for the "Resting at" chip). Everything else lives on the manage
+// page, not here.
+export interface InitialPlot {
+  lat?: number;
+  lng?: number;
+  cemetery?: {
+    name?: string;
+    address?: string;
+    placeId?: string;
+  };
+}
+
 export default function Memorial({
   params,
   initialMemorial,
   initialSiblings = [],
+  initialPlot = null,
+  initialContributions = [],
+  initialClips = [],
   mode = 'public',
 }: {
   params: Promise<{ slug: string }>;
   initialMemorial: Record<string, any> | null;
   initialSiblings?: SiblingMemorial[];
+  initialPlot?: InitialPlot | null;
+  initialContributions?: any[];
+  initialClips?: any[];
   // 'public': strictly the visitor's view, no keeper chrome regardless of auth.
   // 'keeper': the authorised editor's view with inline edits and nudges on empty sections.
   // Served by two distinct routes: /m/[slug] (public) and /memorial/[id] (keeper).
@@ -185,17 +199,22 @@ export default function Memorial({
   // everything it needs (title, hero URL, cemetery, etc.) without waiting
   // for a client Firestore read. `initialMemorial` is null when the server
   // couldn't serve the page publicly (draft, offline, or missing); in that
-  // case the client falls back to an auth-aware fetch for owner preview.
+  // case the client falls back to an auth-aware fetch via /api/memorial/view
+  // for owner preview.
   const [memorial, setMemorial] = useState<any>(initialMemorial || undefined);
-  const [plotCoords, setPlotCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [plotCoords, setPlotCoords] = useState<{ lat: number; lng: number } | null>(
+    initialPlot && typeof initialPlot.lat === 'number' && typeof initialPlot.lng === 'number'
+      ? { lat: initialPlot.lat, lng: initialPlot.lng }
+      : null,
+  );
   // The plot owns the cemetery concept now; the memorial just links to a plot
-  // by id. We fetch alongside the plot coords and feed the hero's "Resting
-  // at" chip from this state.
+  // by id. The server hands us the cemetery sub-object so the "Resting at"
+  // chip renders in the first paint.
   const [plotCemetery, setPlotCemetery] = useState<{
     name?: string;
     address?: string;
     placeId?: string;
-  } | null>(null);
+  } | null>(initialPlot?.cemetery || null);
   const [hero, setHero] = useState(() => {
     if (!initialMemorial) return '';
     if (initialMemorial.heroPhotoUrl) return initialMemorial.heroPhotoUrl;
@@ -208,9 +227,17 @@ export default function Memorial({
     }
     return '';
   });
-  const [approved, setApproved] = useState<any[]>([]);
-  const [clips, setClips] = useState<any[]>([]);
-  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const [approved, setApproved] = useState<any[]>(initialContributions);
+  const [clips, setClips] = useState<any[]>(initialClips);
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>(() => {
+    const urls: Record<string, string> = {};
+    for (const row of initialContributions) {
+      if (row?.photoPath && R2_PUBLIC_URL) {
+        urls[row.id] = `${R2_PUBLIC_URL}/${row.photoPath}`;
+      }
+    }
+    return urls;
+  });
   const [sent, setSent] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>(
     initialMemorial ? 'ready' : 'loading',
@@ -257,67 +284,16 @@ export default function Memorial({
         return;
       }
 
-      // Fast path: server handed us the memorial. Fire plot + contributions
-      // reads in parallel without blocking paint.
-      if (initialMemorial) {
-        const plotPromise = initialMemorial.plotId
-          ? getDoc(doc(db, 'plots', initialMemorial.plotId))
-          : Promise.resolve(null);
-        const contribPromise = getDocs(
-          query(
-            collection(db, 'contributions'),
-            where('memorialId', '==', p.slug),
-            where('status', '==', 'approved'),
-          ),
-        );
-        // Attach handlers immediately so a rejection (e.g. permission denied
-        // against a not-yet-deployed clips rule) is caught in the same tick
-        // it fires — otherwise the await below delays the handler and Chrome
-        // flags the rejection as "Uncaught (in promise)".
-        getDocs(
-          query(collection(db, 'memorials', p.slug, 'clips'), orderBy('createdAt', 'asc')),
-        )
-          .then((cs) => {
-            if (cancelled) return;
-            setClips(cs.docs.map((d) => ({ id: d.id, ...d.data() })));
-          })
-          .catch(() => {
-            // Non-fatal: the memorial still renders without clips.
-          });
+      // Fast path: server already seeded memorial + plot + contributions +
+      // clips as props. Nothing to fetch on the client — initial state is
+      // the final state.
+      if (initialMemorial) return;
 
-        plotPromise
-          .then((ps) => {
-            if (cancelled || !ps || !ps.exists()) return;
-            const pd = ps.data() as any;
-            if (typeof pd.lat === 'number' && typeof pd.lng === 'number') {
-              setPlotCoords({ lat: pd.lat, lng: pd.lng });
-            }
-            if (pd.cemetery) setPlotCemetery(pd.cemetery);
-          })
-          .catch(() => {
-            // Non-fatal: page still renders, we just don't show directions.
-          });
-
-        try {
-          const c = await contribPromise;
-          if (cancelled) return;
-          const rows = c.docs.map((d) => ({ id: d.id, ...d.data() }));
-          setApproved(rows);
-          const urls: Record<string, string> = {};
-          for (const row of rows) {
-            if ((row as any).photoPath) {
-              urls[row.id] = `${R2_PUBLIC_URL}/${(row as any).photoPath}`;
-            }
-          }
-          if (Object.keys(urls).length) setPhotoUrls((x) => ({ ...x, ...urls }));
-        } catch {
-          // Non-fatal: the memorial still renders without contributions.
-        }
-        return;
-      }
-
-      // Slow path: server returned null (draft/offline/missing). Wait for
-      // auth to resolve so an owner can preview their own in-progress page.
+      // Slow path: server returned null (draft/offline/missing/private).
+      // Wait for auth so an owner can preview their own in-progress page,
+      // then hit the slow-path reader — the admin SDK there bypasses
+      // Firestore security rules and applies the same visibility logic
+      // the server page uses, plus a keeper override.
       const authed = await new Promise<User | null>((resolve) => {
         if (!auth) return resolve(null);
         const unsub = onAuthStateChanged(auth, (u) => {
@@ -327,81 +303,65 @@ export default function Memorial({
       });
       if (cancelled) return;
 
-      let s;
+      const token = authed ? await authed.getIdToken().catch(() => null) : null;
+      let res: Response;
       try {
-        s = await getDoc(doc(db, 'memorials', p.slug));
-      } catch (err: any) {
-        // Firestore denies draft/offline memorials to anyone who isn't the
-        // owner/successor/co-manager — partners, logged-out visitors, random
-        // signed-in users all land here. Not a bug; render the "no access"
-        // state the same way we would for a published-but-private memorial.
-        if (!cancelled) {
-          console.warn('memorial fallback read denied', err?.code || err?.message);
-          setLoadState('draft_no_access');
-        }
+        res = await fetch(`/api/memorial/view/${encodeURIComponent(p.slug)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+      } catch {
+        if (!cancelled) setLoadState('draft_no_access');
         return;
       }
       if (cancelled) return;
-      if (!s.exists()) {
+
+      if (res.status === 404) {
+        setLoadState('draft_no_access');
+        return;
+      }
+      if (!res.ok) {
         setLoadState('not_found');
         return;
       }
 
-      const data: any = { id: s.id, ...s.data() };
-      const isOwner = authed?.uid === data.ownerId;
-      const isLive = data.status === 'live';
-      const isOffline = data.offline === true;
-
-      if ((!isLive || isOffline) && !isOwner) {
-        setLoadState('draft_no_access');
+      const payload = await res.json().catch(() => null);
+      if (cancelled || !payload?.memorial) {
+        if (!cancelled) setLoadState('not_found');
         return;
       }
 
+      const data = payload.memorial;
       setMemorial(data);
-      setIsPreview((!isLive || isOffline) && isOwner);
+      setIsPreview(payload.isPreview === true);
       if (data.heroPhotoPath) {
         setHero(photoSrc(data.heroPhotoPath, data.heroPhotoVariants, 800));
+      } else if (data.heroPhotoUrl) {
+        setHero(data.heroPhotoUrl);
       }
 
-      if (data.plotId) {
-        getDoc(doc(db, 'plots', data.plotId))
-          .then((ps) => {
-            if (cancelled || !ps.exists()) return;
-            const pd = ps.data() as any;
-            if (typeof pd.lat === 'number' && typeof pd.lng === 'number') {
-              setPlotCoords({ lat: pd.lat, lng: pd.lng });
-            }
-            if (pd.cemetery) setPlotCemetery(pd.cemetery);
-          })
-          .catch(() => {});
+      if (payload.plot) {
+        if (
+          typeof payload.plot.lat === 'number' &&
+          typeof payload.plot.lng === 'number'
+        ) {
+          setPlotCoords({ lat: payload.plot.lat, lng: payload.plot.lng });
+        }
+        if (payload.plot.cemetery) setPlotCemetery(payload.plot.cemetery);
       }
 
-      const c = await getDocs(
-        query(
-          collection(db, 'contributions'),
-          where('memorialId', '==', p.slug),
-          where('status', '==', 'approved'),
-        ),
-      );
-      if (cancelled) return;
-      const rows = c.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const rows: any[] = Array.isArray(payload.contributions)
+        ? payload.contributions
+        : [];
       setApproved(rows);
       const urls: Record<string, string> = {};
       for (const row of rows) {
-        if ((row as any).photoPath) {
-          urls[row.id] = `${R2_PUBLIC_URL}/${(row as any).photoPath}`;
+        if (row?.photoPath && R2_PUBLIC_URL) {
+          urls[row.id] = `${R2_PUBLIC_URL}/${row.photoPath}`;
         }
       }
       if (Object.keys(urls).length) setPhotoUrls(urls);
 
-      try {
-        const cs = await getDocs(
-          query(collection(db, 'memorials', p.slug, 'clips'), orderBy('createdAt', 'asc')),
-        );
-        if (!cancelled) setClips(cs.docs.map((d) => ({ id: d.id, ...d.data() })));
-      } catch {
-        // Non-fatal: the memorial still renders without clips.
-      }
+      if (Array.isArray(payload.clips)) setClips(payload.clips);
 
       setLoadState('ready');
     })();
@@ -502,21 +462,38 @@ export default function Memorial({
     }
 
     const audience = fd.get('audience') === 'family_only' ? 'family_only' : 'public';
-    const ref = await addDoc(collection(db, 'contributions'), {
-      memorialId: memorial.id,
-      contributorName: String(fd.get('name')),
-      contributorEmail: String(fd.get('email') || ''),
-      relationship: String(fd.get('relationship') || ''),
-      memory: String(fd.get('memory') || ''),
-      caption: String(fd.get('caption') || ''),
-      photoPath,
-      photoVariants,
-      status: 'pending',
-      audience,
-      mediaType: photoPath ? 'photo' : 'text',
-      sizeBytes,
-      createdAt: serverTimestamp(),
-    });
+
+    // Signed-in keepers get auto-approval on the server; anonymous visitors
+    // land as `status: 'pending'`. The server does the trust check.
+    const token = await auth.currentUser?.getIdToken().catch(() => null);
+    let createdId: string;
+    try {
+      const res = await fetch('/api/contribution/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          memorialId: memorial.id,
+          contributorName: String(fd.get('name')),
+          contributorEmail: String(fd.get('email') || ''),
+          relationship: String(fd.get('relationship') || ''),
+          memory: String(fd.get('memory') || ''),
+          caption: String(fd.get('caption') || ''),
+          photoPath,
+          photoVariants,
+          sizeBytes,
+          audience,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not save the contribution.');
+      createdId = data.id;
+    } catch (err: any) {
+      alert(err.message || 'Could not save the contribution. Please try again.');
+      return;
+    }
 
     // Fire-and-forget: tell every keeper on this memorial that a new
     // contribution is in their inbox. If email dispatch fails we still
@@ -524,7 +501,7 @@ export default function Memorial({
     fetch('/api/contribution/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contributionId: ref.id }),
+      body: JSON.stringify({ contributionId: createdId }),
     }).catch(() => {});
 
     setSent(true);
@@ -1456,22 +1433,19 @@ export default function Memorial({
         </section>
       )}
 
-      <Lightbox
-        open={lightboxIndex >= 0}
-        close={() => setLightboxIndex(-1)}
-        index={Math.max(0, lightboxIndex)}
-        slides={lightboxSlides.map(({ src, alt, title, description }) => ({
-          src,
-          alt,
-          title,
-          description,
-        }))}
-        plugins={[Zoom, Captions]}
-        controller={{ closeOnBackdropClick: true }}
-        zoom={{ maxZoomPixelRatio: 3, scrollToZoom: true }}
-        carousel={{ finite: lightboxSlides.length <= 1 }}
-        styles={{ container: { backgroundColor: 'rgba(15, 22, 20, 0.94)' } }}
-      />
+      {lightboxIndex >= 0 && (
+        <MemorialLightbox
+          open
+          close={() => setLightboxIndex(-1)}
+          index={Math.max(0, lightboxIndex)}
+          slides={lightboxSlides.map(({ src, alt, title, description }) => ({
+            src,
+            alt,
+            title,
+            description,
+          }))}
+        />
+      )}
 
       {isKeeper && mode === 'keeper' && (
         <Link

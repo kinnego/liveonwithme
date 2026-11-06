@@ -1,26 +1,33 @@
 // Server wrapper for the memorial page. Generates SEO metadata + JSON-LD
 // structured data on the server so search engines and social previews get
 // something meaningful without waiting for client-side hydration. The
-// fetched memorial is also handed to the client component as initial
-// state, so the public view paints without a second Firestore round-trip.
+// memorial, plot, approved contributions, clips, and plot siblings are all
+// fetched here and passed down as initial state, so the public view has
+// everything in the HTML payload and ships zero Firestore SDK to the
+// visitor's browser.
 
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import type { Metadata } from 'next';
 import { adminDb } from '@/lib/firebase-admin';
-import MemorialView, { type SiblingMemorial } from './MemorialView';
+import MemorialView, {
+  type InitialPlot,
+  type SiblingMemorial,
+} from './MemorialView';
 
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
 
-// Cache the rendered HTML for a minute. Public memorial pages are read-heavy
+// Cache the rendered HTML for an hour. Public memorial pages are read-heavy
 // and rarely change: visitors scanning a QR code or opening a shared link get
-// a CDN hit, not a Firestore round-trip + cold function boot. Handlers that
-// change what's visible (go-live, hero change, orphan delete, account delete)
-// call `revalidatePath('/m/{id}')` to bust early. Within the 60s window a
-// stale page may show briefly, which is acceptable for freshness-insensitive
-// content and bounded below the TTL regardless.
-export const revalidate = 60;
+// a CDN hit, not a Firestore round-trip + cold function boot. Every handler
+// that changes what's visible (go-live, hero change, orphan delete, account
+// delete) calls `revalidatePath` + `revalidateTag` to bust immediately, so
+// this TTL is really the ceiling for drive-by staleness when a write path
+// forgets to tag us. One hour trades a bit of worst-case freshness for far
+// fewer cold starts — Netlify functions boot in ~7s against Firestore, and
+// we don't want each new drive-by visit to repay that cost every minute.
+export const revalidate = 3600;
 
 // Raw Firestore reader — wrapped below in unstable_cache so visitors share
 // one Firestore round-trip per slug per revalidation window. Mutating
@@ -32,7 +39,7 @@ async function fetchMemorial(slug: string) {
       epitaph: 'She made everyone feel like they belonged.',
       born: '1948-03-12',
       died: '2025-11-04',
-      heroPhotoUrl: '/demo/liveonwithme_lifestyle_01.jpg',
+      heroPhotoUrl: '/demo/liveonwithme_lifestyle_01.webp',
       visibility: 'public',
       status: 'live',
     } as Record<string, any>;
@@ -51,6 +58,58 @@ async function fetchMemorial(slug: string) {
     return { id: snap.id, ...JSON.parse(JSON.stringify(data)) };
   } catch {
     return null;
+  }
+}
+
+async function fetchPlot(plotId: string): Promise<InitialPlot | null> {
+  try {
+    const snap = await adminDb().collection('plots').doc(plotId).get();
+    if (!snap.exists) return null;
+    const data = snap.data() as any;
+    const out: InitialPlot = {};
+    if (typeof data.lat === 'number' && typeof data.lng === 'number') {
+      out.lat = data.lat;
+      out.lng = data.lng;
+    }
+    if (data.cemetery) {
+      out.cemetery = JSON.parse(JSON.stringify(data.cemetery));
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchContributions(memorialId: string): Promise<any[]> {
+  try {
+    const snap = await adminDb()
+      .collection('contributions')
+      .where('memorialId', '==', memorialId)
+      .where('status', '==', 'approved')
+      .get();
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...JSON.parse(JSON.stringify(d.data())),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchClips(memorialId: string): Promise<any[]> {
+  try {
+    const snap = await adminDb()
+      .collection('memorials')
+      .doc(memorialId)
+      .collection('clips')
+      .orderBy('createdAt', 'asc')
+      .get();
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...JSON.parse(JSON.stringify(d.data())),
+    }));
+  } catch {
+    return [];
   }
 }
 
@@ -96,7 +155,7 @@ async function fetchSiblings(
 // one memorial doesn't invalidate the others.
 const loadMemorial = cache((slug: string) =>
   unstable_cache(() => fetchMemorial(slug), ['memorial', slug], {
-    revalidate: 60,
+    revalidate: 3600,
     tags: [`memorial:${slug}`],
   })(),
 );
@@ -106,10 +165,35 @@ const loadSiblings = cache((plotId: string, excludeMemorialId: string) =>
     () => fetchSiblings(plotId, excludeMemorialId),
     ['siblings', plotId, excludeMemorialId],
     {
-      revalidate: 60,
+      revalidate: 3600,
       tags: [`plot:${plotId}`, `memorial:${excludeMemorialId}`],
     },
   )(),
+);
+
+const loadPlot = cache((plotId: string, memorialId: string) =>
+  unstable_cache(() => fetchPlot(plotId), ['plot', plotId], {
+    revalidate: 3600,
+    tags: [`plot:${plotId}`, `memorial:${memorialId}`],
+  })(),
+);
+
+const loadContributions = cache((memorialId: string) =>
+  unstable_cache(
+    () => fetchContributions(memorialId),
+    ['contributions', memorialId],
+    {
+      revalidate: 3600,
+      tags: [`memorial:${memorialId}`, `contributions:${memorialId}`],
+    },
+  )(),
+);
+
+const loadClips = cache((memorialId: string) =>
+  unstable_cache(() => fetchClips(memorialId), ['clips', memorialId], {
+    revalidate: 3600,
+    tags: [`memorial:${memorialId}`, `clips:${memorialId}`],
+  })(),
 );
 
 export async function generateMetadata({
@@ -177,8 +261,18 @@ export default async function Page({
   const { slug } = await params;
   const m = await loadMemorial(slug);
 
-  const siblings =
-    m && m.plotId && m.id ? await loadSiblings(m.plotId, m.id) : [];
+  // Fan out everything the public page needs in parallel so the server round-
+  // trips happen concurrently, not in series. The demo page has none of these
+  // and is skipped to avoid a 1s query against a non-existent memorial id.
+  const isDemo = slug === 'mary-demo';
+  const [siblings, plot, contributions, clips] = m && !isDemo
+    ? await Promise.all([
+        m.plotId && m.id ? loadSiblings(m.plotId, m.id) : Promise.resolve([]),
+        m.plotId && m.id ? loadPlot(m.plotId, m.id) : Promise.resolve(null),
+        m.id ? loadContributions(m.id) : Promise.resolve([]),
+        m.id ? loadClips(m.id) : Promise.resolve([]),
+      ])
+    : [[], null, [], []];
 
   const heroUrl =
     m?.heroPhotoUrl ||
@@ -216,7 +310,15 @@ export default async function Page({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <MemorialView params={params} initialMemorial={m} initialSiblings={siblings} mode="public" />
+      <MemorialView
+        params={params}
+        initialMemorial={m}
+        initialSiblings={siblings}
+        initialPlot={plot}
+        initialContributions={contributions}
+        initialClips={clips}
+        mode="public"
+      />
     </>
   );
 }

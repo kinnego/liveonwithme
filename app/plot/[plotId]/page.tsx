@@ -7,7 +7,7 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { adminDb } from '@/lib/firebase-admin';
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
-import { walkingDirectionsUrl } from '@/lib/plot';
+import { walkingDirectionsUrl } from '@/lib/directions';
 import type { Memorial, Plot } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';

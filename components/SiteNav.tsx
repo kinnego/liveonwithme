@@ -2,8 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase-auth';
 import { UserProfile } from '@/lib/types';
 import { isSuperAdmin } from '@/lib/roles';
 
@@ -43,8 +42,20 @@ export default function SiteNav() {
         }
       }
       setHintSignedIn(!!u);
-      if (u && db) {
+      if (u) {
+        // Lazy-import Firestore so logged-out visitors (the vast majority
+        // of public memorial traffic) never pay for the ~150 KB SDK. The
+        // dynamic import runs once per sign-in; the browser caches the
+        // module, so switching tabs doesn't refetch it.
         try {
+          const [{ doc, getDoc }, { db }] = await Promise.all([
+            import('firebase/firestore'),
+            import('@/lib/firebase'),
+          ]);
+          if (!db) {
+            setProfile(null);
+            return;
+          }
           const snap = await getDoc(doc(db, 'users', u.uid));
           setProfile(snap.exists() ? (snap.data() as UserProfile) : null);
         } catch {
