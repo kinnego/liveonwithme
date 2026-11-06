@@ -18,6 +18,7 @@ import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { canEditMemorial } from '@/lib/roles';
 import { pronounsFor } from '@/lib/pronouns';
+import { revalidatePublicMemorial } from '@/lib/revalidate';
 import type { Memorial, MemorialClip } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
@@ -107,6 +108,7 @@ export default function MemorialClipsPage({ params }: { params: Promise<{ id: st
         label,
         createdAt: serverTimestamp(),
       });
+      revalidatePublicMemorial(m.id);
       (e.target as HTMLFormElement).reset();
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
@@ -120,6 +122,7 @@ export default function MemorialClipsPage({ params }: { params: Promise<{ id: st
     const next = editingLabel.trim();
     if (!next || !m) return;
     await updateDoc(doc(db, 'memorials', m.id, 'clips', id), { label: next });
+    revalidatePublicMemorial(m.id);
     setEditingId(null);
     setEditingLabel('');
   }
@@ -128,6 +131,7 @@ export default function MemorialClipsPage({ params }: { params: Promise<{ id: st
     if (!m) return;
     if (!confirm('Remove this recording from the memorial?')) return;
     await deleteDoc(doc(db, 'memorials', m.id, 'clips', id));
+    revalidatePublicMemorial(m.id);
   }
 
   if (!m) return <PageSkeleton variant="detail" label="Loading recordings" />;

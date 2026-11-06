@@ -10,6 +10,7 @@ import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import type { Metadata } from 'next';
 import { adminDb } from '@/lib/firebase-admin';
+import { publicContributions } from '@/lib/contributions';
 import MemorialView, {
   type InitialPlot,
   type SiblingMemorial,
@@ -87,10 +88,11 @@ async function fetchContributions(memorialId: string): Promise<any[]> {
       .where('memorialId', '==', memorialId)
       .where('status', '==', 'approved')
       .get();
-    return snap.docs.map((d) => ({
+    const rows = snap.docs.map((d) => ({
       id: d.id,
       ...JSON.parse(JSON.stringify(d.data())),
     }));
+    return publicContributions(rows);
   } catch {
     return [];
   }

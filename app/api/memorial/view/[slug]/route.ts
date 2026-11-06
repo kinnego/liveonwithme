@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { isSuperAdmin } from '@/lib/roles';
+import { publicContributions } from '@/lib/contributions';
 import type { UserProfile } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -109,10 +110,12 @@ export async function GET(
       if (pd.cemetery) plot.cemetery = strip(pd.cemetery);
     }
 
-    const contributions = contribSnap.docs.map((d) => ({
-      id: d.id,
-      ...strip(d.data()),
-    }));
+    const contributions = publicContributions(
+      contribSnap.docs.map((d) => ({
+        id: d.id,
+        ...strip(d.data()),
+      })),
+    );
     const clips = clipsSnap.docs.map((d) => ({
       id: d.id,
       ...strip(d.data()),

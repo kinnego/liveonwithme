@@ -10,6 +10,7 @@ import { resizeForMobile } from '@/lib/image';
 import type { Memorial } from '@/lib/types';
 import { canEditMemorial } from '@/lib/roles';
 import { pronounsFor, capitalize } from '@/lib/pronouns';
+import { revalidatePublicMemorial } from '@/lib/revalidate';
 import { PageSkeleton } from '@/components/Skeleton';
 import GalleryManager from '@/components/GalleryManager';
 
@@ -108,6 +109,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
       }
 
       await updateDoc(doc(db, 'memorials', m.id), updates);
+      revalidatePublicMemorial(m.id);
       router.push(`/memorial/${m.id}`);
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');

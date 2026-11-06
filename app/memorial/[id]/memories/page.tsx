@@ -17,6 +17,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { canEditMemorial } from '@/lib/roles';
+import { revalidatePublicMemorial } from '@/lib/revalidate';
 import type { Memorial } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
@@ -124,6 +125,7 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
           update.audioMimeType = '';
         }
         await updateDoc(doc(db, 'contributions', editingId), update);
+        revalidatePublicMemorial(m.id);
         setEditingItem(null);
       } else {
         const docData: Record<string, unknown> = {
@@ -142,6 +144,7 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
           docData.audioMimeType = newAudioMimeType;
         }
         await addDoc(collection(db, 'contributions'), docData);
+        revalidatePublicMemorial(m.id);
       }
       (e.target as HTMLFormElement).reset();
     } catch (err: any) {
@@ -168,6 +171,7 @@ export default function Memories({ params }: { params: Promise<{ id: string }> }
   async function remove(id: string) {
     if (!confirm('Delete this memory?')) return;
     await deleteDoc(doc(db, 'contributions', id));
+    if (m) revalidatePublicMemorial(m.id);
     if (editingId === id) setEditingItem(null);
   }
 

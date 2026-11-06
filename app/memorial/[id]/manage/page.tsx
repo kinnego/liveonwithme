@@ -22,6 +22,7 @@ import { readQuotas, readPricing } from '@/lib/config';
 import { isSecondaryOnPlot } from '@/lib/pricing';
 import { canEditMemorial, isMemorialOwner } from '@/lib/roles';
 import { pronounsFor, capitalize } from '@/lib/pronouns';
+import { revalidatePublicMemorial } from '@/lib/revalidate';
 import { arrayRemove } from 'firebase/firestore';
 import {
   DEFAULT_PRICING,
@@ -381,11 +382,13 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
 
   async function contribStatus(id: string, value: string) {
     await updateDoc(doc(db, 'contributions', id), { status: value });
+    if (m) revalidatePublicMemorial(m.id);
   }
 
   async function contribDelete(id: string) {
     if (!confirm('Delete this permanently? This cannot be undone.')) return;
     await deleteDoc(doc(db, 'contributions', id));
+    if (m) revalidatePublicMemorial(m.id);
   }
 
   async function toggleOffline(nextOffline: boolean) {
@@ -399,6 +402,7 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         offline: nextOffline,
         updatedAt: serverTimestamp(),
       });
+      revalidatePublicMemorial(m.id);
       await refreshMemorial();
       showToast(nextOffline ? 'Memorial taken offline' : 'Memorial is back online');
     } catch (err: any) {

@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { isSuperAdmin } from '@/lib/roles';
+import { revalidatePublicMemorial } from '@/lib/revalidate';
 import { ContributionReport, Memorial, UserProfile } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { PageSkeleton } from '@/components/Skeleton';
@@ -127,7 +128,11 @@ export default function AdminContributionReports() {
     }
   }
 
-  async function hideContribution(contributionId: string, reportId: string) {
+  async function hideContribution(
+    contributionId: string,
+    reportId: string,
+    memorialId: string,
+  ) {
     if (!auth.currentUser) return;
     setBusyId(reportId);
     try {
@@ -142,6 +147,7 @@ export default function AdminContributionReports() {
         decidedByUid: auth.currentUser.uid,
         decidedAt: serverTimestamp(),
       });
+      if (memorialId) revalidatePublicMemorial(memorialId);
     } catch (err) {
       console.error('hide contribution failed', err);
     } finally {
@@ -276,7 +282,7 @@ export default function AdminContributionReports() {
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     {c && c.status !== 'rejected' && (
                       <button
-                        onClick={() => hideContribution(r.contributionId, r.id)}
+                        onClick={() => hideContribution(r.contributionId, r.id, r.memorialId)}
                         disabled={busyId === r.id}
                         className="button small"
                       >
