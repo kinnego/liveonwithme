@@ -1,16 +1,15 @@
 'use client';
-// Finds cemeteries close to the user's current location. Merges Google Places
-// Nearby Search with our community-added collection (client-side Haversine
-// filter — fine while we're under a few hundred community entries; swap in a
-// geohash prefix query if we outgrow that).
+// Finds cemeteries close to the user's current location. See
+// lib/cemetery-search for the merged Google + community implementation.
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { loadGoogleMaps } from '@/lib/places';
-import { CUSTOM_PLACE_ID_PREFIX } from '@/lib/cemeteries';
-import type { CustomCemetery } from '@/lib/types';
+import ButtonLink from '@/components/ButtonLink';
+import {
+  formatDistance,
+  searchNearbyCemeteries,
+  type NearbyCemetery,
+} from '@/lib/cemetery-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,14 +17,6 @@ export const dynamic = 'force-dynamic';
 // margin — larger radii dilute results with places in another town.
 const SEARCH_RADIUS_METERS = 8000;
 const MAX_RESULTS = 25;
-
-type Result = {
-  placeId: string;
-  name: string;
-  address?: string;
-  distanceMeters: number;
-  source: 'google' | 'community';
-};
 
 type Status =
   | 'idle'
@@ -39,7 +30,7 @@ type Status =
 
 export default function NearbyCemeteriesPage() {
   const [status, setStatus] = useState<Status>('idle');
-  const [results, setResults] = useState<Result[]>([]);
+  const [results, setResults] = useState<NearbyCemetery[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -75,15 +66,11 @@ export default function NearbyCemeteriesPage() {
       setStatus('searching');
 
       try {
-        const [googleResults, customResults] = await Promise.all([
-          fetchGoogleNearby(coords),
-          fetchNearbyCustom(coords),
-        ]);
+        const merged = await searchNearbyCemeteries(coords, {
+          radiusMeters: SEARCH_RADIUS_METERS,
+          maxResults: MAX_RESULTS,
+        });
         if (cancelled) return;
-
-        const merged = [...googleResults, ...customResults]
-          .sort((a, b) => a.distanceMeters - b.distanceMeters)
-          .slice(0, MAX_RESULTS);
         setResults(merged);
         setStatus('ready');
       } catch (err: any) {
@@ -136,9 +123,9 @@ export default function NearbyCemeteriesPage() {
             are, and only for this page. If you&rsquo;d rather not share it,
             you can search by name instead.
           </p>
-          <Link href="/" className="button secondary small">
+          <ButtonLink href="/" className="button secondary small">
             Back to search
-          </Link>
+          </ButtonLink>
         </div>
       )}
 
@@ -148,9 +135,9 @@ export default function NearbyCemeteriesPage() {
             This device doesn&rsquo;t support location. Please search by name
             or cemetery instead.
           </p>
-          <Link href="/" className="button secondary small">
+          <ButtonLink href="/" className="button secondary small">
             Back to search
-          </Link>
+          </ButtonLink>
         </div>
       )}
 
@@ -173,9 +160,9 @@ export default function NearbyCemeteriesPage() {
             If you&rsquo;re standing in a graveyard right now that isn&rsquo;t
             listed, you can add it. It takes about a minute.
           </p>
-          <Link href="/cemetery/add" className="button">
+          <ButtonLink href="/cemetery/add" className="button">
             Add this cemetery
-          </Link>
+          </ButtonLink>
         </div>
       )}
 
@@ -245,92 +232,12 @@ export default function NearbyCemeteriesPage() {
             <p style={{ margin: 0, fontSize: 14 }}>
               Not seeing the graveyard you&rsquo;re looking for?
             </p>
-            <Link href="/cemetery/add" className="button secondary small" style={{ marginTop: 10 }}>
+            <ButtonLink href="/cemetery/add" className="button secondary small" style={{ marginTop: 10 }}>
               Add a cemetery
-            </Link>
+            </ButtonLink>
           </div>
         </>
       )}
     </main>
   );
-}
-
-async function fetchGoogleNearby(coords: {
-  lat: number;
-  lng: number;
-}): Promise<Result[]> {
-  const google = await loadGoogleMaps();
-  await google.maps.importLibrary('places');
-  const { Place } = google.maps.places;
-  const { places } = await Place.searchNearby({
-    fields: ['id', 'displayName', 'formattedAddress', 'location'],
-    locationRestriction: {
-      center: coords,
-      radius: SEARCH_RADIUS_METERS,
-    },
-    // Nearby Search's primary-type allowlist doesn't include `place_of_worship`
-    // (it's a category alias, not a searchable primary type). `church` covers
-    // most Irish/UK churchyards; add other faiths here if we broaden geo.
-    includedPrimaryTypes: ['cemetery', 'church'],
-    maxResultCount: 20,
-    rankPreference: 'DISTANCE',
-  });
-  if (!Array.isArray(places)) return [];
-  return places
-    .map((p: any): Result | null => {
-      if (!p.id || !p.location) return null;
-      const lat = typeof p.location.lat === 'function' ? p.location.lat() : p.location.lat;
-      const lng = typeof p.location.lng === 'function' ? p.location.lng() : p.location.lng;
-      return {
-        placeId: p.id,
-        name: p.displayName || 'Unnamed place',
-        address: p.formattedAddress || undefined,
-        distanceMeters: haversineMeters(coords, { lat, lng }),
-        source: 'google',
-      };
-    })
-    .filter(Boolean) as Result[];
-}
-
-async function fetchNearbyCustom(coords: {
-  lat: number;
-  lng: number;
-}): Promise<Result[]> {
-  if (!db) return [];
-  const snap = await getDocs(collection(db, 'cemeteries'));
-  return snap.docs
-    .map((d): Result | null => {
-      const c = d.data() as CustomCemetery;
-      if (typeof c.lat !== 'number' || typeof c.lng !== 'number') return null;
-      const distanceMeters = haversineMeters(coords, { lat: c.lat, lng: c.lng });
-      if (distanceMeters > SEARCH_RADIUS_METERS) return null;
-      return {
-        placeId: `${CUSTOM_PLACE_ID_PREFIX}${d.id}`,
-        name: c.name,
-        address: c.address,
-        distanceMeters,
-        source: 'community',
-      };
-    })
-    .filter(Boolean) as Result[];
-}
-
-function haversineMeters(
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number },
-): number {
-  const R = 6371000;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-
-function formatDistance(m: number): string {
-  if (m < 1000) return `${Math.round(m)} m`;
-  return `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`;
 }

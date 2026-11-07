@@ -32,6 +32,15 @@ function AddCemeteryInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const prefillName = searchParams?.get('name') || '';
+  // Hand-off from /cemetery/pick drops lat/lng into the URL so we centre
+  // the map on the spot the user already chose instead of asking for their
+  // location again.
+  const prefillCoords = (() => {
+    const lat = Number(searchParams?.get('lat'));
+    const lng = Number(searchParams?.get('lng'));
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    return null;
+  })();
 
   const mapRef = useRef<HTMLDivElement>(null);
   const markerRef = useRef<any>(null);
@@ -58,21 +67,25 @@ function AddCemeteryInner() {
 
         // Start centred on the user's current location when possible so the
         // "I'm standing in the graveyard right now" case works with a single tap.
-        const start = await new Promise<{ lat: number; lng: number }>((resolve) => {
-          if (!navigator.geolocation) return resolve(FALLBACK_CENTER);
-          const timeout = setTimeout(() => resolve(FALLBACK_CENTER), 4000);
-          navigator.geolocation.getCurrentPosition(
-            (p) => {
-              clearTimeout(timeout);
-              resolve({ lat: p.coords.latitude, lng: p.coords.longitude });
-            },
-            () => {
-              clearTimeout(timeout);
-              resolve(FALLBACK_CENTER);
-            },
-            { enableHighAccuracy: true, timeout: 4000, maximumAge: 60_000 },
-          );
-        });
+        // If we were sent here from the pick page with lat/lng, skip geolocation
+        // and drop straight onto that spot.
+        const start = prefillCoords
+          ? prefillCoords
+          : await new Promise<{ lat: number; lng: number }>((resolve) => {
+              if (!navigator.geolocation) return resolve(FALLBACK_CENTER);
+              const timeout = setTimeout(() => resolve(FALLBACK_CENTER), 4000);
+              navigator.geolocation.getCurrentPosition(
+                (p) => {
+                  clearTimeout(timeout);
+                  resolve({ lat: p.coords.latitude, lng: p.coords.longitude });
+                },
+                () => {
+                  clearTimeout(timeout);
+                  resolve(FALLBACK_CENTER);
+                },
+                { enableHighAccuracy: true, timeout: 4000, maximumAge: 60_000 },
+              );
+            });
 
         if (cancelled || !mapRef.current) return;
 

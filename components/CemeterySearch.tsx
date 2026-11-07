@@ -11,6 +11,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { useRouter } from 'next/navigation';
 import { loadGoogleMaps } from '@/lib/places';
 import { customPlaceIdOf, searchCustomCemeteries } from '@/lib/cemeteries';
@@ -210,7 +211,7 @@ export default function CemeterySearch() {
           style={{ flex: 1, height: 1, background: 'var(--line)' }}
         />
       </div>
-      <Link
+      <ButtonLink
         href="/cemetery/nearby"
         className="button secondary"
         style={{
@@ -238,7 +239,16 @@ export default function CemeterySearch() {
           <circle cx="12" cy="9" r="3" />
         </svg>
         Find graveyards near me
-      </Link>
+      </ButtonLink>
+      <p className="muted" style={{ fontSize: 13, textAlign: 'center', margin: '10px 0 0' }}>
+        Can&rsquo;t find it by name?{' '}
+        <Link
+          href="/cemetery/pick"
+          style={{ color: 'var(--brand)', textDecoration: 'underline' }}
+        >
+          Pick the spot on a map
+        </Link>
+      </p>
       {status === 'no-key' && (
         <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
           Search isn&rsquo;t configured yet.
@@ -321,18 +331,16 @@ export default function CemeterySearch() {
           )}
 
           <a
+            href="/cemetery/pick"
+            onClick={() => setOpen(false)}
+            style={fallbackRowStyle}
+          >
+            Pick the spot on a map
+          </a>
+          <a
             href={addHref}
             onClick={() => setOpen(false)}
-            style={{
-              display: 'block',
-              padding: '12px 16px',
-              borderTop: '1px solid var(--line)',
-              background: '#f7f4ee',
-              color: 'var(--sage)',
-              fontWeight: 600,
-              fontSize: 14,
-              textDecoration: 'none',
-            }}
+            style={fallbackRowStyle}
           >
             + Add a cemetery not listed above
           </a>
@@ -341,6 +349,17 @@ export default function CemeterySearch() {
     </div>
   );
 }
+
+const fallbackRowStyle: React.CSSProperties = {
+  display: 'block',
+  padding: '12px 16px',
+  borderTop: '1px solid var(--line)',
+  background: '#f7f4ee',
+  color: 'var(--sage)',
+  fontWeight: 600,
+  fontSize: 14,
+  textDecoration: 'none',
+};
 
 const rowStyle: React.CSSProperties = {
   display: 'block',
