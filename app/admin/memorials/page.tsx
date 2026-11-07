@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -156,9 +157,9 @@ export default function AdminMemorials() {
               : 'Showing the latest 500. Type to search across every memorial.'}
           </p>
         </div>
-        <Link href="/admin" className="button secondary">
+        <ButtonLink href="/admin" className="button secondary">
           Back to console
-        </Link>
+        </ButtonLink>
       </div>
 
       <input

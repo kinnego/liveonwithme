@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -171,9 +172,9 @@ export default function AdminCemeteries() {
           <div className="eyebrow">Admin · cemeteries</div>
           <h2 style={{ marginBottom: 0 }}>Reported cemetery listings</h2>
         </div>
-        <Link href="/admin" className="button secondary">
+        <ButtonLink href="/admin" className="button secondary">
           Back to console
-        </Link>
+        </ButtonLink>
       </div>
 
       {error && <p style={{ color: '#a94442', fontSize: 14 }}>{error}</p>}

@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase-auth';
@@ -109,9 +110,9 @@ export default function SiteNav() {
           <Link href="/auth" onClick={closeMenu}>
             Sign in
           </Link>
-          <Link className="button small" href="/create" onClick={closeMenu}>
+          <ButtonLink className="button small" href="/create" onClick={closeMenu}>
             Create a page
-          </Link>
+          </ButtonLink>
         </div>
       </nav>
     );

@@ -15,6 +15,7 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import QRCode from 'qrcode';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -275,9 +276,9 @@ export default function CemeteryArtworkPage({
             at this cemetery, you can download artwork for that plot from the plot
             page.
           </p>
-          <Link href="/dashboard" className="button" style={{ marginTop: 20 }}>
+          <ButtonLink href="/dashboard" className="button" style={{ marginTop: 20 }}>
             Back to your dashboard
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -290,9 +291,9 @@ export default function CemeteryArtworkPage({
           <div className="eyebrow">Cemetery artwork</div>
           <h2>Could not load artwork</h2>
           <p className="muted">{error}</p>
-          <Link href={`/cemetery/${placeId}`} className="button" style={{ marginTop: 20 }}>
+          <ButtonLink href={`/cemetery/${placeId}`} className="button" style={{ marginTop: 20 }}>
             Back to the cemetery
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -347,9 +348,9 @@ export default function CemeteryArtworkPage({
   return (
     <main className="shell">
       <div style={{ marginBottom: 14 }}>
-        <Link href={`/cemetery/${placeId}`} className="button secondary small">
+        <ButtonLink href={`/cemetery/${placeId}`} className="button secondary small">
           Back to the cemetery
-        </Link>
+        </ButtonLink>
       </div>
       <div className="dashboardHead">
         <div>

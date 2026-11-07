@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, getDoc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -76,9 +77,9 @@ export default function AdminAudit() {
           <h2 style={{ marginBottom: 0 }}>Recent activity</h2>
           <p className="muted" style={{ margin: '4px 0 0' }}>Last 200 events, newest first.</p>
         </div>
-        <Link href="/admin" className="button secondary">
+        <ButtonLink href="/admin" className="button secondary">
           Back to console
-        </Link>
+        </ButtonLink>
       </div>
 
       {events.length === 0 ? (

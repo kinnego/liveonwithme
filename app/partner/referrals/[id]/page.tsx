@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -211,9 +212,9 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
         <div className="card">
           <h3>Something went wrong</h3>
           <p className="muted">{error}</p>
-          <Link href="/partner" className="button soft" style={{ marginTop: 12, display: 'inline-flex' }}>
+          <ButtonLink href="/partner" className="button soft" style={{ marginTop: 12, display: 'inline-flex' }}>
             Back to your customers
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -284,9 +285,9 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
             <div style={{ marginTop: 18 }}>
               <div className="eyebrow">The memorial page</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-                <Link href={`/m/${r.memorialId}`} className="button secondary small">
+                <ButtonLink href={`/m/${r.memorialId}`} className="button secondary small">
                   View memorial
-                </Link>
+                </ButtonLink>
               </div>
             </div>
 
@@ -299,9 +300,9 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
               </p>
               {plotId ? (
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
-                  <Link href={`/plot/${plotId}/artwork`} className="button secondary small">
+                  <ButtonLink href={`/plot/${plotId}/artwork`} className="button secondary small">
                     Headstone artwork
-                  </Link>
+                  </ButtonLink>
                 </div>
               ) : (
                 <p className="muted" style={{ margin: '10px 0 0', fontSize: 13 }}>
@@ -318,9 +319,9 @@ export default function PartnerReferral({ params }: { params: Promise<{ id: stri
                 headstone.
               </p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
-                <Link href={`/memorial/${r.memorialId}/artwork`} className="button secondary small">
+                <ButtonLink href={`/memorial/${r.memorialId}/artwork`} className="button secondary small">
                   Memorial artwork
-                </Link>
+                </ButtonLink>
               </div>
             </div>
           </div>

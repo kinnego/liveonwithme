@@ -8,6 +8,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -410,9 +411,9 @@ export default function MemorialArtworkPage({
         <div className="formCard center">
           <div className="eyebrow">For a keepsake</div>
           <h2>We couldn&rsquo;t find that memorial.</h2>
-          <Link href="/dashboard" className="button" style={{ marginTop: 20 }}>
+          <ButtonLink href="/dashboard" className="button" style={{ marginTop: 20 }}>
             Back to dashboard
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -425,9 +426,9 @@ export default function MemorialArtworkPage({
           <div className="eyebrow">For a keepsake</div>
           <h2>Only the memorial&rsquo;s custodian can design artwork.</h2>
           {memorial && (
-            <Link href={`/m/${memorial.slug}`} className="button" style={{ marginTop: 20 }}>
+            <ButtonLink href={`/m/${memorial.slug}`} className="button" style={{ marginTop: 20 }}>
               View the memorial
-            </Link>
+            </ButtonLink>
           )}
         </div>
       </main>
@@ -891,12 +892,12 @@ export default function MemorialArtworkPage({
         )}
 
         <div style={{ marginTop: 30, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href={`/memorial/${memorial.id}/manage`} className="button soft">
+          <ButtonLink href={`/memorial/${memorial.id}/manage`} className="button soft">
             Back to manage
-          </Link>
-          <Link href={`/m/${memorial.slug}`} className="button soft">
+          </ButtonLink>
+          <ButtonLink href={`/m/${memorial.slug}`} className="button soft">
             View memorial
-          </Link>
+          </ButtonLink>
         </div>
       </div>
     </main>

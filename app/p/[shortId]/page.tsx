@@ -4,6 +4,7 @@
 
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { adminDb } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
@@ -32,9 +33,9 @@ export default async function ShortPlot({
               If you scanned a QR code, please try again — and if it still doesn&rsquo;t work,
               email <a href="mailto:hello@freastar.com">hello@freastar.com</a>.
             </p>
-            <Link href="/" className="button" style={{ marginTop: 20 }}>
+            <ButtonLink href="/" className="button" style={{ marginTop: 20 }}>
               Return home
-            </Link>
+            </ButtonLink>
           </div>
         </main>
       );

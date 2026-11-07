@@ -9,6 +9,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -242,9 +243,9 @@ export default function DemoQrPage() {
             This page is for approved partners and site administrators. If you&rsquo;ve applied
             to become a partner, we&rsquo;ll email you once your application is approved.
           </p>
-          <Link href="/partner/apply" className="button" style={{ marginTop: 20 }}>
+          <ButtonLink href="/partner/apply" className="button" style={{ marginTop: 20 }}>
             Apply to become a partner
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -261,7 +262,7 @@ export default function DemoQrPage() {
   return (
     <main className="shell">
       <div style={{ maxWidth: 690, margin: '0 auto 10px' }}>
-        <Link href="/partner" className="button secondary small">Partner dashboard</Link>
+        <ButtonLink href="/partner" className="button secondary small">Partner dashboard</ButtonLink>
       </div>
       <div className="formCard">
         <div className="eyebrow">Demo QR designer</div>

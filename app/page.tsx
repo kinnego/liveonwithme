@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import UnifiedSearch from '@/components/UnifiedSearch';
@@ -63,12 +64,12 @@ export default function Home() {
             someone you love, or a page in your own words for the people who will come after.
           </p>
           <div className="actions">
-            <Link href="/create" className="button">
+            <ButtonLink href="/create" className="button">
               Create a page
-            </Link>
-            <Link href="/m/mary-demo" className="button secondary">
+            </ButtonLink>
+            <ButtonLink href="/m/mary-demo" className="button secondary">
               See an example
-            </Link>
+            </ButtonLink>
           </div>
           <p className="muted" style={{ marginTop: 18, fontSize: 14 }}>
             <span style={{ whiteSpace: 'nowrap' }}>Family-controlled</span>
@@ -150,9 +151,9 @@ export default function Home() {
             &ldquo;A person&rsquo;s life is not only the years they lived, but the stories that
             remain in everyone they touched.&rdquo;
           </div>
-          <Link href="/create" className="button">
+          <ButtonLink href="/create" className="button">
             Begin gently
-          </Link>
+          </ButtonLink>
         </div>
       </section>
 
@@ -174,9 +175,9 @@ export default function Home() {
             keepsake, set up in minutes and cared for by them for a lifetime.
             You focus on the family; we handle the technology.
           </p>
-          <Link href="/partner/apply" className="button">
+          <ButtonLink href="/partner/apply" className="button">
             Become a partner
-          </Link>
+          </ButtonLink>
         </div>
       </section>
     </main>

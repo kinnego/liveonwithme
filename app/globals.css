@@ -5,6 +5,11 @@
 .skRow{display:flex;gap:12px;align-items:center}
 .skStack{display:flex;flex-direction:column;gap:10px}
 iframe#nl-badge-frame,iframe[title="Powered by Netlify"]{display:none!important}
+.link-hint{display:inline-block;width:.55em;height:.55em;margin-left:.45em;border-radius:50%;background:currentColor;opacity:0;visibility:hidden;vertical-align:middle}
+.link-hint.is-pending{visibility:visible;animation:linkHintFade .2s ease 100ms forwards,linkHintPulse 1s ease-in-out 100ms infinite}
+@keyframes linkHintFade{to{opacity:.6}}
+@keyframes linkHintPulse{50%{opacity:.2}}
+@media (prefers-reduced-motion:reduce){.link-hint.is-pending{animation:linkHintFade .2s ease 100ms forwards}}
 .songPill{display:inline-flex;align-items:center;gap:8px;margin-top:16px;padding:8px 16px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.55);color:white;font-size:14px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);transition:background .15s ease}
 .songPill:hover{background:rgba(255,255,255,.24)}
 .heroMeta .songPill{margin-top:0;background:var(--sage2);border-color:var(--line);color:var(--ink);backdrop-filter:none}

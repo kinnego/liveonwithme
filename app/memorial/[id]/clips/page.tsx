@@ -1,6 +1,7 @@
 'use client';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import {
   addDoc,
   collection,
@@ -154,9 +155,9 @@ export default function MemorialClipsPage({ params }: { params: Promise<{ id: st
             page.
           </p>
         </div>
-        <Link href={`/memorial/${m.id}`} className="button secondary">
+        <ButtonLink href={`/memorial/${m.id}`} className="button secondary">
           Back
-        </Link>
+        </ButtonLink>
       </div>
 
       <div className="formCard" style={{ margin: '20px 0' }}>

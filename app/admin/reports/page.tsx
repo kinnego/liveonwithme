@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -176,9 +177,9 @@ export default function AdminContributionReports() {
               : `Last ${reports.length} report${reports.length === 1 ? '' : 's'}.`}
           </p>
         </div>
-        <Link href="/admin" className="button secondary">
+        <ButtonLink href="/admin" className="button secondary">
           Back to console
-        </Link>
+        </ButtonLink>
       </div>
 
       <div style={{ display: 'flex', gap: 8, margin: '0 0 20px' }}>

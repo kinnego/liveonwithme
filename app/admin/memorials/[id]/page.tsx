@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -289,9 +290,9 @@ export default function AdminMemorialInspector({
             <div className="eyebrow">Admin · memorial</div>
             <h2 style={{ marginBottom: 0 }}>Not found</h2>
           </div>
-          <Link href="/admin/memorials" className="button secondary">
+          <ButtonLink href="/admin/memorials" className="button secondary">
             Back to memorials
-          </Link>
+          </ButtonLink>
         </div>
         <div className="card">
           <p className="muted">No memorial with id <code>{id}</code>.</p>
@@ -318,12 +319,12 @@ export default function AdminMemorialInspector({
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Link href={`/m/${m.slug}`} target="_blank" rel="noopener" className="button secondary">
+          <ButtonLink href={`/m/${m.slug}`} target="_blank" rel="noopener" className="button secondary">
             View public page ↗
-          </Link>
-          <Link href="/admin/memorials" className="button secondary">
+          </ButtonLink>
+          <ButtonLink href="/admin/memorials" className="button secondary">
             Back to list
-          </Link>
+          </ButtonLink>
         </div>
       </div>
 
@@ -527,12 +528,12 @@ export default function AdminMemorialInspector({
               mono
             />
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-              <Link href={`/plot/${plot.id}`} target="_blank" rel="noopener" className="button secondary small">
+              <ButtonLink href={`/plot/${plot.id}`} target="_blank" rel="noopener" className="button secondary small">
                 Open plot page ↗
-              </Link>
-              <Link href={`/plot/${plot.id}/artwork`} target="_blank" rel="noopener" className="button secondary small">
+              </ButtonLink>
+              <ButtonLink href={`/plot/${plot.id}/artwork`} target="_blank" rel="noopener" className="button secondary small">
                 Open artwork ↗
-              </Link>
+              </ButtonLink>
             </div>
             <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
               Opens the same tools the custodian uses. Changes you make (shape, custom mark,

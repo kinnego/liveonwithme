@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -135,9 +136,9 @@ export default function AdminPartners() {
           <div className="eyebrow">Admin · partners</div>
           <h2 style={{ marginBottom: 0 }}>Partner applications</h2>
         </div>
-        <Link href="/admin" className="button secondary">
+        <ButtonLink href="/admin" className="button secondary">
           Back to console
-        </Link>
+        </ButtonLink>
       </div>
 
       {error && <p style={{ color: '#a94442', fontSize: 14 }}>{error}</p>}

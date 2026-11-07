@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import {
   doc,
   getDoc,
@@ -640,12 +641,12 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Link href="/dashboard" className="button secondary">
+          <ButtonLink href="/dashboard" className="button secondary">
             Dashboard
-          </Link>
-          <Link href={`/m/${m.slug}`} className="button secondary">
+          </ButtonLink>
+          <ButtonLink href={`/m/${m.slug}`} className="button secondary">
             {isLive ? `View ${pageWord}` : 'Preview'}
-          </Link>
+          </ButtonLink>
         </div>
       </div>
 
@@ -905,9 +906,9 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
                   ? 'Go Live'
                   : `Go Live · €${priceEur}`}
             </button>
-            <Link href={`/m/${m.slug}`} className="button secondary">
+            <ButtonLink href={`/m/${m.slug}`} className="button secondary">
               Preview first
-            </Link>
+            </ButtonLink>
           </div>
 
           {isAwaitingPayment && !isPartnerPaid && (
@@ -988,16 +989,16 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
         <div className="card">
           <h3>{isLegacy ? 'Edit the details' : `Edit ${pronouns.possessive} story`}</h3>
           <p className="muted">Name, dates, primary picture, introduction, life story and privacy.</p>
-          <Link href={`/memorial/${m.id}/edit`} className="button soft">
+          <ButtonLink href={`/memorial/${m.id}/edit`} className="button soft">
             Edit {pageWord}
-          </Link>
+          </ButtonLink>
         </div>
         <div className="card">
           <h3>Photos</h3>
           <p className="muted">Upload photographs, star up to 4 favourites for the highlighted strip.</p>
-          <Link href={`/memorial/${m.id}/gallery`} className="button soft">
+          <ButtonLink href={`/memorial/${m.id}/gallery`} className="button soft">
             Open gallery
-          </Link>
+          </ButtonLink>
         </div>
         <div className="card">
           <h3>Recordings</h3>
@@ -1005,9 +1006,9 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             Voicemails, {pronouns.object} singing, a bit of a speech — short audio clips of{' '}
             {firstName}.
           </p>
-          <Link href={`/memorial/${m.id}/clips`} className="button soft">
+          <ButtonLink href={`/memorial/${m.id}/clips`} className="button soft">
             Open recordings
-          </Link>
+          </ButtonLink>
         </div>
       </div>
 
@@ -1031,9 +1032,9 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           </p>
         )}
         <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-          <Link href={`/memorial/${m.id}/artwork`} className="button">
+          <ButtonLink href={`/memorial/${m.id}/artwork`} className="button">
             Open artwork
-          </Link>
+          </ButtonLink>
         </div>
       </div>
 
@@ -1044,9 +1045,9 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
             ? 'Write in your own voice. The memories and moments you want carried forward.'
             : `Write your own memories. The keeper's voice on the memorial.`}
         </p>
-        <Link href={`/memorial/${m.id}/memories`} className="button soft" style={{ marginTop: 12 }}>
+        <ButtonLink href={`/memorial/${m.id}/memories`} className="button soft" style={{ marginTop: 12 }}>
           Write memories
-        </Link>
+        </ButtonLink>
       </div>
 
       {isLive && quotas.totalBytesPerMemorial > 0 && (

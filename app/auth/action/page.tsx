@@ -5,6 +5,7 @@
 
 import { FormEvent, Suspense, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -91,9 +92,9 @@ function AuthActionInner() {
             If you were trying to reset your password, request a fresh link from the sign-in
             page.
           </p>
-          <Link href="/auth" className="button" style={{ marginTop: 20 }}>
+          <ButtonLink href="/auth" className="button" style={{ marginTop: 20 }}>
             Back to sign in
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -109,9 +110,9 @@ function AuthActionInner() {
             We couldn&rsquo;t handle a link of this type. If you were resetting
             your password, please start again from the sign-in page.
           </p>
-          <Link href="/auth" className="button" style={{ marginTop: 20 }}>
+          <ButtonLink href="/auth" className="button" style={{ marginTop: 20 }}>
             Back to sign in
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -127,9 +128,9 @@ function AuthActionInner() {
             The reset link didn&rsquo;t include a verification token. Please request a
             fresh link from the sign-in page.
           </p>
-          <Link href="/auth" className="button" style={{ marginTop: 20 }}>
+          <ButtonLink href="/auth" className="button" style={{ marginTop: 20 }}>
             Back to sign in
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );

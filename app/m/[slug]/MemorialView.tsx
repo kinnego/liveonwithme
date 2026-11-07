@@ -1,6 +1,7 @@
 'use client';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import nextDynamic from 'next/dynamic';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase-auth';
@@ -519,9 +520,9 @@ export default function Memorial({
           <p className="muted">
             This memorial may have been moved, or it isn't published yet.
           </p>
-          <Link href="/" className="button" style={{ marginTop: 20 }}>
+          <ButtonLink href="/" className="button" style={{ marginTop: 20 }}>
             Return home
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -644,13 +645,13 @@ export default function Memorial({
               zIndex: 2,
             }}
           >
-            <Link
+            <ButtonLink
               href={`/memorial/${memorial.id}/edit`}
               className="button soft small"
               style={{ background: 'rgba(255,255,255,.9)', color: 'var(--ink)' }}
             >
               ✎ Edit header
-            </Link>
+            </ButtonLink>
           </div>
         )}
         <div>
@@ -682,7 +683,7 @@ export default function Memorial({
                 >
                   <SongPlayer videoId={videoId} label={label} />
                   {asKeeper && (
-                    <Link
+                    <ButtonLink
                       href={`/memorial/${memorial.id}/song`}
                       className="button soft small"
                       aria-label="Edit the song"
@@ -694,7 +695,7 @@ export default function Memorial({
                       }}
                     >
                       ✎ Edit
-                    </Link>
+                    </ButtonLink>
                   )}
                 </div>
               );
@@ -705,7 +706,7 @@ export default function Memorial({
                   onClick={(e) => e.stopPropagation()}
                   style={{ marginTop: 18 }}
                 >
-                  <Link
+                  <ButtonLink
                     href={`/memorial/${memorial.id}/song`}
                     className="button soft small"
                     style={{
@@ -714,7 +715,7 @@ export default function Memorial({
                     }}
                   >
                     ✎ Add a song
-                  </Link>
+                  </ButtonLink>
                 </div>
               );
             }
@@ -759,7 +760,7 @@ export default function Memorial({
                   <span style={{ color: 'var(--ink)' }}>{cemetery!.name}</span>
                 )}
                 {asKeeper && (
-                  <Link
+                  <ButtonLink
                     href={
                       memorial.plotId
                         ? `/plot/${memorial.plotId}/manage`
@@ -775,16 +776,16 @@ export default function Memorial({
                     }}
                   >
                     ✎ Edit
-                  </Link>
+                  </ButtonLink>
                 )}
               </p>
             ) : asKeeper && !memorial.plotId ? (
-              <Link
+              <ButtonLink
                 href={`/memorial/${memorial.id}/plot/new`}
                 className="button soft small"
               >
                 ✎ Add a resting place
-              </Link>
+              </ButtonLink>
             ) : null}
             {plotCoords && (
               <p style={{ margin: 0, fontSize: 14 }}>
@@ -901,9 +902,9 @@ export default function Memorial({
         </div>
         {asKeeper && (
           <div style={{ textAlign: 'center', marginTop: 24 }}>
-            <Link href={`/memorial/${memorial.id}/edit#story`} className="button soft small">
+            <ButtonLink href={`/memorial/${memorial.id}/edit#story`} className="button soft small">
               ✎ Edit the story
-            </Link>
+            </ButtonLink>
           </div>
         )}
       </section>
@@ -953,9 +954,9 @@ export default function Memorial({
           ) : null}
           {asKeeper && (
             <div style={{ textAlign: 'center', marginTop: 24 }}>
-              <Link href={`/memorial/${memorial.id}/clips`} className="button soft small">
+              <ButtonLink href={`/memorial/${memorial.id}/clips`} className="button soft small">
                 ✎ {clips.length > 0 ? 'Manage recordings' : 'Add a recording'}
-              </Link>
+              </ButtonLink>
             </div>
           )}
         </section>
@@ -1013,9 +1014,9 @@ export default function Memorial({
           </div>
           {asKeeper && (
             <div style={{ textAlign: 'center', marginTop: 24 }}>
-              <Link href={`/memorial/${memorial.id}/gallery`} className="button soft small">
+              <ButtonLink href={`/memorial/${memorial.id}/gallery`} className="button soft small">
                 ✎ Change favourites
-              </Link>
+              </ButtonLink>
             </div>
           )}
         </section>
@@ -1121,9 +1122,9 @@ export default function Memorial({
         )}
         {(isPreview || asKeeper) && (
           <div style={{ marginTop: 24 }}>
-            <Link href={`/memorial/${memorial.id}/memories`} className="button secondary small">
+            <ButtonLink href={`/memorial/${memorial.id}/memories`} className="button secondary small">
               {memories.length ? 'Edit memories' : 'Write a memory'}
-            </Link>
+            </ButtonLink>
           </div>
         )}
       </section>
@@ -1166,13 +1167,13 @@ export default function Memorial({
               <p className="muted">
                 No photographs yet. This is where family favourites will live.
               </p>
-              <Link
+              <ButtonLink
                 href={`/memorial/${memorial.id}/gallery`}
                 className="button secondary small"
                 style={{ marginTop: 10 }}
               >
                 Add photos
-              </Link>
+              </ButtonLink>
             </div>
           ) : (
             <>
@@ -1181,9 +1182,9 @@ export default function Memorial({
               </p>
               {asKeeper && photos.length > 0 && (
                 <div style={{ textAlign: 'center', marginTop: 16 }}>
-                  <Link href={`/memorial/${memorial.id}/gallery`} className="button soft small">
+                  <ButtonLink href={`/memorial/${memorial.id}/gallery`} className="button soft small">
                     ✎ Open gallery
-                  </Link>
+                  </ButtonLink>
                 </div>
               )}
             </>
@@ -1295,9 +1296,9 @@ export default function Memorial({
             </div>
 
             <div className="center" style={{ marginTop: 28 }}>
-              <Link href="/create" className="button">
+              <ButtonLink href="/create" className="button">
                 Create a memorial like this
-              </Link>
+              </ButtonLink>
               <p className="muted" style={{ marginTop: 12, fontSize: 13 }}>
                 It takes about two minutes to set up.
               </p>
@@ -1427,9 +1428,9 @@ export default function Memorial({
           <p className="muted" style={{ maxWidth: 420, margin: '8px auto 18px' }}>
             A quiet place to share their story, gather photos and memories, and keep them close.
           </p>
-          <Link href="/create" className="button">
+          <ButtonLink href="/create" className="button">
             Start a memorial
-          </Link>
+          </ButtonLink>
         </section>
       )}
 

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -87,9 +88,9 @@ export default function NewPlotForMemorial({
       <main className="shell">
         <div className="formCard">
           <h2>We couldn&rsquo;t find that memorial.</h2>
-          <Link href="/dashboard" className="button secondary" style={{ marginTop: 16 }}>
+          <ButtonLink href="/dashboard" className="button secondary" style={{ marginTop: 16 }}>
             Back to your dashboard
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -100,9 +101,9 @@ export default function NewPlotForMemorial({
     <main className="shell">
       <div className="formCard">
         <div style={{ marginBottom: 14 }}>
-          <Link href={`/memorial/${m.id}`} className="button secondary small">
+          <ButtonLink href={`/memorial/${m.id}`} className="button secondary small">
             Back
-          </Link>
+          </ButtonLink>
         </div>
         <div className="eyebrow">The resting place</div>
         <h2>Where will people come to visit {m.fullName}?</h2>
@@ -136,9 +137,9 @@ export default function NewPlotForMemorial({
                 ? `Create plot at ${cemeteryPick.name || 'this cemetery'}`
                 : 'Pick a cemetery to continue'}
           </button>
-          <Link href={`/memorial/${m.id}`} className="button secondary">
+          <ButtonLink href={`/memorial/${m.id}`} className="button secondary">
             Cancel
-          </Link>
+          </ButtonLink>
         </div>
       </div>
     </main>

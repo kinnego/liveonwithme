@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import {
   onAuthStateChanged,
   signOut,
@@ -219,9 +220,9 @@ export default function Dashboard() {
           <div className="eyebrow">Your keeper space</div>
           <h2 style={{ marginBottom: 0 }}>Memorials</h2>
         </div>
-        <Link href="/create" className="button">
+        <ButtonLink href="/create" className="button">
           Create a page
-        </Link>
+        </ButtonLink>
       </div>
       {owned.length === 0 ? (
         <div className="card">
@@ -244,13 +245,13 @@ export default function Dashboard() {
                   : `${m.born?.slice(0, 4) || ''}${m.died ? ` — ${m.died.slice(0, 4)}` : ''}`}
               </p>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
-                <Link href={`/memorial/${m.id}`} className="button secondary small">
+                <ButtonLink href={`/memorial/${m.id}`} className="button secondary small">
                   Manage {m.kind === 'legacy' ? 'page' : 'memorial'}
-                </Link>
+                </ButtonLink>
                 {m.plotId && (
-                  <Link href={`/plot/${m.plotId}/manage`} className="button secondary small">
+                  <ButtonLink href={`/plot/${m.plotId}/manage`} className="button secondary small">
                     Resting place
-                  </Link>
+                  </ButtonLink>
                 )}
               </div>
             </article>

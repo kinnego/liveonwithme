@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -78,13 +79,13 @@ export default function LegacyClaim() {
             You&rsquo;ll need a LiveOnWith.me account to claim a page. If you don&rsquo;t
             have one yet, we&rsquo;ll create it in a moment — no cost.
           </p>
-          <Link
+          <ButtonLink
             href={`/auth?next=${encodeURIComponent('/legacy/claim')}`}
             className="button"
             style={{ marginTop: 18 }}
           >
             Sign in or create account
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -130,9 +131,9 @@ export default function LegacyClaim() {
             <button className="button" type="submit" disabled={working}>
               {working ? 'Claiming\u2026' : 'Claim the page'}
             </button>
-            <Link href="/dashboard" className="button secondary">
+            <ButtonLink href="/dashboard" className="button secondary">
               Cancel
-            </Link>
+            </ButtonLink>
           </div>
         </form>
       </div>

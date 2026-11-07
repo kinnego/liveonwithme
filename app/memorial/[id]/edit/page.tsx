@@ -1,6 +1,7 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
@@ -135,9 +136,9 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
     <main className="shell">
       <div className="formCard">
         <div style={{ marginBottom: 14 }}>
-          <Link href={`/memorial/${m.id}`} className="button secondary small">
+          <ButtonLink href={`/memorial/${m.id}`} className="button secondary small">
             Back
-          </Link>
+          </ButtonLink>
         </div>
         <div className="eyebrow">Edit {pageWord}</div>
         <h2>{m.fullName}</h2>
@@ -268,9 +269,9 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
             <button disabled={saving} className="button">
               {saving ? 'Saving…' : 'Save changes'}
             </button>
-            <Link href={`/memorial/${m.id}`} className="button secondary">
+            <ButtonLink href={`/memorial/${m.id}`} className="button secondary">
               Cancel
-            </Link>
+            </ButtonLink>
           </div>
         </form>
       </div>

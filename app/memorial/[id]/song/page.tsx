@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
@@ -47,9 +48,9 @@ export default function MemorialSongPage({ params }: { params: Promise<{ id: str
             plays automatically.
           </p>
         </div>
-        <Link href={`/memorial/${m.id}`} className="button secondary">
+        <ButtonLink href={`/memorial/${m.id}`} className="button secondary">
           Back
-        </Link>
+        </ButtonLink>
       </div>
 
       <SongEditor

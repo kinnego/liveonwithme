@@ -9,6 +9,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { useRouter } from 'next/navigation';
 import {
   collection,
@@ -206,9 +207,9 @@ export default function PlotManagePage({
           <p className="muted">
             It may have been removed. If you think this is a mistake, please contact support.
           </p>
-          <Link href="/dashboard" className="button secondary" style={{ marginTop: 16 }}>
+          <ButtonLink href="/dashboard" className="button secondary" style={{ marginTop: 16 }}>
             Back to your dashboard
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -221,9 +222,9 @@ export default function PlotManagePage({
           <p className="muted">
             If a loved one originally set this up, ask them to add you as a co-administrator.
           </p>
-          <Link href="/dashboard" className="button secondary" style={{ marginTop: 16 }}>
+          <ButtonLink href="/dashboard" className="button secondary" style={{ marginTop: 16 }}>
             Back to your dashboard
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -250,12 +251,12 @@ export default function PlotManagePage({
             )}
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <Link href="/dashboard" className="button secondary">
+            <ButtonLink href="/dashboard" className="button secondary">
               Dashboard
-            </Link>
-            <Link href={`/plot/${plot.id}`} className="button secondary">
+            </ButtonLink>
+            <ButtonLink href={`/plot/${plot.id}`} className="button secondary">
               View plot page
-            </Link>
+            </ButtonLink>
           </div>
         </div>
 
@@ -418,14 +419,14 @@ export default function PlotManagePage({
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     {m.status === 'live' && m.slug && (
-                      <Link href={`/m/${m.slug}`} className="button secondary">
+                      <ButtonLink href={`/m/${m.slug}`} className="button secondary">
                         View
-                      </Link>
+                      </ButtonLink>
                     )}
                     {m.ownerId === user?.uid && (
-                      <Link href={`/memorial/${m.id}/manage`} className="button secondary">
+                      <ButtonLink href={`/memorial/${m.id}/manage`} className="button secondary">
                         Manage
-                      </Link>
+                      </ButtonLink>
                     )}
                   </div>
                 </li>
@@ -433,12 +434,12 @@ export default function PlotManagePage({
             </ul>
           )}
           <div style={{ marginTop: 18 }}>
-            <Link
+            <ButtonLink
               href={`/create?plot=${encodeURIComponent(plot.id)}`}
               className="button"
             >
               Add another memorial to this plot
-            </Link>
+            </ButtonLink>
             <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>
               Additional names use the reduced rate. The QR engraved on the stone stays the same — new names simply appear when scanned.
             </p>
@@ -454,12 +455,12 @@ export default function PlotManagePage({
             everyone remembered here.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-            <Link href={`/plot/${plot.id}/artwork`} className="button">
+            <ButtonLink href={`/plot/${plot.id}/artwork`} className="button">
               Open artwork
-            </Link>
-            <Link href={`/plot/${plot.id}`} className="button secondary">
+            </ButtonLink>
+            <ButtonLink href={`/plot/${plot.id}`} className="button secondary">
               View public plot page
-            </Link>
+            </ButtonLink>
           </div>
         </div>
       </div>

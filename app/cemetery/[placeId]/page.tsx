@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
@@ -229,7 +230,7 @@ export default function CemeteryPage({
   return (
     <main className="shell">
       <div style={{ marginBottom: 14 }}>
-        <Link href="/cemetery/nearby" className="button secondary small">Cemeteries nearby</Link>
+        <ButtonLink href="/cemetery/nearby" className="button secondary small">Cemeteries nearby</ButtonLink>
       </div>
       <div className="eyebrow">Find someone</div>
       <h1 style={{ marginBottom: 8 }}>{cemeteryName}</h1>
@@ -241,7 +242,7 @@ export default function CemeteryPage({
 
       {canSeeArtwork && (
         <div style={{ marginBottom: 24 }}>
-          <Link
+          <ButtonLink
             href={`/cemetery/${placeId}/artwork${
               cemeteryName
                 ? `?name=${encodeURIComponent(cemeteryName)}${
@@ -252,7 +253,7 @@ export default function CemeteryPage({
             className="button secondary small"
           >
             Download cemetery artwork
-          </Link>
+          </ButtonLink>
         </div>
       )}
 
@@ -299,7 +300,7 @@ export default function CemeteryPage({
           </p>
           {knownCemeteryName && (
             <div style={{ marginTop: 16 }}>
-              <Link
+              <ButtonLink
                 href={buildCreateLinkForCemetery({
                   name: knownCemeteryName,
                   address: cemeteryAddress,
@@ -310,7 +311,7 @@ export default function CemeteryPage({
                 className="button"
               >
                 Create one for a loved one here
-              </Link>
+              </ButtonLink>
             </div>
           )}
         </div>
@@ -438,9 +439,9 @@ function CommunityBadge({
               Correct the name
             </button>
           ) : (
-            <Link href={`/auth?next=/cemetery/c-${custom.id}`} className="button secondary small">
+            <ButtonLink href={`/auth?next=/cemetery/c-${custom.id}`} className="button secondary small">
               Sign in to correct
-            </Link>
+            </ButtonLink>
           )}
         </div>
       ) : (

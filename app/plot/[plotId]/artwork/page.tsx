@@ -7,6 +7,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -391,9 +392,9 @@ export default function PlotArtworkPage({
           <h2>Not available</h2>
           <p className="muted">{error}</p>
           {plot && (
-            <Link href={`/plot/${plot.id}`} className="button" style={{ marginTop: 20 }}>
+            <ButtonLink href={`/plot/${plot.id}`} className="button" style={{ marginTop: 20 }}>
               Back to plot
-            </Link>
+            </ButtonLink>
           )}
         </div>
       </main>
@@ -709,12 +710,12 @@ export default function PlotArtworkPage({
         )}
 
         <div style={{ marginTop: 30, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href={`/plot/${plot.id}/manage`} className="button soft">
+          <ButtonLink href={`/plot/${plot.id}/manage`} className="button soft">
             Back to plot admin
-          </Link>
-          <Link href={`/plot/${plot.id}`} className="button soft">
+          </ButtonLink>
+          <ButtonLink href={`/plot/${plot.id}`} className="button soft">
             View plot page
-          </Link>
+          </ButtonLink>
         </div>
       </div>
     </main>

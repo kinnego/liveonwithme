@@ -12,6 +12,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { useRouter } from 'next/navigation';
 import {
   collection,
@@ -454,7 +455,7 @@ export default function UnifiedSearch() {
         <span aria-hidden="true" style={{ flex: 1, height: 1, background: 'var(--line)' }} />
       </div>
 
-      <Link
+      <ButtonLink
         href="/cemetery/nearby"
         className="button secondary"
         style={{
@@ -482,7 +483,7 @@ export default function UnifiedSearch() {
           <circle cx="12" cy="9" r="3" />
         </svg>
         Find graveyards near me
-      </Link>
+      </ButtonLink>
 
       {status === 'no-key' && (
         <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -144,8 +145,8 @@ export default function PartnerDashboard() {
             customer separately at whatever price fits your business.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 24, flexWrap: 'wrap' }}>
-            <Link href="/partner/apply" className="button">Apply to become a partner</Link>
-            <Link href="/dashboard" className="button secondary">Go to my dashboard</Link>
+            <ButtonLink href="/partner/apply" className="button">Apply to become a partner</ButtonLink>
+            <ButtonLink href="/dashboard" className="button secondary">Go to my dashboard</ButtonLink>
           </div>
         </div>
       </main>
@@ -191,7 +192,7 @@ export default function PartnerDashboard() {
             {profile?.partnerType ? PARTNER_TYPE_LABELS[profile.partnerType as PartnerType] : 'Approved partner'}
           </p>
         </div>
-        <Link href="/partner/new" className="button">Set up a new memorial</Link>
+        <ButtonLink href="/partner/new" className="button">Set up a new memorial</ButtonLink>
       </div>
 
       <div className="card" style={{ marginBottom: 30, background: '#fffdf9' }}>
@@ -212,7 +213,7 @@ export default function PartnerDashboard() {
             you&rsquo;re talking families through what it looks like.
           </p>
         </div>
-        <Link href="/demo-qr" className="button secondary">Get the demo QR</Link>
+        <ButtonLink href="/demo-qr" className="button secondary">Get the demo QR</ButtonLink>
       </div>
 
       {items.length === 0 ? (
@@ -222,7 +223,7 @@ export default function PartnerDashboard() {
             When a family engages you for a service, start their memorial here. They&rsquo;ll get an invite
             to take it over and add photographs and stories.
           </p>
-          <Link href="/partner/new" className="button" style={{ marginTop: 12 }}>Set up a new memorial</Link>
+          <ButtonLink href="/partner/new" className="button" style={{ marginTop: 12 }}>Set up a new memorial</ButtonLink>
         </div>
       ) : (
         <>
@@ -271,23 +272,23 @@ export default function PartnerDashboard() {
                         Contact: {r.bereavedName}
                       </p>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
-                        <Link href={`/partner/referrals/${r.id}`} className="button secondary small">
+                        <ButtonLink href={`/partner/referrals/${r.id}`} className="button secondary small">
                           Manage
-                        </Link>
+                        </ButtonLink>
                         {r.status === 'claimed' && (
                           <>
-                            <Link href={`/m/${r.memorialId}`} className="button secondary small">
+                            <ButtonLink href={`/m/${r.memorialId}`} className="button secondary small">
                               View memorial
-                            </Link>
-                            <Link href={`/memorial/${r.memorialId}/artwork`} className="button secondary small">
+                            </ButtonLink>
+                            <ButtonLink href={`/memorial/${r.memorialId}/artwork`} className="button secondary small">
                               Memorial artwork
-                            </Link>
+                            </ButtonLink>
                           </>
                         )}
                         {r.status === 'claimed' && plotId && (
-                          <Link href={`/plot/${plotId}/artwork`} className="button secondary small">
+                          <ButtonLink href={`/plot/${plotId}/artwork`} className="button secondary small">
                             Headstone artwork
-                          </Link>
+                          </ButtonLink>
                         )}
                       </div>
                     </article>

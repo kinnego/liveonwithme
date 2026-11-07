@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ButtonLink from '@/components/ButtonLink';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { PageSkeleton } from '@/components/Skeleton';
@@ -155,9 +156,9 @@ export default function AcceptCustody({
           <div className="eyebrow">Thank you</div>
           <h2>{invite.nominationType === 'coManager' ? 'Invitation accepted' : 'Custody accepted'}</h2>
           <p className="muted">{acceptedCopy}</p>
-          <Link href="/dashboard" className="button" style={{ marginTop: 20 }}>
+          <ButtonLink href="/dashboard" className="button" style={{ marginTop: 20 }}>
             Go to my dashboard
-          </Link>
+          </ButtonLink>
         </div>
       </main>
     );
@@ -219,13 +220,13 @@ export default function AcceptCustody({
               {' '}so we can match this invitation to you. If you don&rsquo;t have a
               LiveOnWith.me account yet, we&rsquo;ll create one.
             </p>
-            <Link
+            <ButtonLink
               href={`/auth?next=${encodeURIComponent(`/custody/accept/${token}`)}`}
               className="button"
               style={{ marginTop: 14 }}
             >
               Create account or sign in
-            </Link>
+            </ButtonLink>
           </div>
         )}
 
