@@ -29,6 +29,15 @@ export const dynamic = 'force-dynamic';
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
 
+const demoClips = [
+  {
+    id: 'demo-clip-1',
+    label: 'A voicemail Mary left for Aoife, 2019',
+    url: '/demo/mary-voicemail.m4a',
+    note: 'An illustrative sample voice — recorded for this demo.',
+  },
+];
+
 const demoPhotoUrls: Record<string, string> = {
   'demo-hero': '/demo/liveonwithme_lifestyle_01.webp',
   'demo-1': '/demo/liveonwithme_lifestyle_02.webp',
@@ -143,13 +152,17 @@ This is a place for all the pieces of Mary that live on in the people who knew h
   status: 'live',
   visibility: 'public',
   cemetery: {
-    name: "Glasnevin Cemetery",
-    address: 'Finglas Rd, Glasnevin, Dublin 11, Ireland',
-    placeId: 'ChIJyaMkOMwOZ0gRXpImTPzTKN0',
-    lat: 53.3719,
-    lng: -6.2814,
+    name: 'Glasnevin Cemetery',
+    address: 'Finglas Rd, Glasnevin, Dublin, D11 XA32',
+    placeId: 'ChIJTf7MoOGZXUgRwg549JX1Nu0',
+    lat: 53.3697293,
+    lng: -6.2773294,
   },
-  featuredContributionIds: ['demo-1', 'demo-2', 'demo-3'],
+  plot: {
+    lat: 53.3705,
+    lng: -6.2765,
+  },
+  featuredContributionIds: ['demo-1', 'demo-2', 'demo-3', 'demo-4'],
   galleryDisplayMode: 'square',
 };
 
@@ -274,8 +287,10 @@ export default function Memorial({
         if (cancelled) return;
         setMemorial(demo);
         setPlotCemetery(demo.cemetery);
+        setPlotCoords(demo.plot);
         setHero(demo.heroPhotoUrl);
         setApproved(demoContributions);
+        setClips(demoClips);
         const urlMap: Record<string, string> = {};
         for (const c of demoContributions) {
           if ((c as any).photoPath) urlMap[c.id] = demoPhotoUrls[(c as any).photoPath];
@@ -924,27 +939,35 @@ export default function Memorial({
                 marginRight: 'auto',
               }}
             >
-              {clips.map((clip: any) => (
-                <div
-                  key={clip.id}
-                  style={{
-                    padding: 16,
-                    border: '1px solid var(--line)',
-                    borderRadius: 12,
-                    background: 'var(--card)',
-                  }}
-                >
-                  <div style={{ fontWeight: 600, marginBottom: 8 }}>{clip.label}</div>
-                  {R2_PUBLIC_URL && (
-                    <audio
-                      controls
-                      preload="none"
-                      src={`${R2_PUBLIC_URL}/${clip.path}`}
-                      style={{ width: '100%' }}
-                    />
-                  )}
-                </div>
-              ))}
+              {clips.map((clip: any) => {
+                const src = clip.url || (R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/${clip.path}` : '');
+                return (
+                  <div
+                    key={clip.id}
+                    style={{
+                      padding: 16,
+                      border: '1px solid var(--line)',
+                      borderRadius: 12,
+                      background: 'var(--card)',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 8 }}>{clip.label}</div>
+                    {src && (
+                      <audio
+                        controls
+                        preload="none"
+                        src={src}
+                        style={{ width: '100%' }}
+                      />
+                    )}
+                    {clip.note && (
+                      <p className="muted" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+                        {clip.note}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : asKeeper ? (
             <p className="muted center">

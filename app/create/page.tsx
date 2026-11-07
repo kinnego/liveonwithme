@@ -672,7 +672,7 @@ function CreateInner() {
               padding: 6,
             }}
           >
-            No, this is a different resting place
+            No, this is a new memorial for someone I love
           </button>
         </div>
 
