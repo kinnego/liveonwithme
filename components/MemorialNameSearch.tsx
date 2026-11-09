@@ -16,6 +16,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { formatYears } from '@/lib/age';
 
 type Result = {
   id: string;
@@ -23,18 +24,11 @@ type Result = {
   nickname?: string;
   born?: string;
   died?: string;
+  ageAtDeath?: number | null;
   cemeteryName?: string;
   address?: string;
 };
 
-function formatYears(born?: string, died?: string): string {
-  const b = born?.slice(0, 4);
-  const d = died?.slice(0, 4);
-  if (b && d) return `${b} — ${d}`;
-  if (b) return `Born ${b}`;
-  if (d) return `Died ${d}`;
-  return '';
-}
 
 export default function MemorialNameSearch() {
   const [term, setTerm] = useState('');
@@ -94,6 +88,7 @@ export default function MemorialNameSearch() {
           nickname: data.nickname || undefined,
           born: data.born,
           died: data.died,
+          ageAtDeath: typeof data.ageAtDeath === 'number' ? data.ageAtDeath : null,
           cemeteryName: data.plotId ? cemeteryByPlotId.get(data.plotId) : undefined,
           address: data.address || undefined,
         }));
@@ -171,7 +166,7 @@ export default function MemorialNameSearch() {
           )}
           {status === 'ready' &&
             results.map((r) => {
-              const years = formatYears(r.born, r.died);
+              const years = formatYears(r.born, r.died, r.ageAtDeath);
               const place = r.cemeteryName || r.address;
               return (
                 <Link

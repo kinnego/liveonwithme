@@ -15,6 +15,7 @@ import {
   updateCustomCemeteryName,
 } from '@/lib/cemeteries';
 import { isApprovedPartner, isSuperAdmin } from '@/lib/roles';
+import { formatYears } from '@/lib/age';
 import type { Cemetery, CustomCemetery, UserProfile } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -36,6 +37,7 @@ type Memorial = {
   fullName: string;
   born?: string;
   died?: string;
+  ageAtDeath?: number | null;
   heroPhotoPath?: string;
 };
 
@@ -195,6 +197,7 @@ export default function CemeteryPage({
             fullName: data.fullName,
             born: data.born,
             died: data.died,
+            ageAtDeath: typeof data.ageAtDeath === 'number' ? data.ageAtDeath : null,
             heroPhotoPath: data.heroPhotoPath,
           });
         }
@@ -324,7 +327,7 @@ export default function CemeteryPage({
           </p>
           <div className="cemeteryList">
             {memorials.map((m) => {
-              const years = `${m.born?.slice(0, 4) || ''} — ${m.died?.slice(0, 4) || ''}`;
+              const years = formatYears(m.born, m.died, m.ageAtDeath);
               const hero = m.heroPhotoPath ? `${R2_PUBLIC_URL}/${m.heroPhotoPath}` : '';
               return (
                 <Link

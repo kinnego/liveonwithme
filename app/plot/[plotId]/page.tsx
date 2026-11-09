@@ -8,6 +8,7 @@ import { notFound, redirect } from 'next/navigation';
 import { adminDb } from '@/lib/firebase-admin';
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { walkingDirectionsUrl } from '@/lib/directions';
+import { formatYears } from '@/lib/age';
 import type { Memorial, Plot } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -175,8 +176,7 @@ export default async function PlotPage({
           </p>
           <div className="featureGrid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
             {memorials.map((m) => {
-              const born = m.born?.slice(0, 4) || '';
-              const died = m.died?.slice(0, 4) || '';
+              const years = formatYears(m.born, m.died, m.ageAtDeath);
               return (
                 <Link
                   key={m.id}
@@ -185,9 +185,9 @@ export default async function PlotPage({
                   style={{ display: 'block', textDecoration: 'none' }}
                 >
                   <h3 style={{ marginBottom: 4 }}>{m.fullName}</h3>
-                  {(born || died) && (
+                  {years && (
                     <p className="muted" style={{ margin: '0 0 10px' }}>
-                      {born}{born && died ? ' — ' : ''}{died}
+                      {years}
                     </p>
                   )}
                   {m.epitaph && (

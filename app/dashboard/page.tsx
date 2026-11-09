@@ -16,6 +16,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { formatYears } from '@/lib/age';
 import { useRouter } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
@@ -242,7 +243,7 @@ export default function Dashboard() {
               <p className="muted">
                 {m.kind === 'legacy'
                   ? m.born?.slice(0, 4) || 'A legacy page'
-                  : `${m.born?.slice(0, 4) || ''}${m.died ? ` — ${m.died.slice(0, 4)}` : ''}`}
+                  : formatYears(m.born, m.died, m.ageAtDeath)}
               </p>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
                 <ButtonLink href={`/memorial/${m.id}`} className="button secondary small">
@@ -274,7 +275,7 @@ export default function Dashboard() {
                 <p className="muted">
                   {m.kind === 'legacy'
                     ? m.born?.slice(0, 4) || 'A legacy page'
-                    : `${m.born?.slice(0, 4) || ''}${m.died ? ` — ${m.died.slice(0, 4)}` : ''}`}
+                    : formatYears(m.born, m.died, m.ageAtDeath)}
                 </p>
                 <span>Manage {m.kind === 'legacy' ? 'page' : 'memorial'} →</span>
               </Link>
@@ -298,7 +299,7 @@ export default function Dashboard() {
                 <p className="muted">
                   {m.kind === 'legacy'
                     ? m.born?.slice(0, 4) || 'A legacy page'
-                    : `${m.born?.slice(0, 4) || ''}${m.died ? ` — ${m.died.slice(0, 4)}` : ''}`}
+                    : formatYears(m.born, m.died, m.ageAtDeath)}
                 </p>
                 <span>View {m.kind === 'legacy' ? 'page' : 'memorial'} →</span>
               </Link>

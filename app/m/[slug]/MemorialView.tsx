@@ -11,6 +11,7 @@ import { resizeForMobile } from '@/lib/image';
 import { photoSrc, photoSrcSet } from '@/lib/images';
 import { canEditMemorial } from '@/lib/roles';
 import { pronounsFor, capitalize } from '@/lib/pronouns';
+import { formatYears } from '@/lib/age';
 import { PageSkeleton } from '@/components/Skeleton';
 
 // yet-another-react-lightbox is ~77 KB JS + ~6 KB CSS and most visitors never
@@ -545,12 +546,10 @@ export default function Memorial({
 
   const isLegacy = memorial.kind === 'legacy';
   const bornYear = memorial.born?.slice(0, 4) || '';
-  const diedYear = memorial.died?.slice(0, 4) || '';
   const years = isLegacy
     ? bornYear
-    : bornYear || diedYear
-      ? `${bornYear} — ${diedYear}`
-      : '';
+    : formatYears(memorial.born, memorial.died, memorial.ageAtDeath);
+  const hasBothYears = !!memorial.born && !!memorial.died;
   const publicApproved = approved.filter((x) => x.audience !== 'family_only');
   const photos = publicApproved.filter((x) => x.photoPath && !x.memory);
   const memories = publicApproved.filter((x) => x.memory);
@@ -672,7 +671,7 @@ export default function Memorial({
         <div>
           <div className="dates">
             {years}
-            {!isLegacy && ageAtDeath !== undefined && ageAtDeath !== null && (
+            {!isLegacy && hasBothYears && ageAtDeath !== undefined && ageAtDeath !== null && (
               <span style={{ marginLeft: 12 }}>· Aged {ageAtDeath}</span>
             )}
           </div>

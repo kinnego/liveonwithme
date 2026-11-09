@@ -25,6 +25,7 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
   const [error, setError] = useState('');
   const [born, setBorn] = useState('');
   const [died, setDied] = useState('');
+  const [age, setAge] = useState('');
   const [showDiedField, setShowDiedField] = useState(false);
   const router = useRouter();
 
@@ -40,6 +41,11 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
         setM(data);
         setBorn(data.born || '');
         setDied(data.died || '');
+        setAge(
+          typeof data.ageAtDeath === 'number' && !calculateAgeAtDeath(data.born, data.died)
+            ? String(data.ageAtDeath)
+            : '',
+        );
         if (data.kind === 'legacy' && data.died) setShowDiedField(true);
       })
     );
@@ -72,13 +78,20 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
     try {
       const fd = new FormData(e.currentTarget);
       const nextFullName = String(fd.get('fullName'));
+      const derived = calculateAgeAtDeath(born, died);
+      let manualAge: number | null = null;
+      const typed = age.trim();
+      if (typed) {
+        const n = Number(typed);
+        if (Number.isInteger(n) && n >= 0 && n < 130) manualAge = n;
+      }
       const updates: Record<string, unknown> = {
         fullName: nextFullName,
         fullNameLower: nextFullName.toLowerCase(),
         gender: String(fd.get('gender') || 'unspecified'),
         born,
         died,
-        ageAtDeath: calculateAgeAtDeath(born, died),
+        ageAtDeath: derived ?? manualAge,
         epitaph: String(fd.get('epitaph') || ''),
         story: String(fd.get('story') || ''),
         visibility: String(fd.get('visibility') || 'public'),
@@ -214,10 +227,30 @@ export default function EditMemorial({ params }: { params: Promise<{ id: string 
                   />
                 </div>
               </div>
-              {derivedAge !== null && (
+              {derivedAge !== null ? (
                 <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
                   Age at passing: <strong>{derivedAge}</strong>
                 </p>
+              ) : (
+                <>
+                  <label htmlFor="age" style={{ marginTop: 14 }}>
+                    Age at passing{' '}
+                    <span className="muted" style={{ fontWeight: 400 }}>
+                      (optional — use this if the dates aren&rsquo;t known)
+                    </span>
+                  </label>
+                  <input
+                    id="age"
+                    name="age"
+                    type="number"
+                    min={0}
+                    max={129}
+                    inputMode="numeric"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    style={{ maxWidth: 160 }}
+                  />
+                </>
               )}
             </>
           )}

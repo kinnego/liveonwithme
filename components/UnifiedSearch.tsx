@@ -26,6 +26,7 @@ import {
 import { db } from '@/lib/firebase';
 import { loadGoogleMaps } from '@/lib/places';
 import { customPlaceIdOf, searchCustomCemeteries } from '@/lib/cemeteries';
+import { formatYears } from '@/lib/age';
 import type { CustomCemetery } from '@/lib/types';
 
 type PersonHit = {
@@ -35,6 +36,7 @@ type PersonHit = {
   nickname?: string;
   born?: string;
   died?: string;
+  ageAtDeath?: number | null;
   cemeteryName?: string;
 };
 type GoogleCemeteryHit = {
@@ -55,14 +57,6 @@ const MIN_CHARS = 2;
 const CEMETERY_MIN_CHARS = 3;
 const DEBOUNCE_MS = 250;
 
-function formatYears(born?: string, died?: string): string {
-  const b = born?.slice(0, 4);
-  const d = died?.slice(0, 4);
-  if (b && d) return `${b} — ${d}`;
-  if (b) return `Born ${b}`;
-  if (d) return `Died ${d}`;
-  return '';
-}
 
 export default function UnifiedSearch() {
   const [term, setTerm] = useState('');
@@ -148,6 +142,7 @@ export default function UnifiedSearch() {
       nickname: data.nickname || undefined,
       born: data.born,
       died: data.died,
+      ageAtDeath: typeof data.ageAtDeath === 'number' ? data.ageAtDeath : null,
       cemeteryName: data.plotId ? cemeteryByPlotId.get(data.plotId) : undefined,
     }));
   }
@@ -324,7 +319,7 @@ export default function UnifiedSearch() {
             <div>
               <div style={sectionHeaderStyle}>People</div>
               {people.map((p) => {
-                const years = formatYears(p.born, p.died);
+                const years = formatYears(p.born, p.died, p.ageAtDeath);
                 return (
                   <button
                     key={p.id}
