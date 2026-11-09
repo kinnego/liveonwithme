@@ -152,9 +152,12 @@ function PickerMap({
   onCancel: () => void;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const [status, setStatus] = useState<'idle' | 'ready' | 'error' | 'no-key' | 'no-center'>('idle');
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(startCoords);
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState('');
 
   useEffect(() => {
     // Fall back to the cemetery centre if no existing pin. Cemeteries added
@@ -188,6 +191,7 @@ function PickerMap({
           gestureHandling: 'cooperative',
           mapId: 'DEMO_MAP_ID',
         });
+        mapInstanceRef.current = map;
 
         const marker = new google.maps.marker.AdvancedMarkerElement({
           map,
@@ -226,25 +230,92 @@ function PickerMap({
     };
   }, [cemetery.lat, cemetery.lng, startCoords]);
 
+  function useMyLocation() {
+    if (!('geolocation' in navigator)) {
+      setLocateError('This device doesn’t support location.');
+      return;
+    }
+    setLocating(true);
+    setLocateError('');
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        const here = { lat: p.coords.latitude, lng: p.coords.longitude };
+        const map = mapInstanceRef.current;
+        const marker = markerRef.current;
+        if (marker) marker.position = here;
+        if (map) {
+          map.panTo(here);
+          if (map.getZoom() < 20) map.setZoom(20);
+        }
+        setPosition(here);
+        setLocating(false);
+      },
+      (err) => {
+        setLocating(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocateError('Location permission was denied. Drag the pin instead.');
+        } else {
+          setLocateError('Couldn’t read your location. Try again or drag the pin.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
+    );
+  }
+
   return (
     <div style={{ marginTop: 14 }}>
       <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
         Drag the pin, or tap the map, to place it on the headstone. Satellite view helps.
-        Graveyards look distinctive from above.
+        Graveyards look distinctive from above. If you&rsquo;re standing at the grave, tap
+        &ldquo;I&rsquo;m standing here&rdquo; and we&rsquo;ll drop the pin for you.
       </p>
-      <div
-        ref={mapRef}
-        role="application"
-        aria-label="Map to position the grave pin"
-        style={{
-          width: '100%',
-          height: 380,
-          borderRadius: 18,
-          border: '1px solid var(--line)',
-          background: '#e6ece8',
-          overflow: 'hidden',
-        }}
-      />
+      <div style={{ position: 'relative' }}>
+        <div
+          ref={mapRef}
+          role="application"
+          aria-label="Map to position the grave pin"
+          style={{
+            width: '100%',
+            height: 380,
+            borderRadius: 18,
+            border: '1px solid var(--line)',
+            background: '#e6ece8',
+            overflow: 'hidden',
+          }}
+        />
+        {status === 'ready' && (
+          <button
+            type="button"
+            onClick={useMyLocation}
+            disabled={locating}
+            aria-label="Drop the pin where I'm standing"
+            style={{
+              position: 'absolute',
+              top: 12,
+              left: 12,
+              padding: '10px 14px',
+              background: 'var(--ink)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 999,
+              fontSize: 14,
+              fontWeight: 600,
+              boxShadow: '0 4px 14px rgba(0,0,0,.28)',
+              cursor: locating ? 'default' : 'pointer',
+              opacity: locating ? 0.7 : 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <span aria-hidden>◉</span>
+            {locating ? 'Finding you…' : 'I’m standing here'}
+          </button>
+        )}
+      </div>
+      {locateError && (
+        <p style={{ color: '#a94442', fontSize: 13, marginTop: 8 }}>{locateError}</p>
+      )}
       {status === 'no-key' && (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
           Map isn&rsquo;t configured yet.
