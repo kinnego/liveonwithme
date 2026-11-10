@@ -320,9 +320,88 @@ export interface Plot {
   plotAdminUid?: string;
   plotAdminSuccessorUids: string[]; // ordered, succession-only
   plaqueDesign?: PlaqueDesign;
+  // Set when the plot was created by a family adopting a grave from the
+  // cemetery's burial register (see GraveRecord).
+  sourceGraveRecordId?: string;
   createdByUid: string;
   createdAt?: unknown;
   updatedAt?: unknown;
+}
+
+// ─── Cemetery burial register ────────────────────────────────────────────────
+// Graves from a parish burial register, imported from a spreadsheet or
+// added by a cemetery registrar. They stay private (admin SDK only) until a
+// family adopts one, at which point a normal Plot is created from it.
+// A grave can hold several burials: Irish family graves often do.
+
+export interface GraveBurial {
+  surname: string;
+  forenames?: string;
+  /** Free text as written in the register, e.g. "12 Mar 1931". */
+  died?: string;
+  diedYear?: number | null;
+  age?: string;
+  notes?: string;
+}
+
+export type GraveRecordStatus = 'unclaimed' | 'adopted';
+export type GraveRecordSource = 'import' | 'registrar';
+
+export interface GraveRecord {
+  id: string;
+  placeId: string;
+  cemetery: Cemetery;
+  section?: string;
+  row?: string;
+  plotNumber?: string;
+  lat?: number | null;
+  lng?: number | null;
+  burials: GraveBurial[];
+  inscription?: string;
+  status: GraveRecordStatus;
+  adoptedPlotId?: string | null;
+  adoptedByUid?: string | null;
+  adoptedAt?: unknown;
+  source: GraveRecordSource;
+  createdByUid: string;
+  updatedByUid?: string;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+// Per-cemetery permission, not an account type. Becoming the first
+// registrar of a cemetery is open to any verified account; after that,
+// existing registrars add others. Doc id: `${placeId}__${uid}`.
+export type CemeteryRegistrarStatus = 'active' | 'removed';
+
+export interface CemeteryRegistrar {
+  id: string;
+  placeId: string;
+  uid: string;
+  email: string;
+  cemetery: Cemetery;
+  status: CemeteryRegistrarStatus;
+  addedByUid: string;
+  createdAt?: unknown;
+  removedAt?: unknown;
+  removedByUid?: string;
+}
+
+// A family's "this record looks wrong" flag on a suggested grave. Lands in
+// the super admin's registrars page; nothing else happens automatically.
+export type GraveReportStatus = 'open' | 'dismissed' | 'actioned';
+
+export interface GraveReport {
+  id: string;
+  graveRecordId: string;
+  placeId: string;
+  reason: string;
+  reporterUid: string;
+  reporterEmail?: string;
+  status: GraveReportStatus;
+  createdAt?: unknown;
+  decidedAt?: unknown;
+  decidedByUid?: string;
 }
 
 // ─── PlotMembership ──────────────────────────────────────────────────────────
@@ -430,7 +509,9 @@ export type AuditEntityType =
   | 'referral'
   | 'payment'
   | 'custodyTransfer'
-  | 'successionRequest';
+  | 'successionRequest'
+  | 'graveRecord'
+  | 'cemeteryRegistrar';
 
 export interface AuditEvent {
   id: string;

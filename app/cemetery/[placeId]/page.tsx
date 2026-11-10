@@ -359,6 +359,22 @@ export default function CemeteryPage({
       <p className="muted" style={{ marginTop: 60, fontSize: 13, textAlign: 'center' }}>
         Only memorials that families have chosen to make public appear here.
       </p>
+      {knownCemeteryName && (
+        <p className="muted" style={{ marginTop: 8, fontSize: 13, textAlign: 'center' }}>
+          Do you keep the burial register for this cemetery?{' '}
+          <Link
+            href={`/cemetery/${placeId}/registrar?${new URLSearchParams({
+              name: knownCemeteryName,
+              ...(cemeteryAddress ? { address: cemeteryAddress } : {}),
+              ...(cemeteryLat !== null && cemeteryLng !== null
+                ? { lat: String(cemeteryLat), lng: String(cemeteryLng) }
+                : {}),
+            }).toString()}`}
+          >
+            Open the registrar page
+          </Link>
+        </p>
+      )}
     </main>
   );
 }

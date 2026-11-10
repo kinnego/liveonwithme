@@ -461,6 +461,17 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ─── cemetery burial register ────────────────────────────────────────────
+    // Graves from parish burial registers, the per-cemetery match index,
+    // registrar permissions and families' reports on register entries.
+    // Server-only: every read and write goes through /api/grave-records/*
+    // and /api/registrar/* with the admin SDK, so the register can never be
+    // browsed or scraped from the client.
+    match /graveRecords/{id} { allow read, write: if false; }
+    match /graveIndex/{placeId} { allow read, write: if false; }
+    match /cemeteryRegistrars/{id} { allow read, write: if false; }
+    match /graveReports/{id} { allow read, write: if false; }
+
     // ─── cemetery reports ────────────────────────────────────────────────────
     // Any visitor (signed-in or not) can file a report against a community
     // cemetery listing. Only super admin can read or resolve them so we never

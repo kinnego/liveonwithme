@@ -1,7 +1,7 @@
 # Cemetery registers and grave adoption: agreed plan
 
-Status: **discussion settled 2026-11-10, on hold.** Cathal is contacting a church
-registrar first. Nothing is built yet.
+Status: **built on branch `claude/cemetery-registers`, awaiting review (2026-11-10).**
+Cathal is also contacting a church registrar about a real register.
 Roadmap slot: REQUIREMENTS.md P2 "Cemetery operator portal" / "Grave coordinates".
 
 ## Goals
