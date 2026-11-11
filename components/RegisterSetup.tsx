@@ -90,13 +90,27 @@ export default function RegisterSetup({ placeId, cemeteryName, api }: Props) {
     }
   }
 
+  const big = { fontSize: 17 } as const;
+  const choice = (checked: boolean): React.CSSProperties => ({
+    display: 'flex',
+    gap: 10,
+    alignItems: 'center',
+    border: `2px solid ${checked ? 'var(--ink)' : 'var(--line)'}`,
+    borderRadius: 14,
+    padding: '12px 14px',
+    background: 'white',
+    cursor: 'pointer',
+    margin: 0,
+    fontWeight: checked ? 700 : 500,
+    fontSize: 17,
+  });
+
   return (
-    <div>
-      <h3 style={{ marginTop: 0 }}>1. Tell us about your register</h3>
-      <p className="muted" style={{ marginTop: 0 }}>How are the burial records kept now?</p>
-      <div style={{ display: 'grid', gap: 6 }}>
+    <div style={big}>
+      <h3 style={{ marginTop: 0, fontSize: 24 }}>Step 1 of 3: What does your burial book look like?</h3>
+      <div style={{ display: 'grid', gap: 8 }}>
         {FORMATS.map((f) => (
-          <label key={f.value} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label key={f.value} style={choice(format === f.value)}>
             <input
               type="radio"
               name="register-format"
@@ -105,29 +119,36 @@ export default function RegisterSetup({ placeId, cemeteryName, api }: Props) {
                 setFormat(f.value);
                 setSaved(false);
               }}
+              style={{ width: 20, height: 20, flex: 'none' }}
             />
             {f.label}
           </label>
         ))}
       </div>
 
-      <p className="muted" style={{ margin: '16px 0 6px' }}>
-        Besides names and dates of death, what does it record? Tick whatever you see in it.
+      <p style={{ margin: '20px 0 8px' }}>
+        <strong>What else is written in it?</strong> Tick any you see. Names and dates are already
+        included.
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8 }}>
         {askable.map((f) => (
-          <label key={f.key} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <input type="checkbox" checked={fields.includes(f.key)} onChange={() => toggle(f.key)} style={{ marginTop: 4 }} />
+          <label key={f.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: 0, fontWeight: 500, fontSize: 17 }}>
+            <input
+              type="checkbox"
+              checked={fields.includes(f.key)}
+              onChange={() => toggle(f.key)}
+              style={{ width: 20, height: 20, flex: 'none', marginTop: 3 }}
+            />
             {f.question}
           </label>
         ))}
       </div>
-      <label style={{ display: 'block', marginTop: 12 }}>
-        <span className="fieldLabel">Anything else we should know? (optional)</span>
+      <label style={{ display: 'block', marginTop: 14 }}>
+        <span className="fieldLabel">Anything else we should know? (you can leave this empty)</span>
         <textarea
           rows={2}
           style={{ width: '100%' }}
-          placeholder="e.g. two books, 1890–1950 and 1950 to today; the old book is in Irish"
+          placeholder="e.g. there are two books; the old one is in Irish"
           value={notes}
           onChange={(e) => {
             setNotes(e.target.value);
@@ -135,39 +156,62 @@ export default function RegisterSetup({ placeId, cemeteryName, api }: Props) {
           }}
         />
       </label>
-      <button type="button" className="button secondary small" onClick={save} disabled={saved}>
-        {saved ? 'Saved' : 'Save answers'}
+      <button type="button" className="button secondary" onClick={save} disabled={saved}>
+        {saved ? '✓ Saved' : 'Save my answers'}
       </button>
 
-      <h3 style={{ marginTop: 28 }}>2. Turn it into a spreadsheet</h3>
       {format === 'spreadsheet' ? (
-        <p className="muted" style={{ marginTop: 0 }}>
-          If it&rsquo;s already in Excel, make sure the first row has column headings like the template
-          below, then save it as CSV (File → Save As → CSV) and upload it in step 3.
-        </p>
+        <>
+          <h3 style={{ marginTop: 32, fontSize: 24 }}>Step 2 of 3: Get your spreadsheet ready</h3>
+          <ol style={{ marginTop: 0, paddingLeft: 22, display: 'grid', gap: 6 }}>
+            <li>Open it in Excel or Google Sheets.</li>
+            <li>
+              Make sure the top row has headings, such as <em>Surname</em>, <em>First names</em> and{' '}
+              <em>Died</em>.
+            </li>
+            <li>Select all the rows, copy them, and paste them into step 3 below.</li>
+          </ol>
+          <button type="button" className="button secondary small" onClick={downloadTemplate}>
+            Download an example spreadsheet
+          </button>
+        </>
       ) : (
-        <ol className="muted" style={{ marginTop: 0, paddingLeft: 20 }}>
-          <li>Photograph each page flat, in good light, one page per photo.</li>
-          <li>Open ChatGPT, Claude or a similar AI assistant and start a new chat.</li>
-          <li>Copy the instructions below, paste them in, and attach the photos (a few pages at a time works best).</li>
-          <li>It will give you the register as a table. Check any words marked ?? against the book.</li>
-          <li>Copy the table and paste it into step 3, or save it as a spreadsheet and upload that.</li>
-        </ol>
+        <>
+          <h3 style={{ marginTop: 32, fontSize: 24 }}>Step 2 of 3: Let ChatGPT type out the names</h3>
+          <p style={{ marginTop: 0 }}>
+            ChatGPT is a free app that can read photos. It does the typing for you.
+          </p>
+          <ol style={{ marginTop: 0, paddingLeft: 22, display: 'grid', gap: 8 }}>
+            <li>Take a photo of each page with your phone. Lay the book flat, in good light.</li>
+            <li>Open ChatGPT on your phone or computer and start a new chat.</li>
+            <li>
+              Tap the button below to copy our instructions. Then paste them into ChatGPT.
+            </li>
+            <li>Add your photos, a few pages at a time, and send them.</li>
+            <li>
+              ChatGPT gives you back a table of names. Copy it, and paste it into step 3 below.
+            </li>
+          </ol>
+          <button type="button" className="button" onClick={copyPrompt} style={{ fontSize: 17 }}>
+            {copied ? '✓ Copied. Now paste it into ChatGPT' : 'Copy the instructions for ChatGPT'}
+          </button>
+          <details style={{ marginTop: 12 }}>
+            <summary style={{ cursor: 'pointer' }}>See the instructions</summary>
+            <textarea
+              readOnly
+              rows={8}
+              value={prompt}
+              style={{ width: '100%', fontSize: 13, marginTop: 8 }}
+              onFocus={(e) => e.currentTarget.select()}
+            />
+          </details>
+          <p className="muted" style={{ fontSize: 14 }}>
+            Words ChatGPT couldn&rsquo;t read are marked <strong>??</strong>. You can fix those later.
+            If your book holds anything private, leave those pages out.
+          </p>
+        </>
       )}
-      <textarea readOnly rows={8} value={prompt} style={{ width: '100%', fontSize: 13 }} onFocus={(e) => e.currentTarget.select()} />
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-        <button type="button" className="button small" onClick={copyPrompt}>
-          {copied ? 'Copied' : 'Copy the AI instructions'}
-        </button>
-        <button type="button" className="button secondary small" onClick={downloadTemplate}>
-          Download a blank template
-        </button>
-      </div>
-      <p className="muted" style={{ fontSize: 13 }}>
-        Photos you give an AI assistant are handled under that company&rsquo;s terms. If the register
-        holds anything sensitive, check with your parish first.
-      </p>
-      {error && <p style={{ color: '#a94442', fontSize: 14 }}>{error}</p>}
+      {error && <p style={{ color: '#a94442', fontSize: 15 }}>{error}</p>}
     </div>
   );
 }

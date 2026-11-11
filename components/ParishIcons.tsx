@@ -117,3 +117,46 @@ export function OnlineIcon(p: P) {
     </Svg>
   );
 }
+
+/** A soft round badge holding one of the pictures above. */
+export function IconCircle({ size = 56, children }: { size?: number; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        flex: `0 0 ${size}px`,
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: 'var(--sage2)',
+        color: 'var(--ink)',
+        display: 'grid',
+        placeItems: 'center',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** A bold "OR" between choices, so nobody thinks they must do them all. */
+export function OrDivider() {
+  return (
+    <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0' }}>
+      <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+      <span
+        style={{
+          fontWeight: 800,
+          letterSpacing: '0.12em',
+          fontSize: 15,
+          padding: '4px 14px',
+          borderRadius: 999,
+          background: 'var(--ink)',
+          color: 'white',
+        }}
+      >
+        OR
+      </span>
+      <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+    </div>
+  );
+}

@@ -100,16 +100,15 @@ export default function RegisterUpload({ cemetery, hasExisting, api, onDone }: P
 
   return (
     <div>
-      <h3 style={{ marginTop: 0 }}>3. Upload it</h3>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Choose a CSV file, or paste the table straight from Excel, Google Sheets or the AI chat. The
-        first row must be the column headings.
+      <h3 style={{ marginTop: 0, fontSize: 24 }}>Step 3 of 3: Paste the names in here</h3>
+      <p style={{ marginTop: 0, fontSize: 17 }}>
+        Paste the table you copied from ChatGPT or your spreadsheet into the box below.
       </p>
-      <input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" onChange={(e) => onFile(e.target.files?.[0])} />
       <textarea
-        rows={6}
-        style={{ width: '100%', marginTop: 10, fontSize: 13 }}
-        placeholder={'…or paste here, e.g.\nSection,Row,Plot,Surname,Forenames,Died\nA,1,1,Gallagher,Patrick,1952'}
+        rows={7}
+        aria-label="Paste the table of names here"
+        style={{ width: '100%', fontSize: 15 }}
+        placeholder={'Paste here. It will look something like:\nSurname, First names, Died\nGallagher, Patrick, 1952'}
         value={text}
         onChange={(e) => {
           setText(e.target.value);
@@ -117,6 +116,10 @@ export default function RegisterUpload({ cemetery, hasExisting, api, onDone }: P
           setSummary(null);
         }}
       />
+      <label className="muted" style={{ display: 'block', fontSize: 15, fontWeight: 500, margin: '8px 0 0' }}>
+        Or, if you saved it as a file:{' '}
+        <input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" onChange={(e) => onFile(e.target.files?.[0])} />
+      </label>
 
       {hasExisting && (
         <fieldset style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 12, marginTop: 10 }}>
@@ -144,7 +147,7 @@ export default function RegisterUpload({ cemetery, hasExisting, api, onDone }: P
 
       {!summary && (
         <button type="button" className="button" style={{ marginTop: 12 }} disabled={busy || !text.trim()} onClick={() => run(true)}>
-          {busy ? 'Checking…' : 'Check it before saving'}
+          {busy ? 'Checking…' : 'Show me what will be added'}
         </button>
       )}
 

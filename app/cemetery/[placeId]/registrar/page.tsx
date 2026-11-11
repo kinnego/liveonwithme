@@ -16,6 +16,16 @@ import GraveForm, { emptyGrave, type GraveFormValue } from '@/components/GraveFo
 import RegisterSetup from '@/components/RegisterSetup';
 import RegisterUpload from '@/components/RegisterUpload';
 import MyGraveyards from '@/components/MyGraveyards';
+import {
+  BookIcon,
+  CameraIcon,
+  EnvelopeIcon,
+  HeadstoneIcon,
+  IconCircle,
+  KeyboardIcon,
+  OrDivider,
+  PhonePinIcon,
+} from '@/components/ParishIcons';
 import { graveLabel } from '@/lib/grave-match';
 import { loadGoogleMaps } from '@/lib/places';
 import { customIdFromPlaceId, isCustomPlaceId, readCustomCemetery } from '@/lib/cemeteries';
@@ -239,11 +249,6 @@ export default function RegistrarPage({
     }
   }, [canManage, loadGraves, loadUploads]);
 
-  // Open the "get your register online" steps straight away for an empty register.
-  useEffect(() => {
-    if (graves && graves.length === 0) setShowImport(true);
-  }, [graves]);
-
   const uploadName = useMemo(() => new Map(uploads.map((u) => [u.id, u.fileName])), [uploads]);
 
   const filtered = useMemo(() => {
@@ -441,13 +446,21 @@ export default function RegistrarPage({
         {back}
         <div className="formCard">
           <div className="eyebrow">Burial register</div>
-          <h2>Keep the register for {cemeteryName}</h2>
-          <p className="muted">
-            As a registrar you can add the people buried here, fix mistakes and pin graves on the
-            map. When a family makes a memorial and picks this cemetery, we&rsquo;ll ask them
-            &ldquo;Could this be the grave?&rdquo; so they don&rsquo;t have to find it again. Nothing
-            is ever linked without the family saying yes.
-          </p>
+          <h2>Look after the register for {cemeteryName}</h2>
+          <p style={{ fontSize: 18, marginBottom: 6 }}>Once you&rsquo;re set up, you can:</p>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 18px', display: 'grid', gap: 12 }}>
+            {[
+              { icon: <BookIcon size={30} />, text: 'Put the names from your burial book online' },
+              { icon: <PhonePinIcon size={30} />, text: 'Pin each grave on the map as you walk around' },
+              { icon: <HeadstoneIcon size={30} />, text: 'Help families find where their loved ones are buried' },
+            ].map((it) => (
+              <li key={it.text} style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 17 }}>
+                <IconCircle size={48}>{it.icon}</IconCircle>
+                {it.text}
+              </li>
+            ))}
+          </ul>
+          <p className="muted" style={{ marginTop: 0 }}>It&rsquo;s free, and you can stop at any time.</p>
           {!status ? null : status.canJoin ? (
             <>
               {!cemetery && (
@@ -502,46 +515,94 @@ export default function RegistrarPage({
         </div>
       )}
 
-      {cemetery && (
+      {cemetery && showImport && (
         <div className="card" style={{ marginBottom: 18 }}>
-          {showImport ? (
-            <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                <h2 style={{ margin: '0 0 6px' }}>Get your register online</h2>
-                {graves && graves.length > 0 && (
-                  <button type="button" className="button secondary small" onClick={() => setShowImport(false)}>
-                    Hide
-                  </button>
-                )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+            <h2 style={{ margin: '0 0 6px', fontSize: 30 }}>Put the names in from photos or a spreadsheet</h2>
+            <button type="button" className="button secondary small" onClick={() => setShowImport(false)}>
+              ← Back
+            </button>
+          </div>
+          <p className="muted" style={{ marginTop: 0 }}>Three short steps. Take your time: nothing is saved until the end.</p>
+          <RegisterSetup placeId={placeId} cemeteryName={cemeteryName} api={api} />
+          <div style={{ borderTop: '1px solid var(--line)', margin: '24px 0' }} />
+          <RegisterUpload
+            cemetery={cemetery}
+            hasExisting={!!graves && graves.length > 0}
+            api={api}
+            onDone={() => {
+              loadGraves();
+              loadUploads();
+            }}
+          />
+        </div>
+      )}
+
+      {cemetery && !showImport && !adding && graves && graves.length === 0 && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          <h2 style={{ margin: '0 0 6px', fontSize: 30 }}>Put the names online</h2>
+          <p style={{ marginTop: 0, fontSize: 18 }}>
+            <strong>Choose one way.</strong> You don&rsquo;t need to do all three.
+          </p>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {[
+              {
+                icon: <CameraIcon size={30} />,
+                title: 'From photos of the book',
+                text: 'Take photos with your phone. ChatGPT types out the names, and you upload them here. We show you how.',
+                onClick: () => setShowImport(true),
+              },
+              {
+                icon: <KeyboardIcon size={30} />,
+                title: 'Type them in myself',
+                text: 'One grave at a time. Only the surname is needed.',
+                onClick: () => {
+                  setAdding(true);
+                  setEditingId(null);
+                },
+              },
+              {
+                icon: <EnvelopeIcon size={30} />,
+                title: 'Ask us to help',
+                text: 'Send us an email and a real person will sort it out with you.',
+                href: `mailto:${SUPER_ADMIN_EMAIL}?subject=${encodeURIComponent(`Help with the ${cemeteryName} burial register`)}`,
+              },
+            ].map((o, i) => (
+              <div key={o.title}>
+                {i > 0 && <OrDivider />}
+                {(() => {
+                  const inner = (
+                    <>
+                      <IconCircle size={52}>{o.icon}</IconCircle>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontWeight: 700, fontSize: 19 }}>{o.title}</span>
+                        <span className="muted" style={{ display: 'block', fontSize: 16 }}>{o.text}</span>
+                      </span>
+                    </>
+                  );
+                  const style: React.CSSProperties = {
+                    display: 'flex',
+                    gap: 14,
+                    alignItems: 'center',
+                    width: '100%',
+                    textAlign: 'left',
+                    border: '2px solid var(--line)',
+                    borderRadius: 16,
+                    padding: '14px 16px',
+                    background: 'white',
+                    color: 'inherit',
+                    font: 'inherit',
+                    cursor: 'pointer',
+                  };
+                  return o.href ? (
+                    <a href={o.href} style={style}>{inner}</a>
+                  ) : (
+                    <button type="button" onClick={o.onClick} style={style}>{inner}</button>
+                  );
+                })()}
               </div>
-              <p className="muted" style={{ marginTop: 0 }}>
-                The quickest way to add a whole register: tell us what&rsquo;s in it, use an AI assistant to
-                turn photos of the pages into a spreadsheet, then upload it here. You can still add or fix
-                graves one at a time afterwards.
-              </p>
-              <RegisterSetup placeId={placeId} cemeteryName={cemeteryName} api={api} />
-              <div style={{ borderTop: '1px solid var(--line)', margin: '24px 0' }} />
-              <RegisterUpload
-                cemetery={cemetery}
-                hasExisting={!!graves && graves.length > 0}
-                api={api}
-                onDone={() => {
-                  loadGraves();
-                  loadUploads();
-                }}
-              />
-            </>
-          ) : (
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ flex: '1 1 220px' }}>
-                <strong>Have the register on paper or in a spreadsheet?</strong>{' '}
-                <span className="muted">Upload it in one go.</span>
-              </span>
-              <button type="button" className="button secondary small" onClick={() => setShowImport(true)}>
-                Upload a register
-              </button>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
 
@@ -555,7 +616,7 @@ export default function RegistrarPage({
         />
       )}
 
-      {!adding && (
+      {!adding && !showImport && graves && graves.length > 0 && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18 }}>
           <button
             type="button"
@@ -577,6 +638,9 @@ export default function RegistrarPage({
             }}
           >
             {walkMode ? '✓ Walking the graveyard' : '📍 Walk the graveyard'}
+          </button>
+          <button type="button" className="button secondary" onClick={() => setShowImport(true)}>
+            Upload more names
           </button>
           <input
             type="search"
@@ -617,13 +681,6 @@ export default function RegistrarPage({
         </div>
       )}
 
-      {graves && graves.length === 0 && !adding && (
-        <p className="muted">
-          The register is empty. Upload it above, or add graves one at a time. If you&rsquo;d rather we
-          did it, email photos or a spreadsheet to{' '}
-          <a href={`mailto:${SUPER_ADMIN_EMAIL}`}>{SUPER_ADMIN_EMAIL}</a>.
-        </p>
-      )}
 
       {graves && filtered.length === 0 && graves.length > 0 && (
         <p className="muted">

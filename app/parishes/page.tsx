@@ -15,6 +15,7 @@ import {
   HeadstoneIcon,
   KeyboardIcon,
   OnlineIcon,
+  OrDivider,
   PhonePinIcon,
 } from '@/components/ParishIcons';
 import { SUPER_ADMIN_EMAIL } from '@/lib/types';
@@ -108,28 +109,6 @@ const iconCircle = (size: number): React.CSSProperties => ({
   display: 'grid',
   placeItems: 'center',
 });
-
-function OrDivider() {
-  return (
-    <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0' }}>
-      <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
-      <span
-        style={{
-          fontWeight: 800,
-          letterSpacing: '0.12em',
-          fontSize: 15,
-          padding: '4px 14px',
-          borderRadius: 999,
-          background: 'var(--ink)',
-          color: 'white',
-        }}
-      >
-        OR
-      </span>
-      <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
-    </div>
-  );
-}
 
 /** Step 3: three ways to get the names in. Only one is needed, and says so. */
 function NameOptions() {
