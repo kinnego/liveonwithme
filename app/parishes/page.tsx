@@ -6,6 +6,17 @@ import type { Metadata } from 'next';
 import CemeterySearch from '@/components/CemeterySearch';
 import ButtonLink from '@/components/ButtonLink';
 import MyGraveyards from '@/components/MyGraveyards';
+import {
+  BookIcon,
+  CameraIcon,
+  ChecklistIcon,
+  EnvelopeIcon,
+  FindIcon,
+  HeadstoneIcon,
+  KeyboardIcon,
+  OnlineIcon,
+  PhonePinIcon,
+} from '@/components/ParishIcons';
 import { SUPER_ADMIN_EMAIL } from '@/lib/types';
 
 export const metadata: Metadata = {
@@ -14,58 +25,175 @@ export const metadata: Metadata = {
     'Put your parish burial register online, free. Anyone looking for a loved one’s grave can search a name, find the grave and get directions to it.',
 };
 
-const steps: { title: string; body: React.ReactNode }[] = [
+type Step = { title: string; icon: React.ReactNode; body: React.ReactNode };
+
+const steps: Step[] = [
   {
     title: 'Find your graveyard',
+    icon: <FindIcon size={40} />,
     body: (
       <>
-        Type its name in the box at the bottom of this page and pick it from the list. Then sign
-        in with your email address. That&rsquo;s your account made.
+        Tap &ldquo;Show graveyards near me&rdquo; at the bottom of this page, or type its name.
+        Then sign in with your email address. That&rsquo;s your account made.
       </>
     ),
   },
   {
-    title: 'Tell us what your register looks like',
+    title: 'Tell us about your burial book',
+    icon: <ChecklistIcon size={40} />,
     body: (
       <>
-        Is it a handwritten book, a typed list, or a spreadsheet? Does it have dates, ages,
-        townlands? Tick what it has. We use your answers to give you simple instructions.
+        Is it handwritten, typed, or on a computer? Does it have dates, ages, townlands? Tick the
+        boxes. We use your answers to give you simple instructions.
       </>
     ),
   },
   {
-    title: 'Get the names in',
-    body: (
-      <>
-        Choose whatever is easiest for you:
-        <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
-          <li>
-            <strong>Take photos of the pages</strong> and give them to a free AI helper like
-            ChatGPT, with the words we give you to copy and paste. It turns your photos into a
-            list you can upload.
-          </li>
-          <li>
-            <strong>Type them in</strong> one grave at a time, on your phone or computer.
-          </li>
-          <li>
-            <strong>Email us</strong> and we&rsquo;ll help you do it.
-          </li>
-        </ul>
-        <p style={{ margin: '8px 0 0' }}>You always see a preview first. Nothing is saved until you say so.</p>
-      </>
-    ),
+    title: 'Put the names online',
+    icon: <BookIcon size={40} />,
+    body: null, // drawn by <NameOptions /> below
   },
   {
-    title: 'Walk the graveyard (if you like)',
+    title: 'Pin the graves (if you like)',
+    icon: <PhonePinIcon size={40} />,
     body: (
       <>
-        Bring your phone. Stand at a grave, find the name on your list and tap{' '}
-        <strong>&ldquo;Pin here&rdquo;</strong>. Now families can be guided right to it. You can do
-        a few rows at a time, or skip this step altogether.
+        Walk the graveyard with your phone. Stand at a grave, find the name and tap{' '}
+        <strong>&ldquo;Pin here&rdquo;</strong>. Now families are guided right to it. Do a few rows
+        at a time, or skip this step altogether.
       </>
     ),
   },
 ];
+
+const nameOptions: { icon: React.ReactNode; title: string; body: React.ReactNode }[] = [
+  {
+    icon: <CameraIcon size={36} />,
+    title: 'Take photos of the book',
+    body: (
+      <>
+        Photograph each page with your phone. A free app called ChatGPT reads the photos and types
+        out the names for you. We give you the exact words to put into it, then you upload what
+        it gives back.
+      </>
+    ),
+  },
+  {
+    icon: <KeyboardIcon size={36} />,
+    title: 'Type the names in yourself',
+    body: <>One grave at a time, on your phone or a computer. Only the surname is needed.</>,
+  },
+  {
+    icon: <EnvelopeIcon size={36} />,
+    title: 'Ask us to help',
+    body: (
+      <>
+        Email{' '}
+        <a href={`mailto:${SUPER_ADMIN_EMAIL}`} style={{ textDecoration: 'underline' }}>
+          {SUPER_ADMIN_EMAIL}
+        </a>{' '}
+        and a real person will sort it out with you.
+      </>
+    ),
+  },
+];
+
+const iconCircle = (size: number): React.CSSProperties => ({
+  flex: `0 0 ${size}px`,
+  width: size,
+  height: size,
+  borderRadius: '50%',
+  background: 'var(--sage2)',
+  color: 'var(--ink)',
+  display: 'grid',
+  placeItems: 'center',
+});
+
+function OrDivider() {
+  return (
+    <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0' }}>
+      <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+      <span
+        style={{
+          fontWeight: 800,
+          letterSpacing: '0.12em',
+          fontSize: 15,
+          padding: '4px 14px',
+          borderRadius: 999,
+          background: 'var(--ink)',
+          color: 'white',
+        }}
+      >
+        OR
+      </span>
+      <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+    </div>
+  );
+}
+
+/** Step 3: three ways to get the names in. Only one is needed, and says so. */
+function NameOptions() {
+  return (
+    <div>
+      <p style={{ margin: '0 0 12px' }}>
+        <strong>Choose one way.</strong> You don&rsquo;t need to do all three.
+      </p>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {nameOptions.map((o, i) => (
+          <div key={o.title}>
+            {i > 0 && <OrDivider />}
+            <div
+              className="optionCard"
+              style={{
+                border: '1px solid var(--line)',
+                borderRadius: 16,
+                padding: '14px 16px',
+                background: 'white',
+              }}
+            >
+              <div style={iconCircle(56)}>{o.icon}</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 19, marginBottom: 2 }}>{o.title}</div>
+                <div style={{ fontSize: 17 }}>{o.body}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="muted" style={{ margin: '12px 0 0', fontSize: 16 }}>
+        Whichever way you choose, you see everything before it&rsquo;s saved.
+      </p>
+    </div>
+  );
+}
+
+/** The whole idea at a glance: book, online, family finds the grave. */
+function AtAGlance() {
+  const items: { icon: React.ReactNode; label: string }[] = [
+    { icon: <BookIcon size={46} />, label: 'Your parish burial book' },
+    { icon: <OnlineIcon size={46} />, label: 'Goes online, free' },
+    { icon: <HeadstoneIcon size={46} />, label: 'Families find the grave' },
+  ];
+  return (
+    <div className="glanceStrip" aria-label="Your parish burial book goes online, free, so families can find the grave">
+      {items.map((it, i) => (
+        <div key={it.label} style={{ display: 'contents' }}>
+          {i > 0 && (
+            <div className="glanceArrow" aria-hidden="true">
+              →
+            </div>
+          )}
+          <div style={{ textAlign: 'center' }}>
+            <div className="glanceCircle" style={{ ...iconCircle(84), width: undefined, height: undefined, flex: 'none', margin: '0 auto 8px' }}>
+              {it.icon}
+            </div>
+            <div className="glanceLabel" style={{ fontWeight: 700, lineHeight: 1.3 }}>{it.label}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const faqs: { q: string; a: React.ReactNode }[] = [
   {
@@ -185,6 +313,26 @@ export default function ParishesPage() {
           LiveOnWith.me and find the grave: the graveyard, the row, the plot number, and
           directions right to it.
         </p>
+        <style>{`
+          .visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+          .glanceStrip { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr); align-items: start; gap: 10px; margin: 26px 0 6px; }
+          .glanceArrow { font-size: 30px; color: var(--sage); padding-top: 24px; }
+          .glanceCircle { width: 84px; height: 84px; }
+          .glanceLabel { font-size: 17px; }
+          .stepCard { display: flex; gap: 18px; align-items: flex-start; }
+          .optionCard { display: flex; gap: 14px; align-items: flex-start; }
+          @media (max-width: 560px) {
+            .glanceStrip { gap: 4px; }
+            .glanceArrow { font-size: 22px; padding-top: 18px; }
+            .glanceCircle { width: 62px; height: 62px; }
+            .glanceCircle svg { width: 34px; height: 34px; }
+            .glanceLabel { font-size: 14px; }
+            .stepCard { flex-direction: column; gap: 10px; padding: 20px !important; }
+            .optionCard { padding: 12px !important; }
+            .optionCard > div:first-child { width: 46px !important; height: 46px !important; flex-basis: 46px !important; }
+          }
+        `}</style>
+        <AtAGlance />
         <div className="actions">
           <ButtonLink href="#start" className="button">
             Get started
@@ -212,25 +360,35 @@ export default function ParishesPage() {
         <h2>How it works</h2>
         <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 16 }}>
           {steps.map((s, i) => (
-            <li key={s.title} className="card" style={{ display: 'flex', gap: 18, alignItems: 'flex-start' }}>
-              <div
-                aria-hidden
-                style={{
-                  flex: '0 0 44px',
-                  height: 44,
-                  borderRadius: '50%',
-                  background: 'var(--sage2)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  fontFamily: 'Georgia, serif',
-                  fontSize: 22,
-                }}
-              >
-                {i + 1}
+            <li key={s.title} className="card stepCard">
+              <div style={{ position: 'relative', ...iconCircle(68) }}>
+                {s.icon}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: -6,
+                    left: -6,
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: 'var(--ink)',
+                    color: 'white',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontWeight: 800,
+                    fontSize: 15,
+                  }}
+                >
+                  {i + 1}
+                </span>
               </div>
-              <div style={{ minWidth: 0 }}>
-                <h3 style={{ fontSize: 24, margin: '6px 0 8px' }}>{s.title}</h3>
-                <div>{s.body}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <h3 style={{ fontSize: 24, margin: '4px 0 8px' }}>
+                  <span className="visuallyHidden">Step {i + 1}: </span>
+                  {s.title}
+                </h3>
+                <div>{s.body ?? <NameOptions />}</div>
               </div>
             </li>
           ))}
