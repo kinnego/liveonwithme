@@ -375,3 +375,82 @@ export function graveLabel(g: { section?: string | null; row?: string | null; pl
   if (g.plotNumber) parts.push(`Plot ${g.plotNumber}`);
   return parts.join(' · ');
 }
+
+// ─── Public name search across every register ────────────────────────────────
+//
+// Each grave record stores `searchKeys`: every name word of every person in
+// it, in a few spellings (as written, prefix-stripped surname key, canonical
+// forename), each cut to every prefix from 3 letters up. A search is then
+// one Firestore `array-contains-any` query on the words typed, refined here.
+
+const MIN_KEY = 3;
+const MAX_KEY = 14;
+
+function addPrefixes(out: Set<string>, word: string) {
+  const w = word.slice(0, MAX_KEY);
+  for (let n = MIN_KEY; n <= w.length; n++) out.add(w.slice(0, n));
+}
+
+/** Search keys for one person. */
+export function burialSearchKeys(b: { surname?: string; forenames?: string; nickname?: string }): Set<string> {
+  const out = new Set<string>();
+  const sk = surnameKey(b.surname || '');
+  if (sk) addPrefixes(out, sk);
+  const sn = normalise(b.surname || '');
+  if (sn) {
+    addPrefixes(out, sn.replace(/\s+/g, ''));
+    for (const w of sn.split(' ')) if (!SURNAME_PREFIXES.has(w)) addPrefixes(out, w);
+  }
+  const given = [b.forenames, b.nickname].filter(Boolean).join(' ');
+  for (const w of normalise(given).split(' ')) if (w) addPrefixes(out, w);
+  for (const k of forenameKeys(given)) addPrefixes(out, k);
+  return out;
+}
+
+/** Search keys for a whole grave, stored on the record. Sorted for stable diffs. */
+export function graveSearchKeys(burials: { surname?: string; forenames?: string; nickname?: string }[]): string[] {
+  const all = new Set<string>();
+  for (const b of burials || []) for (const k of burialSearchKeys(b)) all.add(k);
+  return [...all].sort();
+}
+
+/**
+ * Turn what someone typed into search terms. Each term is the set of
+ * spellings any one of which must appear in a person's keys. Irish prefixes
+ * on their own ("O", "Mc") are dropped, and "O'Donnell" / "Mc Ginley" fold
+ * into one term.
+ */
+export function searchTerms(q: string): string[][] {
+  const words = normalise(q).split(' ').filter(Boolean);
+  const terms: string[][] = [];
+  for (let i = 0; i < words.length; i++) {
+    let w = words[i];
+    if (SURNAME_PREFIXES.has(w)) {
+      if (i + 1 < words.length) {
+        w = `${w} ${words[i + 1]}`;
+        i++;
+      } else continue;
+    }
+    const variants = new Set<string>();
+    const plain = w.replace(/\s+/g, '');
+    for (const v of [plain, surnameKey(w), FORENAME_CANON[plain] ?? '', ...w.split(' ').filter((x) => !SURNAME_PREFIXES.has(x))]) {
+      const cut = v.slice(0, MAX_KEY);
+      if (cut.length >= MIN_KEY) variants.add(cut);
+    }
+    if (variants.size) terms.push([...variants]);
+  }
+  return terms;
+}
+
+/** Index of the first person in the grave who matches every term, or -1. */
+export function matchBurialForTerms(
+  burials: { surname?: string; forenames?: string; nickname?: string }[],
+  terms: string[][],
+): number {
+  if (terms.length === 0) return -1;
+  for (let i = 0; i < (burials || []).length; i++) {
+    const keys = burialSearchKeys(burials[i]);
+    if (terms.every((t) => t.some((v) => keys.has(v)))) return i;
+  }
+  return -1;
+}

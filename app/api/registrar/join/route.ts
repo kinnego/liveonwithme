@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
 import { writeAuditAdmin } from '@/lib/audit-admin';
+import { sendRegistrarJoinedAdminNotice } from '@/lib/sendgrid';
 import {
   HttpError,
   REGISTRAR_COLLECTION,
@@ -60,6 +61,18 @@ export async function POST(req: NextRequest) {
       actorEmail: caller.email || undefined,
       details: { placeId: cemetery.placeId, cemeteryName: cemetery.name },
     });
+
+    // Let the site owner know, without holding anyone up if email fails.
+    try {
+      await sendRegistrarJoinedAdminNotice({
+        email: caller.email || '(no email)',
+        cemeteryName: cemetery.name,
+        placeId: cemetery.placeId,
+        how: 'joined',
+      });
+    } catch (err) {
+      console.error('Registrar notice email failed:', err);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {

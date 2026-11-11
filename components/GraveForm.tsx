@@ -25,7 +25,7 @@ const EXTRA_FIELDS: { key: 'nickname' | 'born' | 'address' | 'relations' | 'note
   { key: 'born', label: 'Born', placeholder: 'e.g. 1931' },
   { key: 'address', label: 'Address or townland', placeholder: 'e.g. Meenacross' },
   { key: 'relations', label: 'Relations', placeholder: 'e.g. wife of John' },
-  { key: 'notes', label: 'Notes', placeholder: '' },
+  { key: 'notes', label: 'Private notes', placeholder: 'only registrars see these' },
 ];
 
 export interface GraveFormValue {

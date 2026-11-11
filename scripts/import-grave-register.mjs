@@ -24,7 +24,7 @@
 
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { graveLabel, toIndexBurial } from '../lib/grave-match.ts';
+import { graveLabel, graveSearchKeys, toIndexBurial } from '../lib/grave-match.ts';
 import { parseRegister } from '../lib/register-parse.ts';
 
 // ─── args ────────────────────────────────────────────────────────────────────
@@ -129,6 +129,7 @@ for (let i = 0; i < entries.length; i += 200) {
       row: g.row,
       plotNumber: g.plotNumber,
       burials: g.burials,
+      searchKeys: graveSearchKeys(g.burials),
       inscription: g.inscription,
       lat: g.lat,
       lng: g.lng,

@@ -55,7 +55,7 @@ export const REGISTER_FIELDS: RegisterFieldInfo[] = [
   { key: 'address', header: 'Address', question: 'Address or townland', aliases: ['address', 'townland', 'residence', 'abode', 'lastaddress', 'placeofresidence', 'from'], askable: true },
   { key: 'relations', header: 'Relations', question: 'Family relations (e.g. "wife of John", "son of Mary")', aliases: ['relations', 'relation', 'relationship', 'relatives', 'family', 'spouse', 'parents', 'wifeof', 'sonof', 'daughterof'], askable: true },
   { key: 'inscription', header: 'Inscription', question: 'Headstone inscription', aliases: ['inscription', 'headstone', 'epitaph', 'headstoneinscription'], askable: true },
-  { key: 'notes', header: 'Notes', question: 'Other notes or remarks', aliases: ['notes', 'note', 'remarks', 'comments', 'other', 'officiant', 'priest'], askable: true },
+  { key: 'notes', header: 'Notes', question: 'Other notes or remarks (kept private, only registrars see them)', aliases: ['notes', 'note', 'remarks', 'comments', 'other', 'officiant', 'priest'], askable: true },
   { key: 'lat', header: 'Latitude', question: 'Latitude', aliases: ['lat', 'latitude'] },
   { key: 'lng', header: 'Longitude', question: 'Longitude', aliases: ['lng', 'lon', 'long', 'longitude'] },
 ];

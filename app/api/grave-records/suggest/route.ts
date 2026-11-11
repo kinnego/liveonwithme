@@ -5,8 +5,9 @@
 // Costs one Firestore read for the whole cemetery (the graveIndex doc) plus
 // one per suggestion returned. Never claims anything: the family decides.
 //
-// Only the memorial's owner or co-managers can ask, and only about their
-// own memorial's name, so the register can't be browsed by guessing names.
+// Only the memorial's owner or co-managers can ask. (The register itself is
+// publicly searchable through /api/graves/search; this is the fuzzy,
+// memorial-shaped match used when adopting a grave.)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { writeAuditAdmin } from '@/lib/audit-admin';
+import { sendRegistrarJoinedAdminNotice } from '@/lib/sendgrid';
 import { rateLimit } from '@/lib/rate-limit';
 import {
   HttpError,
@@ -75,6 +76,18 @@ export async function POST(req: NextRequest) {
       actorEmail: caller.email || undefined,
       details: { placeId, inviteeUid: invitee.uid },
     });
+
+    try {
+      await sendRegistrarJoinedAdminNotice({
+        email: invitee.email || email,
+        cemeteryName: cemetery.name || placeId,
+        placeId,
+        how: 'invited',
+        invitedByEmail: caller.email || undefined,
+      });
+    } catch (err) {
+      console.error('Registrar notice email failed:', err);
+    }
 
     return NextResponse.json({ ok: true, registrar: { uid: invitee.uid, email: invitee.email || email } });
   } catch (err) {

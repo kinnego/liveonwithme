@@ -364,6 +364,8 @@ export interface GraveRecord {
   section?: string;
   row?: string;
   plotNumber?: string;
+  /** Name prefixes for the public search (see graveSearchKeys). */
+  searchKeys?: string[];
   lat?: number | null;
   lng?: number | null;
   burials: GraveBurial[];

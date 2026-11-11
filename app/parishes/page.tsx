@@ -5,12 +5,13 @@
 import type { Metadata } from 'next';
 import CemeterySearch from '@/components/CemeterySearch';
 import ButtonLink from '@/components/ButtonLink';
+import MyGraveyards from '@/components/MyGraveyards';
 import { SUPER_ADMIN_EMAIL } from '@/lib/types';
 
 export const metadata: Metadata = {
   title: 'For parishes and graveyards · LiveOnWith.me',
   description:
-    'Put your parish burial register online, free. Families looking for a loved one’s grave find it, and the location, in a few taps.',
+    'Put your parish burial register online, free. Anyone looking for a loved one’s grave can search a name, find the grave and get directions to it.',
 };
 
 const steps: { title: string; body: React.ReactNode }[] = [
@@ -72,21 +73,23 @@ const faqs: { q: string; a: React.ReactNode }[] = [
     a: <>No. It&rsquo;s free for parishes and graveyards.</>,
   },
   {
-    q: 'Can anyone look through our register?',
+    q: 'Who can see the register?',
     a: (
       <>
-        No. The register is not published and can&rsquo;t be searched by the public. A family only
-        sees a grave when it matches the name of the person they are making a memorial for.
+        Anyone can search it, so people can find a grave quickly and go to it. They see the
+        names, dates, ages, townland, the row and plot, the inscription and the pin on the map.
+        Anything you put in <strong>Private notes</strong> is only seen by you and your helpers.
       </>
     ),
   },
   {
-    q: 'What if a family picks the wrong grave?',
+    q: 'Could an upload change a family’s memorial?',
     a: (
       <>
-        Nothing is ever linked automatically. The family has to say &ldquo;Yes, this is the
-        grave&rdquo; themselves. If they see a mistake in a record, they can tell you with one
-        tap, and you can fix it.
+        No. Uploads only change the register. They never touch a memorial page, and once a family
+        has taken on a grave, it&rsquo;s locked. Nothing is linked automatically either: a family
+        has to say &ldquo;Yes, this is the grave&rdquo; themselves, and can tell you about any
+        mistake with one tap.
       </>
     ),
   },
@@ -127,8 +130,28 @@ const faqs: { q: string; a: React.ReactNode }[] = [
     a: (
       <>
         Burial registers are usually about people who died many years ago. But if your book has
-        recent burials or anything private, leave those pages out, or type them in by hand
-        instead.
+        anything private, leave those pages out, or type them in by hand instead. And remember
+        the register can be searched by anyone, so leave out anything you wouldn&rsquo;t put on a
+        noticeboard.
+      </>
+    ),
+  },
+  {
+    q: 'Can we put something up at the graveyard?',
+    a: (
+      <>
+        Yes. Once you&rsquo;re set up, download a poster with a QR code for the gate or the church
+        porch. Visitors scan it with their phone and search for anyone buried there. Families&rsquo;
+        memorial pages come up first, then your register.
+      </>
+    ),
+  },
+  {
+    q: 'We have more than one graveyard.',
+    a: (
+      <>
+        That&rsquo;s fine. Set up each one in turn with the same email address, and you can move
+        between them from the registrar page. Each graveyard can have its own helpers too.
       </>
     ),
   },
@@ -158,9 +181,9 @@ export default function ParishesPage() {
         <div className="eyebrow">For parishes and graveyards</div>
         <h1 style={{ fontSize: 'clamp(40px, 6vw, 68px)' }}>Help families find their loved one&rsquo;s grave</h1>
         <p className="lead" style={{ fontSize: 21 }}>
-          Put your parish burial register online, free. When a family makes a memorial page on
-          LiveOnWith.me, we check your register and show them the grave, with its row, plot number
-          and location.
+          Put your parish burial register online, free. Then anyone can type a name on
+          LiveOnWith.me and find the grave: the graveyard, the row, the plot number, and
+          directions right to it.
         </p>
         <div className="actions">
           <ButtonLink href="#start" className="button">
@@ -217,8 +240,8 @@ export default function ParishesPage() {
       <section className="section" style={{ maxWidth: 820 }}>
         <h2>What families see</h2>
         <p>
-          When someone makes a memorial page and chooses your graveyard, they see something like
-          this:
+          Anyone can search a name and go straight to the grave. And when a family makes a
+          memorial page and chooses your graveyard, they see something like this:
         </p>
         <div className="card" style={{ maxWidth: 520, margin: '20px auto', borderWidth: 2 }}>
           <div className="eyebrow">From the St Mary&rsquo;s burial register</div>
@@ -235,7 +258,7 @@ export default function ParishesPage() {
         </div>
         <p className="muted" style={{ textAlign: 'center', fontSize: 15 }}>
           An example only. If they tap yes, the grave and its location are added to their memorial
-          page. If not, nothing happens.
+          page. If not, nothing happens. Uploads never change a memorial a family has made.
         </p>
       </section>
 
@@ -253,13 +276,24 @@ export default function ParishesPage() {
 
       <section className="section center" id="start" style={{ maxWidth: 820, scrollMarginTop: 20 }}>
         <h2>Find your graveyard</h2>
-        <p className="lead" style={{ margin: '0 auto 24px' }}>
-          Type the name of the graveyard or church, then pick it from the list.
+        <MyGraveyards title="Graveyards you already look after" />
+        <p className="lead" style={{ margin: '0 auto 20px' }}>
+          If you&rsquo;re in the parish now, let your phone show the graveyards closest to you.
+        </p>
+        <ButtonLink href="/cemetery/nearby?for=registrar" className="button">
+          📍 Show graveyards near me
+        </ButtonLink>
+        <p className="muted" style={{ margin: '28px auto 12px', fontSize: 16 }}>
+          Or type the name of the graveyard or church:
         </p>
         <div style={{ maxWidth: 520, margin: '0 auto', textAlign: 'left' }}>
-          <CemeterySearch target="registrar" />
+          <CemeterySearch target="registrar" showNearby={false} />
         </div>
-        <p className="muted" style={{ marginTop: 22, fontSize: 16 }}>
+        <p className="muted" style={{ marginTop: 22, fontSize: 16, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
+          Look after more than one graveyard? Set up one, then come back here for the next. You can
+          also add other helpers to each graveyard once it&rsquo;s set up.
+        </p>
+        <p className="muted" style={{ marginTop: 12, fontSize: 16 }}>
           Stuck? Email{' '}
           <a href={`mailto:${SUPER_ADMIN_EMAIL}`} style={{ textDecoration: 'underline' }}>
             {SUPER_ADMIN_EMAIL}

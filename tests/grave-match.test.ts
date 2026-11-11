@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  graveSearchKeys,
+  matchBurialForTerms,
+  searchTerms,
   forenameKeys,
   graveLabel,
   jaroWinkler,
@@ -158,5 +161,39 @@ describe('graveLabel', () => {
     expect(graveLabel({ section: 'A', row: 'C', plotNumber: '12' })).toBe('Section A · Row C · Plot 12');
     expect(graveLabel({ row: '4' })).toBe('Row 4');
     expect(graveLabel({})).toBe('');
+  });
+});
+
+describe('public register search', () => {
+  const grave = [
+    { surname: "O'Donnell", forenames: 'Bridget', nickname: 'Biddy' },
+    { surname: 'Mc Ginley', forenames: 'Patrick' },
+  ];
+  const find = (q: string) => matchBurialForTerms(grave, searchTerms(q));
+
+  it('finds a person by full or partial name', () => {
+    expect(find("Bridget O'Donnell")).toBe(0);
+    expect(find('odonnell')).toBe(0);
+    expect(find('O Donn')).toBe(0);
+    expect(find('Donnell')).toBe(0);
+    expect(find('brid')).toBe(0);
+  });
+
+  it('understands nicknames, Irish forms and Mc/Mac', () => {
+    expect(find('Biddy')).toBe(0);
+    expect(find('Bríd Ó Dónaill')).toBe(0);
+    expect(find('Paddy McGinley')).toBe(1);
+    expect(find('Pádraig Mac Ginley')).toBe(1);
+  });
+
+  it('needs every word to match the same person', () => {
+    expect(find('Patrick Donnell')).toBe(-1);
+    expect(find('Mary')).toBe(-1);
+    expect(find('O')).toBe(-1);
+  });
+
+  it('stores keys the search can query', () => {
+    const keys = new Set(graveSearchKeys(grave));
+    for (const t of searchTerms('Bridget Ginley')) expect(t.some((v) => keys.has(v))).toBe(true);
   });
 });

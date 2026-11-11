@@ -6,7 +6,7 @@
 import type { Firestore, Transaction } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from './firebase-admin';
 import { shortId } from './ids';
-import { graveLabel, toIndexBurial, yearOf, type GraveIndexEntry } from './grave-match';
+import { graveLabel, graveSearchKeys, toIndexBurial, yearOf, type GraveIndexEntry } from './grave-match';
 import { graveKeyOf } from './register-parse';
 import type { Cemetery, GraveBurial, GraveRecord } from './types';
 
@@ -185,6 +185,20 @@ export function indexEntryOf(id: string, g: Partial<GraveRecord>): GraveIndexEnt
 export async function rebuildGraveIndex(db: Firestore, placeId: string): Promise<number> {
   const snap = await db.collection(GRAVE_COLLECTION).where('placeId', '==', placeId).get();
   const entries = snap.docs.map((d) => indexEntryOf(d.id, d.data() as GraveRecord));
+
+  // Keep each record's public search keys in step with its names. Every
+  // write path ends here, so this is the one place they're maintained.
+  const stale = snap.docs.flatMap((d) => {
+    const want = graveSearchKeys((d.data() as GraveRecord).burials || []);
+    const have = d.data().searchKeys;
+    return Array.isArray(have) && have.join('|') === want.join('|') ? [] : [{ ref: d.ref, want }];
+  });
+  for (let i = 0; i < stale.length; i += 400) {
+    const batch = db.batch();
+    for (const s of stale.slice(i, i + 400)) batch.update(s.ref, { searchKeys: s.want });
+    await batch.commit();
+  }
+
   await db.collection(GRAVE_INDEX_COLLECTION).doc(placeId).set({
     placeId,
     entries,

@@ -15,6 +15,7 @@ import { PageSkeleton } from '@/components/Skeleton';
 import GraveForm, { emptyGrave, type GraveFormValue } from '@/components/GraveForm';
 import RegisterSetup from '@/components/RegisterSetup';
 import RegisterUpload from '@/components/RegisterUpload';
+import MyGraveyards from '@/components/MyGraveyards';
 import { graveLabel } from '@/lib/grave-match';
 import { loadGoogleMaps } from '@/lib/places';
 import { customIdFromPlaceId, isCustomPlaceId, readCustomCemetery } from '@/lib/cemeteries';
@@ -799,6 +800,30 @@ export default function RegistrarPage({
             Stop being a registrar
           </button>
         )}
+      </div>
+
+      <div className="card" style={{ marginTop: 18 }}>
+        <h3 style={{ marginTop: 0 }}>A poster for the noticeboard</h3>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Print a QR code for the gate or the church porch. Visitors scan it to search for anyone
+          buried in {cemeteryName}: memorial pages first, then the register.
+        </p>
+        <ButtonLink
+          href={`/cemetery/${placeId}/artwork?${new URLSearchParams({
+            name: cemetery?.name || '',
+            ...(cemetery?.address ? { address: cemetery.address } : {}),
+          }).toString()}`}
+          className="button secondary small"
+        >
+          Download the poster
+        </ButtonLink>
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <MyGraveyards currentPlaceId={placeId} title="Your other graveyards" />
+        <ButtonLink href="/parishes#start" className="button secondary small">
+          + Set up another graveyard
+        </ButtonLink>
       </div>
     </main>
   );

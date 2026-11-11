@@ -28,7 +28,10 @@ const DEBOUNCE_MS = 250;
 
 // `target` picks where a chosen cemetery goes: its public page (default) or
 // straight to the registrar page, for parishes putting a register online.
-export default function CemeterySearch({ target = 'page' }: { target?: 'page' | 'registrar' } = {}) {
+export default function CemeterySearch({
+  target = 'page',
+  showNearby = true,
+}: { target?: 'page' | 'registrar'; showNearby?: boolean } = {}) {
   const suffix = target === 'registrar' ? '/registrar' : '';
   const [term, setTerm] = useState('');
   const [resultsForTerm, setResultsForTerm] = useState('');
@@ -191,6 +194,8 @@ export default function CemeterySearch({ target = 'page' }: { target?: 'page' | 
           style={{ width: '100%' }}
         />
       </form>
+      {showNearby && (
+      <>
       <div
         style={{
           display: 'flex',
@@ -215,7 +220,7 @@ export default function CemeterySearch({ target = 'page' }: { target?: 'page' | 
         />
       </div>
       <ButtonLink
-        href="/cemetery/nearby"
+        href={target === 'registrar' ? '/cemetery/nearby?for=registrar' : '/cemetery/nearby'}
         className="button secondary"
         style={{
           display: 'flex',
@@ -243,6 +248,8 @@ export default function CemeterySearch({ target = 'page' }: { target?: 'page' | 
         </svg>
         Find graveyards near me
       </ButtonLink>
+      </>
+      )}
       <p className="muted" style={{ fontSize: 13, textAlign: 'center', margin: '10px 0 0' }}>
         Can&rsquo;t find it by name?{' '}
         <Link

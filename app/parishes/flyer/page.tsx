@@ -47,14 +47,14 @@ export default async function ParishFlyerPage() {
         </p>
 
         <p style={{ margin: '0 0 10px' }}>
-          When a family makes a memorial page for someone buried in your graveyard, we check your
-          register and show them the grave: the row, the plot number and where it is. They only
-          see it if the name matches, and nothing is linked unless they say yes.
+          Then anyone can type a name and find the grave: the graveyard, the row, the plot number,
+          and directions right to it. No more phone calls asking &ldquo;where is Granny
+          buried?&rdquo;
         </p>
 
         <h2 style={{ fontSize: 26, margin: '24px 0 10px' }}>How it works</h2>
         <ol style={{ paddingLeft: 22, margin: 0 }}>
-          <li><strong>Find your graveyard</strong> on the website and sign in with your email.</li>
+          <li><strong>Find your graveyard.</strong> Your phone can show the ones closest to you. Then sign in with your email.</li>
           <li><strong>Tell us what your register looks like.</strong> A book, a list or a spreadsheet are all fine.</li>
           <li><strong>Get the names in.</strong> Photograph the pages, type them in, or email us for help.</li>
           <li><strong>Walk the graveyard</strong> with your phone and tap &ldquo;Pin here&rdquo; at each grave, if you like.</li>
