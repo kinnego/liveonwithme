@@ -160,3 +160,96 @@ export function OrDivider() {
     </div>
   );
 }
+
+/** A chat bubble: ChatGPT. */
+export function ChatIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <path d="M8 10h32v22H22l-8 7v-7H8z" />
+      <path d="M15 18h18M15 24h12" />
+    </Svg>
+  );
+}
+
+/** A table: the tidy list ChatGPT gives back. */
+export function TableIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <rect x="7" y="9" width="34" height="30" rx="3" />
+      <path d="M7 17h34M7 25h34M7 33h34M19 9v30" />
+    </Svg>
+  );
+}
+
+/**
+ * Why the photo route needs ChatGPT, as a picture: photo of a page →
+ * ChatGPT types it out as a table → paste it into LiveOnWith.me. With a
+ * one-line example of a handwritten entry becoming a row.
+ */
+export function PhotoToAppFlow({ compact = false }: { compact?: boolean }) {
+  const steps = [
+    { icon: <CameraIcon size={30} />, label: 'You take a photo of a page' },
+    { icon: <ChatIcon size={30} />, label: 'ChatGPT types it out as a list' },
+    { icon: <TableIcon size={30} />, label: 'You paste the list in here' },
+  ];
+  return (
+    <div style={{ margin: '12px 0' }}>
+      <style>{`
+        .ptaFlow { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr); gap: 6px; align-items: start; text-align: center; }
+        .ptaArrow { color: var(--sage); font-size: 22px; padding-top: 14px; }
+        .ptaLabel { font-size: 15px; font-weight: 650; line-height: 1.3; margin-top: 6px; overflow-wrap: break-word; hyphens: none; }
+        @media (max-width: 640px) {
+          .ptaFlow { grid-template-columns: minmax(0,1fr); gap: 2px; text-align: left; }
+          .ptaStep { display: flex; align-items: center; gap: 12px; }
+          .ptaStep .ptaLabel { margin-top: 0; font-size: 16px; }
+          .ptaArrow { padding: 0; width: 52px; text-align: center; line-height: 1; transform: rotate(90deg); }
+        }
+      `}</style>
+      <div className="ptaFlow" role="img" aria-label="You take a photo of a page, ChatGPT types it out as a list, and you paste the list in here">
+        {steps.map((s, i) => (
+          <div key={s.label} style={{ display: 'contents' }}>
+            {i > 0 && <div className="ptaArrow" aria-hidden="true">→</div>}
+            <div className="ptaStep">
+              <div style={{ display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                <IconCircle size={52}>{s.icon}</IconCircle>
+              </div>
+              <div className="ptaLabel">{s.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {!compact && (
+        <div
+          style={{
+            marginTop: 14,
+            border: '1px dashed var(--line)',
+            borderRadius: 12,
+            padding: '10px 12px',
+            fontSize: 15,
+            background: 'var(--paper)',
+          }}
+        >
+          <div className="muted" style={{ fontSize: 13, marginBottom: 4 }}>For example, a line in the book like:</div>
+          <div style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
+            John Gallagher, Meenacross, died 3rd March 1952, aged 70
+          </div>
+          <div className="muted" style={{ fontSize: 13, margin: '8px 0 4px' }}>becomes a row like this:</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {[
+              ['Surname', 'Gallagher'],
+              ['First names', 'John'],
+              ['Died', '03/03/1952'],
+              ['Age', '70'],
+              ['Townland', 'Meenacross'],
+            ].map(([h, v]) => (
+              <div key={h} style={{ border: '1px solid var(--line)', borderRadius: 8, background: 'white', minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, padding: '3px 8px', borderBottom: '1px solid var(--line)' }}>{h}</div>
+                <div style={{ fontSize: 14, padding: '3px 8px' }}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

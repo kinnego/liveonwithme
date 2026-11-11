@@ -17,6 +17,7 @@ import {
   OnlineIcon,
   OrDivider,
   PhonePinIcon,
+  PhotoToAppFlow,
 } from '@/components/ParishIcons';
 import { SUPER_ADMIN_EMAIL } from '@/lib/types';
 
@@ -73,9 +74,11 @@ const nameOptions: { icon: React.ReactNode; title: string; body: React.ReactNode
     title: 'Take photos of the book',
     body: (
       <>
-        Photograph each page with your phone. A free app called ChatGPT reads the photos and types
-        out the names for you. We give you the exact words to put into it, then you upload what
-        it gives back.
+        Our app can&rsquo;t read handwriting by itself, so a free app called <strong>ChatGPT</strong>{' '}
+        does the typing in the middle. We give you the exact words to paste into ChatGPT, so it
+        lays the names out the way our app needs.
+        <PhotoToAppFlow />
+        Not sure how? We&rsquo;ll guide you through it, one step at a time, once you sign up.
       </>
     ),
   },
@@ -117,7 +120,7 @@ function NameOptions() {
       <p style={{ margin: '0 0 12px' }}>
         <strong>Choose one way.</strong> You don&rsquo;t need to do all three.
       </p>
-      <div style={{ display: 'grid', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
         {nameOptions.map((o, i) => (
           <div key={o.title}>
             {i > 0 && <OrDivider />}
@@ -337,7 +340,7 @@ export default function ParishesPage() {
 
       <section className="section" style={{ maxWidth: 820 }}>
         <h2>How it works</h2>
-        <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 16 }}>
+        <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16 }}>
           {steps.map((s, i) => (
             <li key={s.title} className="card stepCard">
               <div style={{ position: 'relative', ...iconCircle(68) }}>

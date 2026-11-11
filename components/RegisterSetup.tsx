@@ -6,6 +6,7 @@
 // the register pages.
 
 import { useEffect, useMemo, useState } from 'react';
+import { PhotoToAppFlow } from '@/components/ParishIcons';
 import {
   REGISTER_FIELDS,
   buildAiPrompt,
@@ -179,8 +180,11 @@ export default function RegisterSetup({ placeId, cemeteryName, api }: Props) {
         <>
           <h3 style={{ marginTop: 32, fontSize: 24 }}>Step 2 of 3: Let ChatGPT type out the names</h3>
           <p style={{ marginTop: 0 }}>
-            ChatGPT is a free app that can read photos. It does the typing for you.
+            Our app can&rsquo;t read handwriting by itself. So you use <strong>ChatGPT</strong>, a free
+            app that can read photos, to type the book out as a tidy list. Our instructions tell it
+            exactly how to lay the list out, so it fits straight into LiveOnWith.me.
           </p>
+          <PhotoToAppFlow />
           <ol style={{ marginTop: 0, paddingLeft: 22, display: 'grid', gap: 8 }}>
             <li>Take a photo of each page with your phone. Lay the book flat, in good light.</li>
             <li>Open ChatGPT on your phone or computer and start a new chat.</li>
