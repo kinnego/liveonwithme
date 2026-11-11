@@ -167,7 +167,8 @@ export default function UnifiedSearch() {
     if (!google?.maps?.places?.AutocompleteSuggestion) return [];
     const request = {
       input: q,
-      includedRegionCodes: ['ie', 'gb'],
+      // Worldwide. With no region or bias set, Google ranks places near the
+      // visitor (by IP) first, so local graveyards still come up top.
       includedPrimaryTypes: ['cemetery', 'church', 'place_of_worship'],
       sessionToken: sessionTokenRef.current,
     };

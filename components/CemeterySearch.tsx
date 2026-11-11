@@ -81,7 +81,8 @@ export default function CemeterySearch({
     // `place_of_worship` instead, so we broaden the filter.
     const request = {
       input: q,
-      includedRegionCodes: ['ie', 'gb'],
+      // Worldwide. With no region or bias set, Google ranks places near the
+      // visitor (by IP) first, so local graveyards still come up top.
       includedPrimaryTypes: ['cemetery', 'church', 'place_of_worship'],
       sessionToken: sessionTokenRef.current,
     };
@@ -181,7 +182,7 @@ export default function CemeterySearch({
       <form onSubmit={onSubmit}>
         <input
           type="search"
-          placeholder="Search a cemetery in Ireland or the UK…"
+          placeholder="Search for a cemetery…"
           value={term}
           onChange={(e) => {
             setTerm(e.target.value);

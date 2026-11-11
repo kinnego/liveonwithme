@@ -60,7 +60,7 @@ export default function CemeteryPicker({ value, onChange }: Props) {
         }
 
         element = new PlaceAutocompleteElement({
-          includedRegionCodes: ['ie', 'gb'],
+          // Worldwide; Google ranks places near the visitor first.
           includedPrimaryTypes: ['cemetery'],
         });
         element.style.width = '100%';
@@ -166,7 +166,7 @@ export default function CemeteryPicker({ value, onChange }: Props) {
       {status !== 'ready' && (
         <input
           defaultValue={value?.name || ''}
-          placeholder="Search for the cemetery in Ireland or the UK…"
+          placeholder="Search for the cemetery…"
           onBlur={handleManualBlur}
         />
       )}
