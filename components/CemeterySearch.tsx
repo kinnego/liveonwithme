@@ -26,7 +26,10 @@ type GoogleSuggestion = {
 const MIN_CHARS = 3;
 const DEBOUNCE_MS = 250;
 
-export default function CemeterySearch() {
+// `target` picks where a chosen cemetery goes: its public page (default) or
+// straight to the registrar page, for parishes putting a register online.
+export default function CemeterySearch({ target = 'page' }: { target?: 'page' | 'registrar' } = {}) {
+  const suffix = target === 'registrar' ? '/registrar' : '';
   const [term, setTerm] = useState('');
   const [resultsForTerm, setResultsForTerm] = useState('');
   const [googleResults, setGoogleResults] = useState<GoogleSuggestion[]>([]);
@@ -154,12 +157,12 @@ export default function CemeterySearch() {
   function goToGooglePlace(s: GoogleSuggestion) {
     setOpen(false);
     const q = s.primary ? `?name=${encodeURIComponent(s.primary)}` : '';
-    router.push(`/cemetery/${encodeURIComponent(s.placeId)}${q}`);
+    router.push(`/cemetery/${encodeURIComponent(s.placeId)}${suffix}${q}`);
   }
 
   function goToCustom(c: CustomCemetery) {
     setOpen(false);
-    router.push(`/cemetery/${customPlaceIdOf(c.id)}`);
+    router.push(`/cemetery/${customPlaceIdOf(c.id)}${suffix}`);
   }
 
   // Dropdown is visible whenever there's enough typed to have triggered a

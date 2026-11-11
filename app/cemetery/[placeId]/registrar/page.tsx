@@ -16,6 +16,8 @@ import GraveForm, { emptyGrave, type GraveFormValue } from '@/components/GraveFo
 import RegisterSetup from '@/components/RegisterSetup';
 import RegisterUpload from '@/components/RegisterUpload';
 import { graveLabel } from '@/lib/grave-match';
+import { loadGoogleMaps } from '@/lib/places';
+import { customIdFromPlaceId, isCustomPlaceId, readCustomCemetery } from '@/lib/cemeteries';
 import { SUPER_ADMIN_EMAIL, type Cemetery, type GraveBurial } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -148,8 +150,43 @@ export default function RegistrarPage({
 
   // Cemetery details: from an existing registrar if there is one, otherwise
   // from the link on the cemetery page.
+  // Arriving from the parishes search we may have only a name (Google) or
+  // nothing at all (a community-added cemetery), so look up the rest.
+  const [looked, setLooked] = useState<Cemetery | null>(null);
+  const needsLookup = status !== null && !status.cemetery && (!sp.name || sp.lat === undefined);
+  useEffect(() => {
+    if (!needsLookup) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (isCustomPlaceId(placeId)) {
+          const c = await readCustomCemetery(customIdFromPlaceId(placeId));
+          if (c && !cancelled) setLooked({ name: c.name, address: c.address || '', placeId, lat: c.lat, lng: c.lng });
+          return;
+        }
+        const google = await loadGoogleMaps();
+        const place = new google.maps.places.Place({ id: placeId });
+        await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+        if (cancelled) return;
+        setLooked({
+          name: place.displayName || sp.name || '',
+          address: place.formattedAddress || '',
+          placeId,
+          lat: place.location?.lat() ?? null,
+          lng: place.location?.lng() ?? null,
+        });
+      } catch (err) {
+        console.error('Cemetery lookup failed:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [needsLookup, placeId, sp.name]);
+
   const cemetery: Cemetery | null = useMemo(() => {
     if (status?.cemetery) return status.cemetery;
+    if (looked && looked.name) return looked;
     if (!sp.name) return null;
     const lat = sp.lat !== undefined ? Number(sp.lat) : NaN;
     const lng = sp.lng !== undefined ? Number(sp.lng) : NaN;
@@ -160,7 +197,7 @@ export default function RegistrarPage({
       lat: Number.isFinite(lat) ? lat : null,
       lng: Number.isFinite(lng) ? lng : null,
     };
-  }, [status, sp.name, sp.address, sp.lat, sp.lng, placeId]);
+  }, [status, looked, sp.name, sp.address, sp.lat, sp.lng, placeId]);
 
   const canManage = !!status && (status.isRegistrar || status.isSuperAdmin);
 
