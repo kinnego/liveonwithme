@@ -19,7 +19,6 @@ import {
   HttpError,
   errorResponseBody,
   getCaller,
-  rebuildGraveIndex,
   uniquePlotShortId,
 } from '@/lib/grave-records-admin';
 import type { GraveRecord, Memorial } from '@/lib/types';
@@ -100,7 +99,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await rebuildGraveIndex(db, result.placeId);
     await Promise.all([
       writeAuditAdmin({
         entityType: 'graveRecord',

@@ -196,4 +196,13 @@ describe('public register search', () => {
     const keys = new Set(graveSearchKeys(grave));
     for (const t of searchTerms('Bridget Ginley')) expect(t.some((v) => keys.has(v))).toBe(true);
   });
+
+  it('keeps the 4-letter surname prefixes that suggestions query on', () => {
+    // candidateGraves asks for surnameKey(name).slice(0, 4); a typo after
+    // the start, or the Irish form, must still land in the candidate set.
+    for (const [stored, typed] of [['Gallagher', 'Gallager'], ["O'Donnell", 'Ó Dónaill'], ['Roe', 'Roe'], ['McGinley', 'Mac Ginley']]) {
+      const keys = new Set(graveSearchKeys([{ surname: stored }]));
+      expect(keys.has(surnameKey(typed).slice(0, 4))).toBe(true);
+    }
+  });
 });

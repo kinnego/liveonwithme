@@ -1,17 +1,17 @@
 // Server-side helpers for the cemetery burial register: auth of callers,
-// registrar checks, input validation and the per-cemetery match index.
-// Everything in graveRecords / graveIndex / cemeteryRegistrars /
+// registrar checks, input validation, candidate lookup for matching and
+// adoption-safe writes.
+// Everything in graveRecords / cemeteryRegistrars /
 // graveReports is admin-SDK only — firestore.rules deny all client access.
 
-import type { Firestore, Transaction } from 'firebase-admin/firestore';
+import type { DocumentReference, Firestore, Transaction } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from './firebase-admin';
 import { shortId } from './ids';
-import { graveLabel, graveSearchKeys, toIndexBurial, yearOf, type GraveIndexEntry } from './grave-match';
+import { graveLabel, graveSearchKeys, normalise, surnameKey, toIndexBurial, yearOf, type GraveIndexEntry } from './grave-match';
 import { graveKeyOf } from './register-parse';
 import type { Cemetery, GraveBurial, GraveRecord } from './types';
 
 export const GRAVE_COLLECTION = 'graveRecords';
-export const GRAVE_INDEX_COLLECTION = 'graveIndex';
 export const REGISTRAR_COLLECTION = 'cemeteryRegistrars';
 export const GRAVE_REPORT_COLLECTION = 'graveReports';
 export const UPLOAD_COLLECTION = 'registerUploads';
@@ -72,16 +72,6 @@ export async function requireRegistrar(db: Firestore, caller: Caller, placeId: s
   throw new HttpError(403, 'Only a registrar of this cemetery can do that.');
 }
 
-export async function activeRegistrarCount(db: Firestore, placeId: string): Promise<number> {
-  const snap = await db
-    .collection(REGISTRAR_COLLECTION)
-    .where('placeId', '==', placeId)
-    .where('status', '==', 'active')
-    .limit(50)
-    .get();
-  return snap.size;
-}
-
 // ─── Input validation ────────────────────────────────────────────────────────
 
 function str(v: unknown, max = MAX_FIELD): string {
@@ -106,6 +96,8 @@ export interface GraveInput {
   plotNumber: string;
   inscription: string;
   burials: GraveBurial[];
+  /** Name prefixes for search, written with the names (see graveSearchKeys). */
+  searchKeys: string[];
   lat: number | null;
   lng: number | null;
 }
@@ -151,12 +143,13 @@ export function parseGraveInput(body: Record<string, unknown>): GraveInput {
     plotNumber,
     inscription: str(body.inscription, MAX_INSCRIPTION),
     burials,
+    searchKeys: graveSearchKeys(burials),
     lat,
     lng,
   };
 }
 
-// ─── Match index ─────────────────────────────────────────────────────────────
+// ─── Matching ─────────────────────────────────────────────────────────────
 
 export function indexEntryOf(id: string, g: Partial<GraveRecord>): GraveIndexEntry {
   return {
@@ -176,43 +169,77 @@ export function indexEntryOf(id: string, g: Partial<GraveRecord>): GraveIndexEnt
   };
 }
 
+/** How many candidate graves one suggestion may read. */
+const SUGGEST_SCAN = 200;
+
 /**
- * Rebuild `graveIndex/{placeId}` from the cemetery's grave records.
- * Called after every write. Reading every grave of one cemetery is cheap at
- * parish scale and always leaves the index correct, even after concurrent
- * edits, which a hand-patched index wouldn't guarantee.
+ * Graves in one cemetery that could match a surname, as match entries.
+ *
+ * Every record carries `searchKeys` (written with its names), so this is one
+ * indexed query on (placeId, searchKeys) that reads only plausible graves,
+ * however big the register gets. The 4-letter surname prefix keeps typos
+ * after the start of the name ("Gallager") and Irish/English forms (which
+ * share a surname key) in the candidate set for the fuzzy scorer.
  */
-export async function rebuildGraveIndex(db: Firestore, placeId: string): Promise<number> {
-  const snap = await db.collection(GRAVE_COLLECTION).where('placeId', '==', placeId).get();
-  const entries = snap.docs.map((d) => indexEntryOf(d.id, d.data() as GraveRecord));
-
-  // Keep each record's public search keys in step with its names. Every
-  // write path ends here, so this is the one place they're maintained.
-  const stale = snap.docs.flatMap((d) => {
-    const want = graveSearchKeys((d.data() as GraveRecord).burials || []);
-    const have = d.data().searchKeys;
-    return Array.isArray(have) && have.join('|') === want.join('|') ? [] : [{ ref: d.ref, want }];
-  });
-  for (let i = 0; i < stale.length; i += 400) {
-    const batch = db.batch();
-    for (const s of stale.slice(i, i + 400)) batch.update(s.ref, { searchKeys: s.want });
-    await batch.commit();
+export async function candidateGraves(db: Firestore, placeId: string, surname: string): Promise<GraveIndexEntry[]> {
+  const keys = new Set<string>();
+  const sk = surnameKey(surname);
+  const plain = normalise(surname).replace(/\s+/g, '');
+  for (const k of [sk, plain]) {
+    if (k.length >= 3) keys.add(k.slice(0, 4));
   }
-
-  await db.collection(GRAVE_INDEX_COLLECTION).doc(placeId).set({
-    placeId,
-    entries,
-    count: entries.length,
-    updatedAt: new Date(),
-  });
-  return entries.length;
+  if (keys.size === 0) return [];
+  const snap = await db
+    .collection(GRAVE_COLLECTION)
+    .where('placeId', '==', placeId)
+    .where('searchKeys', 'array-contains-any', [...keys])
+    .limit(SUGGEST_SCAN)
+    .get();
+  return snap.docs.map((d) => indexEntryOf(d.id, d.data() as GraveRecord));
 }
 
-export async function readGraveIndex(db: Firestore, placeId: string): Promise<GraveIndexEntry[]> {
-  const snap = await db.collection(GRAVE_INDEX_COLLECTION).doc(placeId).get();
-  if (!snap.exists) return [];
-  const entries = snap.data()?.entries;
-  return Array.isArray(entries) ? (entries as GraveIndexEntry[]) : [];
+/** Number of graves in a cemetery's register (a count aggregation, not a scan). */
+export async function registerCount(db: Firestore, placeId: string): Promise<number> {
+  const agg = await db.collection(GRAVE_COLLECTION).where('placeId', '==', placeId).count().get();
+  return agg.data().count;
+}
+
+const ADOPTED_MESSAGE = 'A family looks after this grave now, so it can’t be changed here.';
+
+/**
+ * Change a grave only if no family has adopted it, checked inside a
+ * transaction so an adoption landing at the same moment always wins.
+ * `data` may be a function of the current record (for merges).
+ */
+export async function updateUnlessAdopted(
+  db: Firestore,
+  ref: DocumentReference,
+  data: Record<string, unknown> | ((current: GraveRecord) => Record<string, unknown>),
+  opts: { allowAdopted?: boolean } = {},
+): Promise<void> {
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new HttpError(404, 'Grave not found.');
+    const current = snap.data() as GraveRecord;
+    if (current.status === 'adopted' && !opts.allowAdopted) throw new HttpError(409, ADOPTED_MESSAGE);
+    tx.update(ref, typeof data === 'function' ? data(current) : data);
+  });
+}
+
+/** Delete a grave only if no family has adopted it (transactional). Returns what was deleted. */
+export async function deleteUnlessAdopted(
+  db: Firestore,
+  ref: DocumentReference,
+  opts: { allowAdopted?: boolean } = {},
+): Promise<GraveRecord | null> {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    const current = snap.data() as GraveRecord;
+    if (current.status === 'adopted' && !opts.allowAdopted) throw new HttpError(409, ADOPTED_MESSAGE);
+    tx.delete(ref);
+    return current;
+  });
 }
 
 // ─── Serialisation ───────────────────────────────────────────────────────────

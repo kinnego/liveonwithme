@@ -16,7 +16,6 @@ import {
   getCaller,
   parseCemetery,
   parseGraveInput,
-  rebuildGraveIndex,
   requireRegistrar,
   serializeGrave,
 } from '@/lib/grave-records-admin';
@@ -74,7 +73,6 @@ export async function POST(req: NextRequest) {
       updatedAt: FieldValue.serverTimestamp(),
     };
     await ref.set(data);
-    await rebuildGraveIndex(db, cemetery.placeId);
 
     await writeAuditAdmin({
       entityType: 'graveRecord',

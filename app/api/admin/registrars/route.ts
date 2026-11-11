@@ -14,7 +14,7 @@ import {
   REGISTRAR_COLLECTION,
   errorResponseBody,
   getCaller,
-  rebuildGraveIndex,
+  deleteUnlessAdopted,
   serializeGrave,
 } from '@/lib/grave-records-admin';
 
@@ -78,20 +78,20 @@ export async function POST(req: NextRequest) {
 
     if (action === 'delete_grave') {
       const gRef = db.collection(GRAVE_COLLECTION).doc(graveRecordId);
-      const g = await gRef.get();
-      if (g.exists && g.data()!.status === 'adopted') {
-        throw new HttpError(409, 'A family has adopted this grave; fix it from their plot instead.');
-      }
-      if (g.exists) {
-        await gRef.delete();
-        await rebuildGraveIndex(db, placeId);
+      const deleted = await deleteUnlessAdopted(db, gRef).catch((err) => {
+        if (err instanceof HttpError && err.status === 409) {
+          throw new HttpError(409, 'A family has adopted this grave; fix it from their plot instead.');
+        }
+        throw err;
+      });
+      if (deleted) {
         await writeAuditAdmin({
           entityType: 'graveRecord',
           entityId: graveRecordId,
           action: 'deleted_after_report',
           actorUid: caller.uid,
           actorEmail: caller.email || undefined,
-          details: { placeId, reportId, burials: g.data()!.burials ?? [] },
+          details: { placeId, reportId, burials: deleted.burials ?? [] },
         });
       }
     }

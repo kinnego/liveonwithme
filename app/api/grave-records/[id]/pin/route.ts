@@ -14,7 +14,7 @@ import {
   REGISTRAR_DAILY_WRITE_CAP,
   errorResponseBody,
   getCaller,
-  rebuildGraveIndex,
+  updateUnlessAdopted,
   requireRegistrar,
 } from '@/lib/grave-records-admin';
 
@@ -44,13 +44,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!rl.allowed) throw new HttpError(429, 'You’ve reached today’s limit of changes. Please carry on tomorrow.');
     }
 
-    await ref.update({
+    await updateUnlessAdopted(db, ref, {
       lat: clear ? null : lat,
       lng: clear ? null : lng,
       updatedByUid: caller.uid,
       updatedAt: FieldValue.serverTimestamp(),
     });
-    await rebuildGraveIndex(db, placeId);
     await writeAuditAdmin({
       entityType: 'graveRecord',
       entityId: id,

@@ -2,8 +2,9 @@
 //
 // "Could this be the grave you're looking for?" — fuzzy-matches the
 // memorial's name and year of death against the cemetery's burial register.
-// Costs one Firestore read for the whole cemetery (the graveIndex doc) plus
-// one per suggestion returned. Never claims anything: the family decides.
+// One indexed query reads only graves whose surname could match (see
+// candidateGraves), then one read per suggestion returned. Never claims
+// anything: the family decides.
 //
 // Only the memorial's owner or co-managers can ask. (The register itself is
 // publicly searchable through /api/graves/search; this is the fuzzy,
@@ -19,7 +20,7 @@ import {
   HttpError,
   errorResponseBody,
   getCaller,
-  readGraveIndex,
+  candidateGraves,
 } from '@/lib/grave-records-admin';
 import type { GraveRecord, Memorial } from '@/lib/types';
 
@@ -42,10 +43,10 @@ export async function POST(req: NextRequest) {
     const memorial = memSnap.data() as Memorial;
     if (!canEditMemorial(caller.uid, memorial)) throw new HttpError(403, 'Not your memorial.');
 
-    const entries = await readGraveIndex(db, placeId);
+    const { forenames, surname } = splitFullName(memorial.fullName || '');
+    const entries = await candidateGraves(db, placeId, surname);
     if (entries.length === 0) return NextResponse.json({ suggestions: [] });
 
-    const { forenames, surname } = splitFullName(memorial.fullName || '');
     const matches = matchGraves({ forenames, surname, diedYear: yearOf(memorial.died) }, entries);
 
     // Hydrate the few matches with the full record, for the inscription and

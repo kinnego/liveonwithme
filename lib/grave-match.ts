@@ -10,9 +10,8 @@
 // match closely and a clearly conflicting death year rules a burial out.
 
 // ─── Index shape ─────────────────────────────────────────────────────────────
-// One `graveIndex/{placeId}` doc per cemetery holds a compact entry per
-// grave, so a suggestion costs a single Firestore read. Keys are kept short
-// because the whole cemetery has to fit in one 1 MiB document.
+// A compact match entry per grave, built on the fly from the few candidate
+// records a suggestion reads (see candidateGraves in grave-records-admin).
 
 export interface GraveIndexBurial {
   /** Normalised surname key. */

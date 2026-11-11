@@ -1,5 +1,5 @@
 // Import a parish burial register (spreadsheet saved as CSV) into the
-// private `graveRecords` collection, then rebuild the cemetery's match index.
+// `graveRecords` collection.
 //
 // One row per burial. Rows that share a section + row + plot number are
 // grouped into one grave (Irish family graves often hold several people).
@@ -24,7 +24,7 @@
 
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { graveLabel, graveSearchKeys, toIndexBurial } from '../lib/grave-match.ts';
+import { graveLabel, graveSearchKeys } from '../lib/grave-match.ts';
 import { parseRegister } from '../lib/register-parse.ts';
 
 // ─── args ────────────────────────────────────────────────────────────────────
@@ -107,6 +107,10 @@ if (lat === null || lng === null) {
 const cemetery = { name: cemeteryName, address, placeId, lat: lat ?? null, lng: lng ?? null };
 if (cemetery.lat === null) console.warn('No cemetery coordinates found; maps will need --lat/--lng later.');
 
+// Each write is conditional: new graves are created (fails if the id now
+// exists) and existing ones are updated only if unchanged since we read
+// them, so a family adopting a grave mid-import always wins. A batch that
+// loses a race is redone one write at a time, skipping the losers.
 let written = 0;
 let keptAdopted = 0;
 const entries = [...graves.entries()];
@@ -114,14 +118,14 @@ for (let i = 0; i < entries.length; i += 200) {
   const chunk = entries.slice(i, i + 200);
   const refs = chunk.map(([key]) => db.collection('graveRecords').doc(docIdOf(key)));
   const existing = await db.getAll(...refs);
-  const batch = db.batch();
+  const ops = [];
   chunk.forEach(([, g], j) => {
     const prev = existing[j];
     if (prev.exists && prev.data().status === 'adopted') {
       keptAdopted++;
       return;
     }
-    batch.set(refs[j], {
+    const data = {
       placeId,
       cemetery,
       graveKey: g.key,
@@ -140,33 +144,33 @@ for (let i = 0; i < entries.length; i += 200) {
       updatedByUid: 'import-script',
       ...(prev.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
       updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
-    written++;
+    };
+    ops.push({ ref: refs[j], data, updateTime: prev.exists ? prev.updateTime : null });
   });
-  await batch.commit();
+  const batch = db.batch();
+  for (const op of ops) {
+    if (op.updateTime) batch.update(op.ref, op.data, { lastUpdateTime: op.updateTime });
+    else batch.create(op.ref, op.data);
+  }
+  try {
+    await batch.commit();
+    written += ops.length;
+  } catch {
+    for (const op of ops) {
+      try {
+        await db.runTransaction(async (tx) => {
+          const cur = await tx.get(op.ref);
+          if (cur.exists && cur.data().status === 'adopted') throw new Error('adopted');
+          if (cur.exists) tx.update(op.ref, op.data);
+          else tx.create(op.ref, op.data);
+        });
+        written++;
+      } catch {
+        keptAdopted++;
+      }
+    }
+  }
 }
-
-// Rebuild the match index (mirrors rebuildGraveIndex in lib/grave-records-admin.ts).
-const all = await db.collection('graveRecords').where('placeId', '==', placeId).get();
-const indexEntries = all.docs.map((d) => {
-  const g = d.data();
-  return {
-    id: d.id,
-    l: graveLabel(g),
-    b: (g.burials || []).map((b) =>
-      toIndexBurial({ surname: b.surname, forenames: [b.forenames, b.nickname].filter(Boolean).join(' '), diedYear: b.diedYear ?? null }),
-    ),
-    a: g.status === 'adopted',
-    p: g.adoptedPlotId ?? null,
-    g: typeof g.lat === 'number' && typeof g.lng === 'number',
-  };
-});
-await db.collection('graveIndex').doc(placeId).set({
-  placeId,
-  entries: indexEntries,
-  count: indexEntries.length,
-  updatedAt: new Date(),
-});
 
 await db.collection('auditEvents').add({
   entityType: 'graveRecord',
@@ -177,5 +181,5 @@ await db.collection('auditEvents').add({
   timestamp: FieldValue.serverTimestamp(),
 });
 
-console.log(`Wrote ${written} graves (${keptAdopted} already adopted, left alone). Index now holds ${indexEntries.length} graves.`);
+console.log(`Wrote ${written} graves (${keptAdopted} already adopted, left alone).`);
 process.exit(0);

@@ -10,13 +10,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import { graveLabel, matchBurialForTerms, searchTerms } from '@/lib/grave-match';
-import { GRAVE_COLLECTION, GRAVE_INDEX_COLLECTION } from '@/lib/grave-records-admin';
+import { GRAVE_COLLECTION, registerCount } from '@/lib/grave-records-admin';
 import { publicBurial } from '@/lib/grave-public';
 import type { GraveRecord } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
-const SCAN = 150;
+// Records read per search, at most. Bounds the cost of any one request.
+const SCAN = 100;
 const RETURN = 12;
 
 export async function GET(req: NextRequest) {
@@ -29,19 +30,20 @@ export async function GET(req: NextRequest) {
   try {
     // Every path that touches Firestore is rate limited per IP, including
     // the register count below.
-    const rl = await rateLimit(`grave-search:${clientIp(req.headers)}`, { max: 300, windowSec: 600 });
+    const rl = await rateLimit(`grave-search:${clientIp(req.headers)}`, { max: 120, windowSec: 600 });
     if (!rl.allowed) {
       return NextResponse.json({ error: 'Too many searches. Please wait a few minutes.' }, { status: 429 });
     }
 
     if (countOnly) {
       // With a cemetery and no name: just say whether it has a register, so
-      // the cemetery page knows to show the search box. One small read.
+      // the cemetery page knows to show the search box. A count
+      // aggregation: about one read per 1,000 graves.
       // The CDN keeps the answer for 5 minutes, so repeat visits and QR
       // scans of a busy graveyard don't reach the database at all.
-      const snap = await adminDb().collection(GRAVE_INDEX_COLLECTION).doc(placeId).get();
+      const count = await registerCount(adminDb(), placeId);
       return NextResponse.json(
-        { results: [], count: snap.exists ? Number(snap.data()?.count) || 0 : 0 },
+        { results: [], count },
         { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300' } },
       );
     }
@@ -50,17 +52,9 @@ export async function GET(req: NextRequest) {
     const pivot = [...terms].sort((a, b) => Math.max(...b.map((v) => v.length)) - Math.max(...a.map((v) => v.length)))[0];
     const db = adminDb();
     const base = db.collection(GRAVE_COLLECTION).where('searchKeys', 'array-contains-any', pivot.slice(0, 30));
-    let docs;
-    if (placeId) {
-      try {
-        docs = (await base.where('placeId', '==', placeId).limit(SCAN).get()).docs;
-      } catch {
-        // Composite index not deployed yet: search everywhere and filter.
-        docs = (await base.limit(SCAN * 3).get()).docs.filter((d) => d.data().placeId === placeId);
-      }
-    } else {
-      docs = (await base.limit(SCAN).get()).docs;
-    }
+    // Per-cemetery search needs the (placeId, searchKeys) composite index
+    // in firestore.indexes.json.
+    const docs = (await (placeId ? base.where('placeId', '==', placeId) : base).limit(SCAN).get()).docs;
 
     const results = [];
     for (const d of docs) {

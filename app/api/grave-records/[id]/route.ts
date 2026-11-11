@@ -15,7 +15,8 @@ import {
   errorResponseBody,
   getCaller,
   parseGraveInput,
-  rebuildGraveIndex,
+  deleteUnlessAdopted,
+  updateUnlessAdopted,
   requireRegistrar,
   serializeGrave,
   type Caller,
@@ -52,13 +53,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { db, ref, placeId } = await loadEditable(caller, id);
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const input = parseGraveInput(body);
-    await ref.update({
-      ...input,
-      editedByHand: true,
-      updatedByUid: caller.uid,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    await rebuildGraveIndex(db, placeId);
+    // Re-checked in a transaction: an adoption that lands between the check
+    // above and this write still wins.
+    await updateUnlessAdopted(
+      db,
+      ref,
+      { ...input, editedByHand: true, updatedByUid: caller.uid, updatedAt: FieldValue.serverTimestamp() },
+      { allowAdopted: caller.isSuperAdmin },
+    );
     await writeAuditAdmin({
       entityType: 'graveRecord',
       entityId: id,
@@ -80,9 +82,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const caller = await getCaller(req.headers.get('Authorization'));
     const { id } = await params;
     const { db, ref, placeId } = await loadEditable(caller, id);
-    const before = (await ref.get()).data();
-    await ref.delete();
-    await rebuildGraveIndex(db, placeId);
+    const before = await deleteUnlessAdopted(db, ref, { allowAdopted: caller.isSuperAdmin });
     await writeAuditAdmin({
       entityType: 'graveRecord',
       entityId: id,

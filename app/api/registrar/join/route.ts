@@ -11,7 +11,6 @@ import { sendRegistrarJoinedAdminNotice } from '@/lib/sendgrid';
 import {
   HttpError,
   REGISTRAR_COLLECTION,
-  activeRegistrarCount,
   errorResponseBody,
   getCaller,
   parseCemetery,
@@ -33,24 +32,33 @@ export async function POST(req: NextRequest) {
     const db = adminDb();
     const ref = db.collection(REGISTRAR_COLLECTION).doc(registrarDocId(cemetery.placeId, caller.uid));
 
-    // Count + create aren't one atomic step, so two people pressing "Become
-    // the registrar" in the same second could both get in. That's harmless —
-    // both were eligible a moment ago — and not worth a lock.
-    if (!caller.isSuperAdmin && (await activeRegistrarCount(db, cemetery.placeId)) > 0) {
-      throw new HttpError(
-        409,
-        'This cemetery already has a registrar. Ask them to add you from their registrar page.',
-      );
-    }
-
-    await ref.set({
-      placeId: cemetery.placeId,
-      uid: caller.uid,
-      email: caller.email || '',
-      cemetery,
-      status: 'active',
-      addedByUid: caller.uid,
-      createdAt: FieldValue.serverTimestamp(),
+    // Check and create in one transaction, so two people pressing "Become
+    // the registrar" at the same moment can't both become the first one.
+    await db.runTransaction(async (tx) => {
+      if (!caller.isSuperAdmin) {
+        const existing = await tx.get(
+          db
+            .collection(REGISTRAR_COLLECTION)
+            .where('placeId', '==', cemetery.placeId)
+            .where('status', '==', 'active')
+            .limit(1),
+        );
+        if (!existing.empty) {
+          throw new HttpError(
+            409,
+            'This cemetery already has a registrar. Ask them to add you from their registrar page.',
+          );
+        }
+      }
+      tx.set(ref, {
+        placeId: cemetery.placeId,
+        uid: caller.uid,
+        email: caller.email || '',
+        cemetery,
+        status: 'active',
+        addedByUid: caller.uid,
+        createdAt: FieldValue.serverTimestamp(),
+      });
     });
 
     await writeAuditAdmin({
