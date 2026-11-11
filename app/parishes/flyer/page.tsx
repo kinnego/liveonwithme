@@ -55,8 +55,8 @@ export default async function ParishFlyerPage() {
         <h2 style={{ fontSize: 26, margin: '24px 0 10px' }}>How it works</h2>
         <ol style={{ paddingLeft: 22, margin: 0 }}>
           <li><strong>Find your graveyard.</strong> Your phone can show the ones closest to you. Then sign in with your email.</li>
-          <li><strong>Tell us what your register looks like.</strong> A book, a list or a spreadsheet are all fine.</li>
-          <li><strong>Get the names in.</strong> Photograph the pages, type them in, or email us for help.</li>
+          <li><strong>Tell us about your burial book.</strong> Handwritten, typed or on a computer are all fine.</li>
+          <li><strong>Put the names online, whichever way suits you:</strong> photograph the pages and let the free ChatGPT app type them up for you, <strong>OR</strong> type them in, <strong>OR</strong> email us and we&rsquo;ll help. You only need one.</li>
           <li><strong>Walk the graveyard</strong> with your phone and tap &ldquo;Pin here&rdquo; at each grave, if you like.</li>
         </ol>
 
