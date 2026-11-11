@@ -23,25 +23,29 @@ export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get('q') || '').slice(0, 80);
   const placeId = (req.nextUrl.searchParams.get('placeId') || '').slice(0, 200);
   const terms = searchTerms(q);
-  if (terms.length === 0) {
-    // With a cemetery and no name: just say whether it has a register, so
-    // the cemetery page knows to show the search box. One small read.
-    if (placeId && !q) {
-      try {
-        const snap = await adminDb().collection(GRAVE_INDEX_COLLECTION).doc(placeId).get();
-        return NextResponse.json({ results: [], count: snap.exists ? Number(snap.data()?.count) || 0 : 0 });
-      } catch {
-        return NextResponse.json({ results: [], count: 0 });
-      }
-    }
-    return NextResponse.json({ results: [] });
-  }
+  const countOnly = !!placeId && !q;
+  if (terms.length === 0 && !countOnly) return NextResponse.json({ results: [] });
 
   try {
+    // Every path that touches Firestore is rate limited per IP, including
+    // the register count below.
     const rl = await rateLimit(`grave-search:${clientIp(req.headers)}`, { max: 300, windowSec: 600 });
     if (!rl.allowed) {
       return NextResponse.json({ error: 'Too many searches. Please wait a few minutes.' }, { status: 429 });
     }
+
+    if (countOnly) {
+      // With a cemetery and no name: just say whether it has a register, so
+      // the cemetery page knows to show the search box. One small read.
+      // The CDN keeps the answer for 5 minutes, so repeat visits and QR
+      // scans of a busy graveyard don't reach the database at all.
+      const snap = await adminDb().collection(GRAVE_INDEX_COLLECTION).doc(placeId).get();
+      return NextResponse.json(
+        { results: [], count: snap.exists ? Number(snap.data()?.count) || 0 : 0 },
+        { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300' } },
+      );
+    }
+
     // Query on the term with the longest spelling: it narrows the most.
     const pivot = [...terms].sort((a, b) => Math.max(...b.map((v) => v.length)) - Math.max(...a.map((v) => v.length)))[0];
     const db = adminDb();
