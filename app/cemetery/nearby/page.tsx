@@ -32,6 +32,19 @@ export default function NearbyCemeteriesPage() {
   const [status, setStatus] = useState<Status>('idle');
   const [results, setResults] = useState<NearbyCemetery[]>([]);
   const [error, setError] = useState('');
+  // From the parishes page: picking a graveyard opens its registrar page.
+  const [forRegistrar, setForRegistrar] = useState(false);
+  useEffect(() => {
+    setForRegistrar(new URLSearchParams(window.location.search).get('for') === 'registrar');
+  }, []);
+  const backHref = forRegistrar ? '/parishes#start' : '/';
+
+  function hrefFor(r: NearbyCemetery): string {
+    if (!forRegistrar) return `/cemetery/${encodeURIComponent(r.placeId)}`;
+    const q = new URLSearchParams({ name: r.name, lat: String(r.lat), lng: String(r.lng) });
+    if (r.address) q.set('address', r.address);
+    return `/cemetery/${encodeURIComponent(r.placeId)}/registrar?${q.toString()}`;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -92,11 +105,21 @@ export default function NearbyCemeteriesPage() {
 
   return (
     <main className="shell">
-      <div className="eyebrow">Find someone</div>
-      <h1 style={{ marginBottom: 8 }}>Graveyards near you</h1>
+      <div className="eyebrow">{forRegistrar ? 'For parishes' : 'Find someone'}</div>
+      <h1 style={{ marginBottom: 8 }}>{forRegistrar ? 'Which graveyard do you look after?' : 'Graveyards near you'}</h1>
       <p className="muted" style={{ marginTop: 0, marginBottom: 28 }}>
-        Cemeteries, church graveyards and burial grounds within roughly{' '}
-        {Math.round(SEARCH_RADIUS_METERS / 1000)} km of where you are.
+        {forRegistrar ? (
+          <>
+            These are the graveyards closest to you, nearest first. Tap yours to set up its
+            register. Look after more than one? Set up one, then come back and tap the next. The
+            same sign-in works for all of them.
+          </>
+        ) : (
+          <>
+            Cemeteries, church graveyards and burial grounds within roughly{' '}
+            {Math.round(SEARCH_RADIUS_METERS / 1000)} km of where you are.
+          </>
+        )}
       </p>
 
       {status === 'locating' && (
@@ -123,7 +146,7 @@ export default function NearbyCemeteriesPage() {
             are, and only for this page. If you&rsquo;d rather not share it,
             you can search by name instead.
           </p>
-          <ButtonLink href="/" className="button secondary small">
+          <ButtonLink href={backHref} className="button secondary small">
             Back to search
           </ButtonLink>
         </div>
@@ -135,7 +158,7 @@ export default function NearbyCemeteriesPage() {
             This device doesn&rsquo;t support location. Please search by name
             or cemetery instead.
           </p>
-          <ButtonLink href="/" className="button secondary small">
+          <ButtonLink href={backHref} className="button secondary small">
             Back to search
           </ButtonLink>
         </div>
@@ -175,7 +198,7 @@ export default function NearbyCemeteriesPage() {
             {results.map((r) => (
               <li key={`${r.source}:${r.placeId}`}>
                 <Link
-                  href={`/cemetery/${encodeURIComponent(r.placeId)}`}
+                  href={hrefFor(r)}
                   className="card"
                   style={{
                     display: 'flex',

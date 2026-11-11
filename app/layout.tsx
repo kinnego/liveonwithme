@@ -109,6 +109,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/partner/apply" style={{ color: 'var(--muted)' }}>
                 For funeral directors &amp; partners
               </Link>
+              <Link href="/parishes" style={{ color: 'var(--muted)' }}>
+                For parishes &amp; graveyards
+              </Link>
               <Link href="/help/succession" style={{ color: 'var(--muted)' }}>
                 Need help managing a memorial?
               </Link>

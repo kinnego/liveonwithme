@@ -20,6 +20,7 @@ import { createPerson } from '@/lib/person';
 import { slugify } from '@/lib/ids';
 import { writeAudit } from '@/lib/audit';
 import { attachMemorialToExistingPlot, createPlotForMemorial, isPlotAdmin } from '@/lib/plot';
+import { fetchGraveSuggestions } from '@/components/GraveSuggestions';
 import { isApprovedPartner } from '@/lib/roles';
 import type { Cemetery, MemorialKind, Plot, UserProfile } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
@@ -317,6 +318,9 @@ function CreateInner() {
       const fd = new FormData(e.currentTarget);
       const fullName = String(fd.get('fullName')).trim();
       const slug = `${slugify(fullName)}-${Math.random().toString(36).slice(2, 7)}`;
+      // Where to land once everything is saved. Normally the manage page; the
+      // resting-place step when the burial register has a possible match.
+      let nextPath = `/memorial/${slug}/manage`;
       const memorialRef = doc(db, 'memorials', slug);
 
       const born = String(fd.get('born') || '');
@@ -374,18 +378,33 @@ function CreateInner() {
         });
       } else if (presetCemetery) {
         // No existing plot to attach to, but the family arrived here from a
-        // specific cemetery — create the plot now so they land on the plot
-        // manager (pin + QR) immediately, no extra picker step.
+        // specific cemetery. If the cemetery's burial register has a likely
+        // match, send them to the resting-place step to answer "Could this
+        // be the grave?" (after the photo upload below). Otherwise create
+        // the plot now so they land on the plot manager immediately.
         setProgress('Setting up the resting place…');
-        await createPlotForMemorial({
-          memorial: {
-            id: slug,
-            ownerId: auth.currentUser.uid,
-            personId,
-            plotId: null,
-          },
-          cemetery: presetCemetery,
-        });
+        const suggestions = await fetchGraveSuggestions(slug, presetCemetery.placeId);
+        if (suggestions.length > 0) {
+          const q = new URLSearchParams({
+            cemeteryName: presetCemetery.name,
+            cemeteryPlaceId: presetCemetery.placeId,
+            ...(presetCemetery.address ? { cemeteryAddress: presetCemetery.address } : {}),
+            ...(presetCemetery.lat !== null && presetCemetery.lng !== null
+              ? { cemeteryLat: String(presetCemetery.lat), cemeteryLng: String(presetCemetery.lng) }
+              : {}),
+          });
+          nextPath = `/memorial/${slug}/plot/new?${q.toString()}`;
+        } else {
+          await createPlotForMemorial({
+            memorial: {
+              id: slug,
+              ownerId: auth.currentUser.uid,
+              personId,
+              plotId: null,
+            },
+            cemetery: presetCemetery,
+          });
+        }
       }
 
       const photo = fd.get('photo') as File;
@@ -430,7 +449,7 @@ function CreateInner() {
         }).catch(() => {});
       } catch {}
 
-      router.push(`/memorial/${slug}/manage`);
+      router.push(nextPath);
     } catch (err: any) {
       console.error('create failed', err);
       setError(

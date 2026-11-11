@@ -18,13 +18,25 @@ import { createPlotForMemorial } from '@/lib/plot';
 import { writeAudit } from '@/lib/audit';
 import { PageSkeleton } from '@/components/Skeleton';
 import CemeteryPicker from '@/components/CemeteryPicker';
+import GraveSuggestions from '@/components/GraveSuggestions';
 
 export const dynamic = 'force-dynamic';
 
 export default function NewPlotForMemorial({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  // Set by /create when the family arrived from a cemetery page and the
+  // register had possible matches: we land here with the cemetery already
+  // picked so they can answer "Could this be the grave?".
+  searchParams: Promise<{
+    cemeteryName?: string;
+    cemeteryAddress?: string;
+    cemeteryPlaceId?: string;
+    cemeteryLat?: string;
+    cemeteryLng?: string;
+  }>;
 }) {
   const router = useRouter();
   const [m, setM] = useState<Memorial | null>(null);
@@ -32,6 +44,23 @@ export default function NewPlotForMemorial({
   // Pick is held locally and only committed on confirm — Places autocomplete
   // misclicks are frequent and we don't want to spin up a Plot each time.
   const [cemeteryPick, setCemeteryPick] = useState<Cemetery | null>(null);
+  const [suggestionCount, setSuggestionCount] = useState(0);
+  const [joinRequested, setJoinRequested] = useState(false);
+
+  useEffect(() => {
+    searchParams.then((sp) => {
+      if (!sp.cemeteryName || !sp.cemeteryPlaceId) return;
+      const lat = Number(sp.cemeteryLat);
+      const lng = Number(sp.cemeteryLng);
+      setCemeteryPick({
+        name: sp.cemeteryName,
+        address: sp.cemeteryAddress || '',
+        placeId: sp.cemeteryPlaceId,
+        lat: sp.cemeteryLat && Number.isFinite(lat) ? lat : null,
+        lng: sp.cemeteryLng && Number.isFinite(lng) ? lng : null,
+      });
+    });
+  }, [searchParams]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -97,6 +126,24 @@ export default function NewPlotForMemorial({
   }
   if (!m) return <PageSkeleton variant="form" label="Loading" />;
 
+  if (joinRequested) {
+    return (
+      <main className="shell">
+        <div className="formCard">
+          <div className="eyebrow">The resting place</div>
+          <h2>Request sent</h2>
+          <p className="muted">
+            We&rsquo;ve asked the family member who looks after the grave to add {m.fullName}&rsquo;s
+            memorial to it. Once they approve, the grave will show on the memorial.
+          </p>
+          <ButtonLink href={`/memorial/${m.id}/manage`} className="button" style={{ marginTop: 12 }}>
+            Back to the memorial
+          </ButtonLink>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="shell">
       <div className="formCard">
@@ -116,9 +163,23 @@ export default function NewPlotForMemorial({
         <div style={{ marginTop: 18 }}>
           <CemeteryPicker
             value={cemeteryPick}
-            onChange={(next) => setCemeteryPick(next)}
+            onChange={(next) => {
+              setCemeteryPick(next);
+              setSuggestionCount(0);
+            }}
           />
         </div>
+
+        {cemeteryPick && (
+          <GraveSuggestions
+            memorialId={m.id}
+            personId={m.personId}
+            cemetery={cemeteryPick}
+            onLoaded={setSuggestionCount}
+            onAdopted={(plotId) => router.push(`/plot/${plotId}/manage`)}
+            onJoinRequested={() => setJoinRequested(true)}
+          />
+        )}
 
         {error && (
           <p style={{ color: '#a94442', marginTop: 14, fontSize: 14 }}>{error}</p>
@@ -134,7 +195,9 @@ export default function NewPlotForMemorial({
             {busy
               ? 'Creating plot…'
               : cemeteryPick
-                ? `Create plot at ${cemeteryPick.name || 'this cemetery'}`
+                ? suggestionCount > 0
+                  ? 'None of these, create a new plot'
+                  : `Create plot at ${cemeteryPick.name || 'this cemetery'}`
                 : 'Pick a cemetery to continue'}
           </button>
           <ButtonLink href={`/memorial/${m.id}`} className="button secondary">

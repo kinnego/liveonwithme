@@ -9,7 +9,8 @@
 //   - Poster (A4 portrait) — print-ready for notice boards.
 //   - Business card (85x51mm) — small handout for family contacts.
 //
-// Access is restricted to approved partners and super admins. Keepers manage
+// Access is restricted to approved partners, super admins and the
+// cemetery's registrars. Keepers manage
 // individual plots, not the cemetery; cemetery-level signage is a partner /
 // admin concern (funeral directors, parish priests, cemetery operators).
 
@@ -136,8 +137,16 @@ export default function CemeteryArtworkPage({
         const profSnap = await getDoc(doc(db, 'users', u.uid));
         const prof = profSnap.exists() ? (profSnap.data() as UserProfile) : null;
         if (!isSuperAdmin(prof) && !isApprovedPartner(prof)) {
-          setAccess('denied');
-          return;
+          // The graveyard's registrars can print its poster too.
+          const token = await u.getIdToken();
+          const res = await fetch(`/api/registrar?placeId=${encodeURIComponent(placeId)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const st = await res.json().catch(() => ({}));
+          if (!res.ok || !st.isRegistrar) {
+            setAccess('denied');
+            return;
+          }
         }
         setAccess('ok');
       } catch (err: any) {
@@ -272,7 +281,7 @@ export default function CemeteryArtworkPage({
           <h2>Not available</h2>
           <p className="muted">
             Cemetery QR artwork is for approved partners (funeral directors, parish
-            priests, cemetery operators) and site admins. If you look after a plot
+            priests, cemetery operators), the cemetery&rsquo;s registrars and site admins. If you look after a plot
             at this cemetery, you can download artwork for that plot from the plot
             page.
           </p>

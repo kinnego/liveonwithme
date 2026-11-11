@@ -138,18 +138,20 @@ export default function PlotLocationEditor({ plotId, cemetery, actorUid, actorEm
   );
 }
 
-function PickerMap({
+export function PickerMap({
   cemetery,
   startCoords,
   saving,
   onSave,
   onCancel,
+  saveLabel = 'Save grave location',
 }: {
-  cemetery: Cemetery;
+  cemetery: Pick<Cemetery, 'lat' | 'lng'>;
   startCoords: { lat: number; lng: number } | null;
   saving: boolean;
   onSave: (coords: { lat: number; lng: number }) => void;
   onCancel: () => void;
+  saveLabel?: string;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -344,7 +346,7 @@ function PickerMap({
           disabled={saving || !position || status !== 'ready'}
           onClick={() => position && onSave(position)}
         >
-          {saving ? 'Saving…' : 'Save grave location'}
+          {saving ? 'Saving…' : saveLabel}
         </button>
         <button
           type="button"

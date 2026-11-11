@@ -58,6 +58,14 @@
         { "fieldPath": "plotId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "graveRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "placeId", "order": "ASCENDING" },
+        { "fieldPath": "searchKeys", "arrayConfig": "CONTAINS" }
+      ]
     }
   ],
   "fieldOverrides": []

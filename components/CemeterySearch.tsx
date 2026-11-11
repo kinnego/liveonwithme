@@ -26,7 +26,13 @@ type GoogleSuggestion = {
 const MIN_CHARS = 3;
 const DEBOUNCE_MS = 250;
 
-export default function CemeterySearch() {
+// `target` picks where a chosen cemetery goes: its public page (default) or
+// straight to the registrar page, for parishes putting a register online.
+export default function CemeterySearch({
+  target = 'page',
+  showNearby = true,
+}: { target?: 'page' | 'registrar'; showNearby?: boolean } = {}) {
+  const suffix = target === 'registrar' ? '/registrar' : '';
   const [term, setTerm] = useState('');
   const [resultsForTerm, setResultsForTerm] = useState('');
   const [googleResults, setGoogleResults] = useState<GoogleSuggestion[]>([]);
@@ -75,7 +81,8 @@ export default function CemeterySearch() {
     // `place_of_worship` instead, so we broaden the filter.
     const request = {
       input: q,
-      includedRegionCodes: ['ie', 'gb'],
+      // Worldwide. With no region or bias set, Google ranks places near the
+      // visitor (by IP) first, so local graveyards still come up top.
       includedPrimaryTypes: ['cemetery', 'church', 'place_of_worship'],
       sessionToken: sessionTokenRef.current,
     };
@@ -154,12 +161,12 @@ export default function CemeterySearch() {
   function goToGooglePlace(s: GoogleSuggestion) {
     setOpen(false);
     const q = s.primary ? `?name=${encodeURIComponent(s.primary)}` : '';
-    router.push(`/cemetery/${encodeURIComponent(s.placeId)}${q}`);
+    router.push(`/cemetery/${encodeURIComponent(s.placeId)}${suffix}${q}`);
   }
 
   function goToCustom(c: CustomCemetery) {
     setOpen(false);
-    router.push(`/cemetery/${customPlaceIdOf(c.id)}`);
+    router.push(`/cemetery/${customPlaceIdOf(c.id)}${suffix}`);
   }
 
   // Dropdown is visible whenever there's enough typed to have triggered a
@@ -175,7 +182,7 @@ export default function CemeterySearch() {
       <form onSubmit={onSubmit}>
         <input
           type="search"
-          placeholder="Search a cemetery in Ireland or the UK…"
+          placeholder="Search for a cemetery…"
           value={term}
           onChange={(e) => {
             setTerm(e.target.value);
@@ -188,6 +195,8 @@ export default function CemeterySearch() {
           style={{ width: '100%' }}
         />
       </form>
+      {showNearby && (
+      <>
       <div
         style={{
           display: 'flex',
@@ -212,7 +221,7 @@ export default function CemeterySearch() {
         />
       </div>
       <ButtonLink
-        href="/cemetery/nearby"
+        href={target === 'registrar' ? '/cemetery/nearby?for=registrar' : '/cemetery/nearby'}
         className="button secondary"
         style={{
           display: 'flex',
@@ -240,6 +249,8 @@ export default function CemeterySearch() {
         </svg>
         Find graveyards near me
       </ButtonLink>
+      </>
+      )}
       <p className="muted" style={{ fontSize: 13, textAlign: 'center', margin: '10px 0 0' }}>
         Can&rsquo;t find it by name?{' '}
         <Link

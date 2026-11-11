@@ -92,6 +92,10 @@ export default function AdminHome() {
           <h3>Cemetery reports</h3>
           <p className="muted">Review reported community-added cemetery listings.</p>
         </Link>
+        <Link href="/admin/registrars" className="card" style={{ display: 'block' }}>
+          <h3>Cemetery registrars</h3>
+          <p className="muted">See who keeps each burial register and act on reported entries.</p>
+        </Link>
         <Link href="/admin/reports" className="card" style={{ display: 'block' }}>
           <h3>Reported memories</h3>
           <p className="muted">Review visitor reports on contributions to public memorials.</p>

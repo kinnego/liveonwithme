@@ -10,7 +10,7 @@
 // The plain QR itself isn't built here — callers already have the decorated
 // QR SVG from `qrcode` + lib/qr. We embed it as a nested <svg>.
 
-const TAGLINE_DEFAULT = 'Scan to visit everyone remembered here';
+const TAGLINE_DEFAULT = 'Scan to find a grave or memorial here';
 
 export type CemeteryArtworkVariant = 'sticker' | 'poster' | 'card';
 

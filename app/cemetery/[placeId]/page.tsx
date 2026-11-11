@@ -6,6 +6,7 @@ import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firesto
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import CemeterySearch from '@/components/CemeterySearch';
+import RegisterSearch from '@/components/RegisterSearch';
 import CemeteryMap from '@/components/CemeteryMap';
 import {
   customIdFromPlaceId,
@@ -93,12 +94,21 @@ export default function CemeteryPage({
       try {
         const snap = await getDoc(doc(db, 'users', user.uid));
         const prof = snap.exists() ? (snap.data() as UserProfile) : null;
-        setCanSeeArtwork(isSuperAdmin(prof) || isApprovedPartner(prof));
+        if (isSuperAdmin(prof) || isApprovedPartner(prof)) {
+          setCanSeeArtwork(true);
+          return;
+        }
+        // Registrars of this cemetery can print its noticeboard poster.
+        const res = await fetch(`/api/registrar?placeId=${encodeURIComponent(placeId)}`, {
+          headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+        });
+        const st = await res.json().catch(() => ({}));
+        setCanSeeArtwork(res.ok && !!st.isRegistrar);
       } catch {
         setCanSeeArtwork(false);
       }
     })();
-  }, [user]);
+  }, [user, placeId]);
 
   useEffect(() => {
     if (!isCustom) return;
@@ -272,6 +282,8 @@ export default function CemeteryPage({
         <ReportBlock cemeteryId={custom.id} user={user} />
       )}
 
+      <RegisterSearch placeId={placeId} cemeteryName={cemeteryName} memorials={memorials} />
+
       <CemeteryMap
         placeId={placeId}
         name={cemeteryName}
@@ -362,6 +374,22 @@ export default function CemeteryPage({
       <p className="muted" style={{ marginTop: 60, fontSize: 13, textAlign: 'center' }}>
         Only memorials that families have chosen to make public appear here.
       </p>
+      {knownCemeteryName && (
+        <p className="muted" style={{ marginTop: 8, fontSize: 13, textAlign: 'center' }}>
+          Do you keep the burial register for this cemetery?{' '}
+          <Link
+            href={`/cemetery/${placeId}/registrar?${new URLSearchParams({
+              name: knownCemeteryName,
+              ...(cemeteryAddress ? { address: cemeteryAddress } : {}),
+              ...(cemeteryLat !== null && cemeteryLng !== null
+                ? { lat: String(cemeteryLat), lng: String(cemeteryLng) }
+                : {}),
+            }).toString()}`}
+          >
+            Open the registrar page
+          </Link>
+        </p>
+      )}
     </main>
   );
 }

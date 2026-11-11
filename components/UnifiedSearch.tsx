@@ -52,6 +52,15 @@ type CustomCemeteryHit = {
   address?: string;
 };
 type CemeteryHit = GoogleCemeteryHit | CustomCemeteryHit;
+// A grave from a parish burial register (see /api/graves/search).
+type GraveHit = {
+  id: string;
+  name: string;
+  nickname?: string;
+  died?: string;
+  cemeteryName: string;
+  label: string;
+};
 
 const MIN_CHARS = 2;
 const CEMETERY_MIN_CHARS = 3;
@@ -62,6 +71,7 @@ export default function UnifiedSearch() {
   const [term, setTerm] = useState('');
   const [resultsForTerm, setResultsForTerm] = useState('');
   const [people, setPeople] = useState<PersonHit[]>([]);
+  const [graves, setGraves] = useState<GraveHit[]>([]);
   const [googleCemeteries, setGoogleCemeteries] = useState<GoogleCemeteryHit[]>([]);
   const [customCemeteries, setCustomCemeteries] = useState<CustomCemeteryHit[]>([]);
   const [open, setOpen] = useState(false);
@@ -152,7 +162,8 @@ export default function UnifiedSearch() {
     if (!google?.maps?.places?.AutocompleteSuggestion) return [];
     const request = {
       input: q,
-      includedRegionCodes: ['ie', 'gb'],
+      // Worldwide. With no region or bias set, Google ranks places near the
+      // visitor (by IP) first, so local graveyards still come up top.
       includedPrimaryTypes: ['cemetery', 'church', 'place_of_worship'],
       sessionToken: sessionTokenRef.current,
     };
@@ -185,13 +196,23 @@ export default function UnifiedSearch() {
     }));
   }
 
+  async function fetchGraves(q: string): Promise<GraveHit[]> {
+    const res = await fetch(`/api/graves/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => ({}));
+    return Array.isArray(data.results) ? data.results.slice(0, 6) : [];
+  }
+
   async function runSearch(q: string) {
     const seq = ++requestSeqRef.current;
     setStatus('searching');
     setOpen(true);
     try {
-      const [peopleData, googleData, customData] = await Promise.all([
+      const [peopleData, gravesData, googleData, customData] = await Promise.all([
         fetchPeople(q).catch(() => [] as PersonHit[]),
+        q.length >= CEMETERY_MIN_CHARS
+          ? fetchGraves(q).catch(() => [] as GraveHit[])
+          : Promise.resolve([] as GraveHit[]),
         q.length >= CEMETERY_MIN_CHARS
           ? fetchGoogleCemeteries(q).catch(() => [] as GoogleCemeteryHit[])
           : Promise.resolve([] as GoogleCemeteryHit[]),
@@ -201,6 +222,7 @@ export default function UnifiedSearch() {
       ]);
       if (seq !== requestSeqRef.current) return;
       setPeople(peopleData);
+      setGraves(gravesData);
       setGoogleCemeteries(googleData);
       setCustomCemeteries(customData);
       setResultsForTerm(q);
@@ -217,6 +239,7 @@ export default function UnifiedSearch() {
     if (q.length < MIN_CHARS) {
       requestSeqRef.current++;
       setPeople([]);
+      setGraves([]);
       setGoogleCemeteries([]);
       setCustomCemeteries([]);
       setResultsForTerm('');
@@ -232,6 +255,11 @@ export default function UnifiedSearch() {
   function goToPerson(p: PersonHit) {
     setOpen(false);
     router.push(`/m/${p.id}`);
+  }
+
+  function goToGrave(g: GraveHit) {
+    setOpen(false);
+    router.push(`/grave/${g.id}`);
   }
 
   function goToGoogleCemetery(c: GoogleCemeteryHit) {
@@ -250,6 +278,7 @@ export default function UnifiedSearch() {
     // Enter picks the top result, preferring people (the more specific
     // match given someone typically types a full name).
     if (people[0]) return goToPerson(people[0]);
+    if (graves[0]) return goToGrave(graves[0]);
     if (googleCemeteries[0]) return goToGoogleCemetery(googleCemeteries[0]);
     if (customCemeteries[0]) return goToCustomCemetery(customCemeteries[0]);
   }
@@ -271,7 +300,7 @@ export default function UnifiedSearch() {
   const showDropdown =
     open && trimmed.length >= MIN_CHARS && status !== 'idle';
   const hasAnyResults =
-    people.length > 0 || googleCemeteries.length > 0 || customCemeteries.length > 0;
+    people.length > 0 || graves.length > 0 || googleCemeteries.length > 0 || customCemeteries.length > 0;
   const addHref = `/cemetery/add${trimmed ? `?name=${encodeURIComponent(trimmed)}` : ''}`;
 
   return (
@@ -354,6 +383,31 @@ export default function UnifiedSearch() {
             </div>
           )}
 
+          {status === 'ready' && graves.length > 0 && (
+            <div>
+              <div style={sectionHeaderStyle}>Graves · from parish registers</div>
+              {graves.map((g) => (
+                <button key={g.id} type="button" onClick={() => goToGrave(g)} style={rowStyle}>
+                  <div style={rowTopStyle}>
+                    <div style={{ fontWeight: 600 }}>
+                      {g.name}
+                      {g.nickname && (
+                        <span className="muted" style={{ fontWeight: 400, marginLeft: 6 }}>
+                          ({g.nickname})
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ ...pillStyle, background: '#e8eef3', color: '#2f4b5b' }}>Grave</span>
+                  </div>
+                  {g.died && <div style={{ fontSize: 13, marginTop: 2 }}>Died {g.died}</div>}
+                  <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                    {[g.cemeteryName, g.label].filter(Boolean).join(' · ')}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
           {status === 'ready' && (googleCemeteries.length > 0 || customCemeteries.length > 0) && (
             <div>
               <div style={sectionHeaderStyle}>Cemeteries</div>
@@ -402,7 +456,7 @@ export default function UnifiedSearch() {
 
           {status === 'ready' && !hasAnyResults && (
             <div className="muted" style={{ padding: '14px 16px', fontSize: 14 }}>
-              No public memorials or cemeteries match &ldquo;{resultsForTerm}&rdquo;.
+              No memorials, graves or cemeteries match &ldquo;{resultsForTerm}&rdquo;.
             </div>
           )}
 

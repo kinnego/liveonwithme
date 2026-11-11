@@ -1198,3 +1198,53 @@ export async function sendEmailChangeNotice(
     ...TRANSACTIONAL_SETTINGS,
   });
 }
+
+/**
+ * Tell the site owner someone became a registrar for a graveyard. Nothing
+ * waits on this: registrars start straight away, and the email is only so
+ * the owner can spot anything odd and remove them from /admin/registrars.
+ */
+export async function sendRegistrarJoinedAdminNotice(args: {
+  email: string;
+  cemeteryName: string;
+  placeId: string;
+  how: 'joined' | 'invited';
+  invitedByEmail?: string;
+}) {
+  const site = siteUrl();
+  const registrarLink = `${site}/cemetery/${encodeURIComponent(args.placeId)}/registrar`;
+  const adminLink = `${site}/admin/registrars`;
+  const subject = `New registrar for ${args.cemeteryName}`;
+  const how =
+    args.how === 'joined'
+      ? 'signed up as the first registrar'
+      : `was added as a registrar${args.invitedByEmail ? ` by ${args.invitedByEmail}` : ''}`;
+  const text = [
+    `${args.email} ${how} for ${args.cemeteryName}.`,
+    '',
+    'They can start adding graves straight away. Nothing for you to do unless it looks wrong.',
+    '',
+    `Their registrar page: ${registrarLink}`,
+    `Remove a registrar: ${adminLink}`,
+  ].join('\n');
+  const html = wrapEmail(`
+        <h1 style="font-family:Georgia,serif;font-weight:500;font-size:24px;line-height:1.25;margin:0 0 18px;color:#25312d;">
+          New registrar for ${escapeHtml(args.cemeteryName)}
+        </h1>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.6;margin:0 0 14px;">
+          <strong>${escapeHtml(args.email)}</strong> ${escapeHtml(how)}.
+        </p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.6;margin:0 0 22px;color:#6d7772;">
+          They can start adding graves straight away. Nothing for you to do unless it looks wrong.
+        </p>
+        <p style="text-align:center;margin:24px 0 10px;">
+          <a href="${registrarLink}" style="display:inline-block;background:#25312d;color:#ffffff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-weight:650;padding:14px 28px;border-radius:999px;">
+            See their register
+          </a>
+        </p>
+        <p style="text-align:center;font-family:Inter,system-ui,sans-serif;font-size:13px;margin:0;">
+          <a href="${adminLink}" style="color:#6d7772;">Remove a registrar in admin</a>
+        </p>
+  `);
+  await client().send({ to: SUPER_ADMIN_EMAIL, from: fromAddress(), subject, text, html, ...TRANSACTIONAL_SETTINGS });
+}
