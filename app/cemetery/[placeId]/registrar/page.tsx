@@ -13,6 +13,8 @@ import { auth } from '@/lib/firebase';
 import ButtonLink from '@/components/ButtonLink';
 import { PageSkeleton } from '@/components/Skeleton';
 import GraveForm, { emptyGrave, type GraveFormValue } from '@/components/GraveForm';
+import RegisterSetup from '@/components/RegisterSetup';
+import RegisterUpload from '@/components/RegisterUpload';
 import { graveLabel } from '@/lib/grave-match';
 import { SUPER_ADMIN_EMAIL, type Cemetery, type GraveBurial } from '@/lib/types';
 
@@ -29,9 +31,27 @@ type Grave = {
   inscription: string;
   status: 'unclaimed' | 'adopted';
   adoptedPlotId: string | null;
-  source: 'import' | 'registrar';
+  source: 'import' | 'registrar' | 'upload';
+  uploadId: string | null;
+  editedByHand: boolean;
   updatedAt: number | null;
 };
+
+type Upload = {
+  id: string;
+  fileName: string;
+  mode: 'add_and_update' | 'add_only';
+  uploadedByEmail: string | null;
+  people: number;
+  graves: number;
+  added: number;
+  updated: number;
+  skipped: number;
+  uncertainCells: number;
+  createdAt: number | null;
+};
+
+type PinState = { busy: true } | { busy: false; accuracy: number | null; prev: { lat: number | null; lng: number | null } } | { busy: false; error: string };
 
 type Status = {
   isRegistrar: boolean;
@@ -78,6 +98,11 @@ function toFormValue(g: Grave): GraveFormValue {
       surname: b.surname,
       died: b.died || (b.diedYear ? String(b.diedYear) : ''),
       age: b.age || '',
+      nickname: b.nickname || '',
+      born: b.born || '',
+      address: b.address || '',
+      relations: b.relations || '',
+      notes: b.notes || '',
     })),
   };
 }
@@ -114,6 +139,10 @@ export default function RegistrarPage({
   const [shown, setShown] = useState(PAGE);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteMsg, setInviteMsg] = useState('');
+  const [uploads, setUploads] = useState<Upload[]>([]);
+  const [showImport, setShowImport] = useState(false);
+  const [walkMode, setWalkMode] = useState(false);
+  const [pins, setPins] = useState<Record<string, PinState>>({});
 
   useEffect(() => onAuthStateChanged(auth, (u) => setUser(u)), []);
 
@@ -156,19 +185,43 @@ export default function RegistrarPage({
     if (user) loadStatus();
   }, [user, loadStatus]);
 
+  const loadUploads = useCallback(async () => {
+    try {
+      const data = await api<{ uploads: Upload[] }>(`/api/grave-records/uploads?placeId=${encodeURIComponent(placeId)}`);
+      setUploads(data.uploads);
+    } catch {
+      // History is a nice-to-have; the register still works without it.
+    }
+  }, [placeId]);
+
   useEffect(() => {
-    if (canManage) loadGraves();
-  }, [canManage, loadGraves]);
+    if (canManage) {
+      loadGraves();
+      loadUploads();
+    }
+  }, [canManage, loadGraves, loadUploads]);
+
+  // Open the "get your register online" steps straight away for an empty register.
+  useEffect(() => {
+    if (graves && graves.length === 0) setShowImport(true);
+  }, [graves]);
+
+  const uploadName = useMemo(() => new Map(uploads.map((u) => [u.id, u.fileName])), [uploads]);
 
   const filtered = useMemo(() => {
     if (!graves) return [];
     const q = search.trim().toLowerCase();
-    if (!q) return graves;
-    return graves.filter((g) =>
-      g.burials.some((b) => `${b.forenames || ''} ${b.surname}`.toLowerCase().includes(q)) ||
+    // Walking the graveyard: only graves still waiting for a pin, so the
+    // list shrinks as you go.
+    const base = walkMode
+      ? graves.filter((g) => (g.lat === null || pins[g.id]) && g.status !== 'adopted')
+      : graves;
+    if (!q) return base;
+    return base.filter((g) =>
+      g.burials.some((b) => `${b.forenames || ''} ${b.nickname || ''} ${b.surname}`.toLowerCase().includes(q)) ||
       graveLabel(g).toLowerCase().includes(q),
     );
-  }, [graves, search]);
+  }, [graves, search, walkMode, pins]);
 
   const stats = useMemo(() => {
     const gs = graves || [];
@@ -216,6 +269,69 @@ export default function RegistrarPage({
     await api(`/api/grave-records/${id}`, { method: 'DELETE' });
     setGraves((cur) => (cur || []).filter((g) => g.id !== id));
     setEditingId(null);
+  }
+
+  function pinHere(g: Grave) {
+    if (!('geolocation' in navigator)) {
+      setPins((p) => ({ ...p, [g.id]: { busy: false, error: 'This device can’t share its location.' } }));
+      return;
+    }
+    setPins((p) => ({ ...p, [g.id]: { busy: true } }));
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        try {
+          await api(`/api/grave-records/${g.id}/pin`, { method: 'POST', body: JSON.stringify({ lat, lng }) });
+          setPins((p) => ({
+            ...p,
+            [g.id]: { busy: false, accuracy: Math.round(pos.coords.accuracy), prev: { lat: g.lat, lng: g.lng } },
+          }));
+          // Keep the grave on screen (with Undo) until the next search,
+          // even though walk mode hides pinned graves.
+          setGraves((cur) => (cur || []).map((x) => (x.id === g.id ? { ...x, lat, lng } : x)));
+        } catch (err: any) {
+          setPins((p) => ({ ...p, [g.id]: { busy: false, error: err.message } }));
+        }
+      },
+      () =>
+        setPins((p) => ({
+          ...p,
+          [g.id]: { busy: false, error: 'Couldn’t get your location. Check location is allowed for this site.' },
+        })),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  }
+
+  async function undoPin(g: Grave) {
+    const st = pins[g.id];
+    if (!st || st.busy || !('prev' in st)) return;
+    try {
+      await api(`/api/grave-records/${g.id}/pin`, { method: 'POST', body: JSON.stringify(st.prev) });
+      setGraves((cur) => (cur || []).map((x) => (x.id === g.id ? { ...x, ...st.prev } : x)));
+      setPins((p) => {
+        const next = { ...p };
+        delete next[g.id];
+        return next;
+      });
+    } catch (err: any) {
+      setPins((p) => ({ ...p, [g.id]: { busy: false, error: err.message } }));
+    }
+  }
+
+  async function downloadUpload(u: Upload) {
+    try {
+      const { fileName, text } = await api<{ fileName: string; text: string }>(`/api/grave-records/uploads/${u.id}`);
+      const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = /\.(csv|tsv|txt)$/i.test(fileName) ? fileName : `${fileName}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message);
+    }
   }
 
   async function invite() {
@@ -348,6 +464,49 @@ export default function RegistrarPage({
         </div>
       )}
 
+      {cemetery && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          {showImport ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+                <h2 style={{ margin: '0 0 6px' }}>Get your register online</h2>
+                {graves && graves.length > 0 && (
+                  <button type="button" className="button secondary small" onClick={() => setShowImport(false)}>
+                    Hide
+                  </button>
+                )}
+              </div>
+              <p className="muted" style={{ marginTop: 0 }}>
+                The quickest way to add a whole register: tell us what&rsquo;s in it, use an AI assistant to
+                turn photos of the pages into a spreadsheet, then upload it here. You can still add or fix
+                graves one at a time afterwards.
+              </p>
+              <RegisterSetup placeId={placeId} cemeteryName={cemeteryName} api={api} />
+              <div style={{ borderTop: '1px solid var(--line)', margin: '24px 0' }} />
+              <RegisterUpload
+                cemetery={cemetery}
+                hasExisting={!!graves && graves.length > 0}
+                api={api}
+                onDone={() => {
+                  loadGraves();
+                  loadUploads();
+                }}
+              />
+            </>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ flex: '1 1 220px' }}>
+                <strong>Have the register on paper or in a spreadsheet?</strong>{' '}
+                <span className="muted">Upload it in one go.</span>
+              </span>
+              <button type="button" className="button secondary small" onClick={() => setShowImport(true)}>
+                Upload a register
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {cemetery && adding && (
         <GraveForm
           cemetery={cemetery}
@@ -370,9 +529,20 @@ export default function RegistrarPage({
           >
             Add a grave
           </button>
+          <button
+            type="button"
+            className={walkMode ? 'button' : 'button secondary'}
+            aria-pressed={walkMode}
+            onClick={() => {
+              setWalkMode(!walkMode);
+              setShown(PAGE);
+            }}
+          >
+            {walkMode ? '✓ Walking the graveyard' : '📍 Walk the graveyard'}
+          </button>
           <input
             type="search"
-            placeholder="Search by name or row"
+            placeholder={walkMode ? 'Type the name on the headstone' : 'Search by name or row'}
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -385,20 +555,45 @@ export default function RegistrarPage({
 
       {graves === null && <p className="muted">Loading the register…</p>}
 
-      {graves && graves.length === 0 && !adding && (
-        <div className="card" style={{ marginBottom: 18 }}>
-          <h3 style={{ marginTop: 0 }}>The register is empty</h3>
-          <p className="muted" style={{ marginBottom: 0 }}>
-            Add graves one at a time with the button above. If you have the register as a
-            spreadsheet, or photos of the register book, email{' '}
-            <a href={`mailto:${SUPER_ADMIN_EMAIL}`}>{SUPER_ADMIN_EMAIL}</a> and we&rsquo;ll load
-            it in for you.
+      {walkMode && (
+        <div className="card" style={{ marginBottom: 14, padding: '12px 16px' }}>
+          <p style={{ margin: 0 }}>
+            Stand at a headstone, type the name you see, and tap <strong>Pin here</strong>. The list only
+            shows graves without a pin, so it gets shorter as you go. Not on the list?{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setAdding(true);
+                setEditingId(null);
+              }}
+              style={{ background: 'none', border: 0, padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+            >
+              Add it by hand
+            </button>{' '}
+            (use &ldquo;Pin where I&rsquo;m standing&rdquo; in the form).
+          </p>
+          <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }}>
+            Phone GPS is usually right to within 3–10 metres. If it says more than 10 m, wait a few
+            seconds in the open and try again, or fix the pin on the map later with Edit.
           </p>
         </div>
       )}
 
+      {graves && graves.length === 0 && !adding && (
+        <p className="muted">
+          The register is empty. Upload it above, or add graves one at a time. If you&rsquo;d rather we
+          did it, email photos or a spreadsheet to{' '}
+          <a href={`mailto:${SUPER_ADMIN_EMAIL}`}>{SUPER_ADMIN_EMAIL}</a>.
+        </p>
+      )}
+
       {graves && filtered.length === 0 && graves.length > 0 && (
-        <p className="muted">No graves match &ldquo;{search}&rdquo;.</p>
+        <p className="muted">
+          {walkMode && !search
+            ? 'Every grave has a pin. Well done!'
+            : `No ${walkMode ? 'unpinned ' : ''}graves match “${search}”.`}
+          {walkMode && search && ' It may already be pinned, or not in the register yet: add it by hand.'}
+        </p>
       )}
 
       {cemetery &&
@@ -423,18 +618,61 @@ export default function RegistrarPage({
                     {g.status === 'adopted' && ' · looked after by a family'}
                   </div>
                   {g.burials.map((b, i) => (
-                    <div key={i} style={{ fontWeight: 600 }}>
-                      {[b.forenames, b.surname].filter(Boolean).join(' ')}
+                    <div key={i}>
+                      <span style={{ fontWeight: 600 }}>
+                        {[b.forenames, b.nickname && `(${b.nickname})`, b.surname].filter(Boolean).join(' ')}
+                      </span>
                       {(b.died || b.diedYear) && (
-                        <span className="muted" style={{ fontWeight: 400 }}>
+                        <span className="muted">
                           {' '}
                           · died {b.died || b.diedYear}
                           {b.age ? `, aged ${b.age}` : ''}
                         </span>
                       )}
+                      {(b.relations || b.address) && (
+                        <span className="muted" style={{ fontSize: 13 }}>
+                          {' '}
+                          · {[b.relations, b.address].filter(Boolean).join(', ')}
+                        </span>
+                      )}
                     </div>
                   ))}
+                  <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                    {g.source === 'upload'
+                      ? `From ${g.uploadId && uploadName.get(g.uploadId) ? `“${uploadName.get(g.uploadId)}”` : 'an uploaded sheet'}`
+                      : g.source === 'import'
+                        ? 'Imported by LiveOnWith.me'
+                        : 'Added by hand'}
+                    {g.editedByHand && g.source !== 'registrar' && ' · fixed by hand since'}
+                  </div>
+                  {(() => {
+                    const st = pins[g.id];
+                    if (!st || st.busy) return null;
+                    if ('error' in st) return <div style={{ color: '#a94442', fontSize: 13, marginTop: 4 }}>{st.error}</div>;
+                    return (
+                      <div style={{ fontSize: 13, marginTop: 4 }}>
+                        📍 Pinned{st.accuracy !== null ? ` (accurate to about ${st.accuracy} m)` : ''}.{' '}
+                        <button
+                          type="button"
+                          onClick={() => undoPin(g)}
+                          style={{ background: 'none', border: 0, padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+                        >
+                          Undo
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
+                {walkMode && g.status !== 'adopted' && !(pins[g.id] && !pins[g.id].busy && 'prev' in pins[g.id]) && (
+                  <button
+                    type="button"
+                    className="button small"
+                    disabled={!!pins[g.id]?.busy}
+                    onClick={() => pinHere(g)}
+                  >
+                    {pins[g.id]?.busy ? 'Finding you…' : '📍 Pin here'}
+                  </button>
+                )}
                 {g.status === 'adopted' ? (
                   g.adoptedPlotId && (
                     <Link href={`/plot/${g.adoptedPlotId}`} className="button secondary small">
@@ -464,7 +702,32 @@ export default function RegistrarPage({
         </button>
       )}
 
-      <div className="card" style={{ marginTop: 40 }}>
+      {uploads.length > 0 && (
+        <div className="card" style={{ marginTop: 40 }}>
+          <h3 style={{ marginTop: 0 }}>Uploaded sheets</h3>
+          <p className="muted" style={{ marginTop: 0 }}>
+            We keep a copy of every sheet exactly as it was uploaded, so you can download it again.
+          </p>
+          {uploads.map((u) => (
+            <div key={u.id} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+              <span style={{ flex: '1 1 240px', minWidth: 0, overflowWrap: 'anywhere' }}>
+                <strong>{u.fileName}</strong>
+                <span className="muted" style={{ fontSize: 13 }}>
+                  {' '}
+                  · {u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IE') : ''}
+                  {u.uploadedByEmail ? ` by ${u.uploadedByEmail}` : ''} · {u.people} people, {u.added} graves added
+                  {u.updated ? `, ${u.updated} updated` : ''}
+                </span>
+              </span>
+              <button type="button" className="button secondary small" onClick={() => downloadUpload(u)}>
+                Download
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="card" style={{ marginTop: uploads.length > 0 ? 18 : 40 }}>
         <h3 style={{ marginTop: 0 }}>Registrars</h3>
         <p className="muted" style={{ marginTop: 0 }}>
           Everyone here can add and fix graves for {cemeteryName}.

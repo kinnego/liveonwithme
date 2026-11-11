@@ -7,12 +7,15 @@ import type { Firestore, Transaction } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from './firebase-admin';
 import { shortId } from './ids';
 import { graveLabel, toIndexBurial, yearOf, type GraveIndexEntry } from './grave-match';
+import { graveKeyOf } from './register-parse';
 import type { Cemetery, GraveBurial, GraveRecord } from './types';
 
 export const GRAVE_COLLECTION = 'graveRecords';
 export const GRAVE_INDEX_COLLECTION = 'graveIndex';
 export const REGISTRAR_COLLECTION = 'cemeteryRegistrars';
 export const GRAVE_REPORT_COLLECTION = 'graveReports';
+export const UPLOAD_COLLECTION = 'registerUploads';
+export const PROFILE_COLLECTION = 'registerProfiles';
 
 /** Max graves one registrar can add or edit per day. Stops junk dumps. */
 export const REGISTRAR_DAILY_WRITE_CAP = 300;
@@ -97,6 +100,7 @@ export function parseCemetery(raw: unknown): Cemetery | null {
 }
 
 export interface GraveInput {
+  graveKey: string;
   section: string;
   row: string;
   plotNumber: string;
@@ -121,8 +125,14 @@ export function parseGraveInput(body: Record<string, unknown>): GraveInput {
     if (died) burial.died = died;
     const age = str(b.age, 20);
     if (age) burial.age = age;
-    const notes = str(b.notes, 300);
-    if (notes) burial.notes = notes;
+    for (const f of ['nickname', 'born', 'buried'] as const) {
+      const v = str(b[f], 40);
+      if (v) burial[f] = v;
+    }
+    for (const f of ['address', 'relations', 'notes'] as const) {
+      const v = str(b[f], 300);
+      if (v) burial[f] = v;
+    }
     burials.push(burial);
   }
   if (burials.length === 0) {
@@ -131,10 +141,14 @@ export function parseGraveInput(body: Record<string, unknown>): GraveInput {
   const lat = typeof body.lat === 'number' && Number.isFinite(body.lat) ? body.lat : null;
   const lng = typeof body.lng === 'number' && Number.isFinite(body.lng) ? body.lng : null;
   if ((lat === null) !== (lng === null)) throw new HttpError(400, 'Pin is incomplete.');
+  const section = str(body.section, 30);
+  const row = str(body.row, 30);
+  const plotNumber = str(body.plotNumber, 30);
   return {
-    section: str(body.section, 30),
-    row: str(body.row, 30),
-    plotNumber: str(body.plotNumber, 30),
+    graveKey: graveKeyOf({ section, row, plotNumber, burials }),
+    section,
+    row,
+    plotNumber,
     inscription: str(body.inscription, MAX_INSCRIPTION),
     burials,
     lat,
@@ -149,7 +163,12 @@ export function indexEntryOf(id: string, g: Partial<GraveRecord>): GraveIndexEnt
     id,
     l: graveLabel(g),
     b: (g.burials || []).map((b) =>
-      toIndexBurial({ surname: b.surname, forenames: b.forenames, diedYear: b.diedYear ?? null }),
+      toIndexBurial({
+        surname: b.surname,
+        // Nicknames match too: "Hughie" in the register finds Hugh.
+        forenames: [b.forenames, b.nickname].filter(Boolean).join(' '),
+        diedYear: b.diedYear ?? null,
+      }),
     ),
     a: g.status === 'adopted',
     p: g.adoptedPlotId ?? null,
@@ -205,6 +224,8 @@ export function serializeGrave(id: string, data: Record<string, unknown>) {
     status: g.status,
     adoptedPlotId: g.adoptedPlotId || null,
     source: g.source,
+    uploadId: g.uploadId || null,
+    editedByHand: !!g.editedByHand,
     updatedAt: millis(g.updatedAt),
   };
 }

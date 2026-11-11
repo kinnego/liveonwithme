@@ -471,6 +471,8 @@ service cloud.firestore {
     match /graveIndex/{placeId} { allow read, write: if false; }
     match /cemeteryRegistrars/{id} { allow read, write: if false; }
     match /graveReports/{id} { allow read, write: if false; }
+    match /registerUploads/{id} { allow read, write: if false; }
+    match /registerProfiles/{placeId} { allow read, write: if false; }
 
     // ─── cemetery reports ────────────────────────────────────────────────────
     // Any visitor (signed-in or not) can file a report against a community

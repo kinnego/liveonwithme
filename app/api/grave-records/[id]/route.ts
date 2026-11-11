@@ -54,6 +54,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const input = parseGraveInput(body);
     await ref.update({
       ...input,
+      editedByHand: true,
       updatedByUid: caller.uid,
       updatedAt: FieldValue.serverTimestamp(),
     });

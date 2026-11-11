@@ -61,6 +61,10 @@ export async function POST(req: NextRequest) {
             name: [b.forenames, b.surname].filter(Boolean).join(' '),
             died: b.died || (b.diedYear ? String(b.diedYear) : ''),
             age: b.age || '',
+            // Details that help a family recognise their own.
+            nickname: b.nickname || '',
+            relations: b.relations || '',
+            address: b.address || '',
           })),
           inscription: g.inscription || '',
           hasPin: m.entry.g,

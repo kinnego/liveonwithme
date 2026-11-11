@@ -13,7 +13,20 @@ export interface GraveFormBurial {
   surname: string;
   died: string;
   age: string;
+  nickname?: string;
+  born?: string;
+  address?: string;
+  relations?: string;
+  notes?: string;
 }
+
+const EXTRA_FIELDS: { key: 'nickname' | 'born' | 'address' | 'relations' | 'notes'; label: string; placeholder: string }[] = [
+  { key: 'nickname', label: 'Known as', placeholder: 'e.g. Hughie' },
+  { key: 'born', label: 'Born', placeholder: 'e.g. 1931' },
+  { key: 'address', label: 'Address or townland', placeholder: 'e.g. Meenacross' },
+  { key: 'relations', label: 'Relations', placeholder: 'e.g. wife of John' },
+  { key: 'notes', label: 'Notes', placeholder: '' },
+];
 
 export interface GraveFormValue {
   section: string;
@@ -61,6 +74,9 @@ export default function GraveForm({ cemetery, initial, isNew, onSave, onCancel, 
   const [mapOpen, setMapOpen] = useState(false);
   const [mapStart, setMapStart] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
+  const [moreOpen, setMoreOpen] = useState<number[]>(() =>
+    initial.burials.flatMap((b, i) => (EXTRA_FIELDS.some((f) => b[f.key]) ? [i] : [])),
+  );
 
   const hasPin = v.lat !== null && v.lng !== null;
 
@@ -148,8 +164,8 @@ export default function GraveForm({ cemetery, initial, isNew, onSave, onCancel, 
         Who is buried here? Only the surname is needed.
       </p>
       {v.burials.map((b, i) => (
+        <div key={i}>
         <div
-          key={i}
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
@@ -183,6 +199,36 @@ export default function GraveForm({ cemetery, initial, isNew, onSave, onCancel, 
             value={b.age}
             onChange={(e) => setBurial(i, { age: e.target.value })}
           />
+        </div>
+        {moreOpen.includes(i) ? (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: 8,
+              margin: '0 0 12px',
+            }}
+          >
+            {EXTRA_FIELDS.map((f) => (
+              <input
+                key={f.key}
+                aria-label={f.label}
+                placeholder={f.placeholder ? `${f.label}, ${f.placeholder}` : f.label}
+                value={b[f.key] || ''}
+                onChange={(e) => setBurial(i, { [f.key]: e.target.value })}
+              />
+            ))}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setMoreOpen((cur) => [...cur, i])}
+            className="muted"
+            style={{ background: 'none', border: 0, padding: 0, margin: '0 0 10px', fontSize: 13, textDecoration: 'underline', cursor: 'pointer', color: 'inherit' }}
+          >
+            + More about this person (nickname, born, townland, relations)
+          </button>
+        )}
         </div>
       ))}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

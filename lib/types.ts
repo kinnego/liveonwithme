@@ -337,15 +337,25 @@ export interface Plot {
 export interface GraveBurial {
   surname: string;
   forenames?: string;
+  /** "Known as" / nickname, e.g. "Hughie". Also used for matching. */
+  nickname?: string;
   /** Free text as written in the register, e.g. "12 Mar 1931". */
+  born?: string;
   died?: string;
   diedYear?: number | null;
+  buried?: string;
   age?: string;
+  /** Address or townland. */
+  address?: string;
+  /** e.g. "wife of John Boyle". */
+  relations?: string;
   notes?: string;
 }
 
 export type GraveRecordStatus = 'unclaimed' | 'adopted';
-export type GraveRecordSource = 'import' | 'registrar';
+// How the grave first got into the register: the command-line import, a
+// registrar typing it in by hand, or a registrar's spreadsheet upload.
+export type GraveRecordSource = 'import' | 'registrar' | 'upload';
 
 export interface GraveRecord {
   id: string;
@@ -363,6 +373,12 @@ export interface GraveRecord {
   adoptedByUid?: string | null;
   adoptedAt?: unknown;
   source: GraveRecordSource;
+  /** registerUploads doc the grave came from (or was last updated by). */
+  uploadId?: string | null;
+  /** True once a registrar has edited the grave by hand. */
+  editedByHand?: boolean;
+  /** Identity used to match the grave on later uploads (see lib/register-parse). */
+  graveKey?: string;
   createdByUid: string;
   updatedByUid?: string;
   createdAt?: unknown;
@@ -385,6 +401,37 @@ export interface CemeteryRegistrar {
   createdAt?: unknown;
   removedAt?: unknown;
   removedByUid?: string;
+}
+
+// A spreadsheet a registrar uploaded. The original text is kept so they can
+// download exactly what they sent, and graves link back to it by uploadId.
+export type RegisterUploadMode = 'add_and_update' | 'add_only';
+
+export interface RegisterUpload {
+  id: string;
+  placeId: string;
+  fileName: string;
+  mode: RegisterUploadMode;
+  uploadedByUid: string;
+  uploadedByEmail?: string;
+  people: number;
+  graves: number;
+  added: number;
+  updated: number;
+  skipped: number;
+  uncertainCells: number;
+  createdAt?: unknown;
+}
+
+// Answers to "Tell us about your register", per cemetery. Drives the
+// template and AI prompt we hand the registrar.
+export interface RegisterProfile {
+  placeId: string;
+  format: 'handwritten' | 'typed' | 'spreadsheet' | 'cards' | 'other';
+  fields: string[];
+  notes?: string;
+  updatedByUid: string;
+  updatedAt?: unknown;
 }
 
 // A family's "this record looks wrong" flag on a suggested grave. Lands in

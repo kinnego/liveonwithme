@@ -18,15 +18,14 @@
 // credentials). Without --lat/--lng the cemetery's coordinates are copied
 // from an existing plot or community cemetery with the same place id.
 //
-// Column headers are matched loosely (case and spacing don't matter):
-//   section | row | plot (or "plot number", "grave", "grave no")
-//   surname (or "last name")   forenames (or "first name", "first names", "forename", "christian name")
-//   died (or "date of death", "death", "year")   age   notes   inscription   lat   lng
-// See scripts/grave-register-template.csv.
+// Column headers are matched loosely, by the same parser the registrar
+// page's upload uses (lib/register-parse.ts). See
+// scripts/grave-register-template.csv.
 
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { graveLabel, toIndexBurial, yearOf } from '../lib/grave-match.ts';
+import { graveLabel, toIndexBurial } from '../lib/grave-match.ts';
+import { parseRegister } from '../lib/register-parse.ts';
 
 // ─── args ────────────────────────────────────────────────────────────────────
 
@@ -47,115 +46,18 @@ if (!file || !placeId || !cemeteryName) {
   process.exit(1);
 }
 
-// ─── CSV ─────────────────────────────────────────────────────────────────────
+// ─── parse (same parser as the registrar page's upload) ──────────────────────
 
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let field = '';
-  let inQuotes = false;
-  text = text.replace(/^﻿/, '');
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"' && text[i + 1] === '"') {
-        field += '"';
-        i++;
-      } else if (c === '"') inQuotes = false;
-      else field += c;
-    } else if (c === '"') inQuotes = true;
-    else if (c === ',') {
-      row.push(field);
-      field = '';
-    } else if (c === '\n' || c === '\r') {
-      if (c === '\r' && text[i + 1] === '\n') i++;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = '';
-    } else field += c;
-  }
-  if (field !== '' || row.length) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows.filter((r) => r.some((f) => f.trim() !== ''));
+const parsed = parseRegister(readFileSync(file, 'utf8'));
+if (parsed.error) {
+  console.error(parsed.error);
+  process.exit(1);
 }
-
-const HEADER_ALIASES = {
-  section: ['section', 'sect', 'area'],
-  row: ['row'],
-  plotNumber: ['plot', 'plotnumber', 'plotno', 'grave', 'graveno', 'gravenumber', 'number', 'no'],
-  surname: ['surname', 'lastname', 'familyname'],
-  forenames: ['forenames', 'forename', 'firstname', 'firstnames', 'christianname', 'givenname', 'givennames'],
-  died: ['died', 'dateofdeath', 'death', 'dod', 'year', 'yearofdeath', 'dateofburial', 'burialdate'],
-  age: ['age'],
-  notes: ['notes', 'note', 'remarks', 'address', 'townland'],
-  inscription: ['inscription', 'headstone'],
-  lat: ['lat', 'latitude'],
-  lng: ['lng', 'lon', 'long', 'longitude'],
-};
-
-function mapHeaders(headerRow) {
-  const map = {};
-  headerRow.forEach((h, i) => {
-    const key = h.toLowerCase().replace(/[^a-z]/g, '');
-    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
-      if (aliases.includes(key) && map[field] === undefined) map[field] = i;
-    }
-  });
-  if (map.surname === undefined) {
-    console.error(`No surname column found. Headers were: ${headerRow.join(', ')}`);
-    process.exit(1);
-  }
-  return map;
-}
-
-// ─── group rows into graves ──────────────────────────────────────────────────
-
-const rows = parseCsv(readFileSync(file, 'utf8'));
-const cols = mapHeaders(rows[0]);
-const get = (r, f) => (cols[f] === undefined ? '' : String(r[cols[f]] ?? '').trim());
-
-const graves = new Map();
-let burialCount = 0;
-let skipped = 0;
-rows.slice(1).forEach((r, i) => {
-  const surname = get(r, 'surname');
-  if (!surname) {
-    skipped++;
-    return;
-  }
-  const section = get(r, 'section');
-  const row = get(r, 'row');
-  const plotNumber = get(r, 'plotNumber');
-  const key = plotNumber
-    ? `${placeId}|${section.toLowerCase()}|${row.toLowerCase()}|${plotNumber.toLowerCase()}`
-    : `${placeId}|line|${i + 2}`;
-  if (!graves.has(key)) {
-    graves.set(key, { section, row, plotNumber, burials: [], inscription: '', lat: null, lng: null });
-  }
-  const g = graves.get(key);
-  const died = get(r, 'died');
-  const burial = { surname, diedYear: yearOf(died) };
-  const forenames = get(r, 'forenames');
-  if (forenames) burial.forenames = forenames;
-  if (died) burial.died = died;
-  const age = get(r, 'age');
-  if (age) burial.age = age;
-  const notes = get(r, 'notes');
-  if (notes) burial.notes = notes;
-  g.burials.push(burial);
-  burialCount++;
-  const inscription = get(r, 'inscription');
-  if (inscription && !g.inscription) g.inscription = inscription;
-  const lat = Number(get(r, 'lat'));
-  const lng = Number(get(r, 'lng'));
-  if (get(r, 'lat') && get(r, 'lng') && Number.isFinite(lat) && Number.isFinite(lng)) {
-    g.lat = lat;
-    g.lng = lng;
-  }
-});
+const graves = new Map(parsed.graves.map((g) => [`${placeId}|${g.key}`, g]));
+const burialCount = parsed.people;
+const skipped = parsed.skippedRows.length;
+if (parsed.unknownHeaders.length) console.warn(`Ignoring unrecognised columns: ${parsed.unknownHeaders.join(', ')}`);
+if (parsed.uncertainCells) console.warn(`${parsed.uncertainCells} cells are marked ?? as hard to read.`);
 
 const docIdOf = (key) => `imp_${createHash('sha1').update(key).digest('hex').slice(0, 20)}`;
 
@@ -222,6 +124,7 @@ for (let i = 0; i < entries.length; i += 200) {
     batch.set(refs[j], {
       placeId,
       cemetery,
+      graveKey: g.key,
       section: g.section,
       row: g.row,
       plotNumber: g.plotNumber,
@@ -249,7 +152,9 @@ const indexEntries = all.docs.map((d) => {
   return {
     id: d.id,
     l: graveLabel(g),
-    b: (g.burials || []).map((b) => toIndexBurial({ surname: b.surname, forenames: b.forenames, diedYear: b.diedYear ?? null })),
+    b: (g.burials || []).map((b) =>
+      toIndexBurial({ surname: b.surname, forenames: [b.forenames, b.nickname].filter(Boolean).join(' '), diedYear: b.diedYear ?? null }),
+    ),
     a: g.status === 'adopted',
     p: g.adoptedPlotId ?? null,
     g: typeof g.lat === 'number' && typeof g.lng === 'number',

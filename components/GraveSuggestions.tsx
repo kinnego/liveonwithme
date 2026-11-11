@@ -15,7 +15,7 @@ export type GraveSuggestion = {
   id: string;
   label: string;
   matchedIndex: number;
-  burials: { name: string; died: string; age: string }[];
+  burials: { name: string; died: string; age: string; nickname?: string; relations?: string; address?: string }[];
   inscription: string;
   hasPin: boolean;
   adopted: boolean;
@@ -149,7 +149,15 @@ export default function GraveSuggestions({ memorialId, personId, cemetery, onLoa
           <div key={s.id} className="card" style={{ marginBottom: 12 }}>
             <div style={{ fontWeight: 700, fontSize: 18 }}>{matched?.name}</div>
             <div className="muted" style={{ fontSize: 14 }}>
-              {[matched?.died && `Died ${matched.died}`, matched?.age && `aged ${matched.age}`].filter(Boolean).join(', ')}
+              {[
+                matched?.nickname && `Known as ${matched.nickname}`,
+                matched?.died && `Died ${matched.died}`,
+                matched?.age && `aged ${matched.age}`,
+                matched?.relations,
+                matched?.address,
+              ]
+                .filter(Boolean)
+                .join(', ')}
             </div>
             <div className="muted" style={{ fontSize: 14, marginTop: 6 }}>
               {s.label || 'No row or plot number recorded'}
