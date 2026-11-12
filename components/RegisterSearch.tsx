@@ -8,7 +8,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { matchBurialForTerms, searchTerms } from '@/lib/grave-match';
 
-type MemorialLite = { id: string; slug?: string; fullName: string; nickname?: string; died?: string };
+type MemorialLite = { id: string; slug?: string; fullName: string; nickname?: string; died?: string; heroPhotoPath?: string };
+
+const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
 type Hit = { id: string; name: string; nickname?: string; died?: string; age?: string; label: string; hasPin: boolean; others: number };
 
@@ -114,14 +116,27 @@ export default function RegisterSearch({
             <li key={m.id}>
               <Link
                 href={`/m/${m.slug || m.id}`}
-                style={{ display: 'block', padding: '12px 14px', border: '1px solid var(--sage)', borderRadius: 12, background: 'white' }}
+                style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 14px', border: '1px solid var(--sage)', borderRadius: 12, background: 'white' }}
               >
+                {m.heroPhotoPath && R2_PUBLIC_URL ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`${R2_PUBLIC_URL}/${m.heroPhotoPath}`}
+                    alt=""
+                    width={56}
+                    height={56}
+                    loading="lazy"
+                    style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+                  />
+                ) : null}
+                <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 650 }}>
                   {m.fullName}
                   {m.nickname && <span className="muted" style={{ fontWeight: 400 }}> ({m.nickname})</span>}
                 </div>
                 <div className="muted" style={{ fontSize: 14 }}>
                   {[m.died && `Died ${m.died.slice(0, 4)}`, 'Memorial page'].filter(Boolean).join(' · ')}
+                </div>
                 </div>
               </Link>
             </li>
