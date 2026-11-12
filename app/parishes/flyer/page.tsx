@@ -1,8 +1,9 @@
-// A one-page A4 leaflet for parish newsletters and noticeboards, with a QR
-// code pointing to /parishes. Print hides the site header and footer.
+// A one-page A4 leaflet for parish newsletters and noticeboards. No QR — the
+// per-cemetery visitor poster at /cemetery/[placeId]/artwork handles that;
+// this leaflet only needs to point the parish at liveonwith.me/parishes.
+// Print hides the site header and footer.
 
 import type { Metadata } from 'next';
-import QRCode from 'qrcode';
 import PrintButton from './PrintButton';
 import { SUPER_ADMIN_EMAIL } from '@/lib/types';
 
@@ -14,7 +15,6 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me
 
 export default async function ParishFlyerPage() {
   const url = `${SITE_URL}/parishes`;
-  const qr = await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
   const shortUrl = url.replace(/^https?:\/\/(www\.)?/, '');
 
   return (
@@ -62,29 +62,16 @@ export default async function ParishFlyerPage() {
 
         <div
           style={{
-            display: 'flex',
-            gap: 24,
-            alignItems: 'center',
             marginTop: 30,
             paddingTop: 24,
             borderTop: '1px solid var(--line)',
-            flexWrap: 'wrap',
           }}
         >
-          <div
-            role="img"
-            aria-label={`QR code for ${shortUrl}`}
-            style={{ width: 150, height: 150, flex: '0 0 150px' }}
-            dangerouslySetInnerHTML={{ __html: qr.replace('<svg', '<svg width="150" height="150"') }}
-          />
-          <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-            <div style={{ fontWeight: 700, fontSize: 19 }}>Point your phone&rsquo;s camera here to start</div>
-            <div style={{ marginTop: 6 }}>
-              or go to <strong>{shortUrl}</strong>
-            </div>
-            <div className="muted" style={{ marginTop: 10 }}>
-              Questions? Email <strong>{SUPER_ADMIN_EMAIL}</strong> and a real person will help.
-            </div>
+          <div style={{ fontWeight: 700, fontSize: 20 }}>
+            Get started at <strong>{shortUrl}</strong>
+          </div>
+          <div className="muted" style={{ marginTop: 10 }}>
+            Questions? Email <strong>{SUPER_ADMIN_EMAIL}</strong> and a real person will help.
           </div>
         </div>
       </article>
