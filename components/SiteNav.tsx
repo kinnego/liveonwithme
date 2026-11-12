@@ -62,7 +62,9 @@ export default function SiteNav() {
       setUser(null);
       return;
     }
-    return onAuthStateChanged(auth, async (u) => {
+    let stopRefresh: () => void = () => {};
+    const stopAuth = onAuthStateChanged(auth, async (u) => {
+      stopRefresh();
       setUser(u);
       if (typeof window !== 'undefined') {
         try {
@@ -91,6 +93,19 @@ export default function SiteNav() {
           }
           const snap = await getDoc(doc(db, 'users', u.uid));
           setProfile(snap.exists() ? (snap.data() as UserProfile) : null);
+          // Re-read when they come back to the tab, so a change made
+          // elsewhere (such as being approved as a partner) shows up
+          // without signing out and in again.
+          stopRefresh();
+          const refresh = () => {
+            if (document.visibilityState !== 'visible') return;
+            getDoc(doc(db, 'users', u.uid))
+              .then((s2) => setProfile(s2.exists() ? (s2.data() as UserProfile) : null))
+              .catch(() => {});
+            loadMyGraveyards(u).then(setGraveyards);
+          };
+          document.addEventListener('visibilitychange', refresh);
+          stopRefresh = () => document.removeEventListener('visibilitychange', refresh);
         } catch {
           setProfile(null);
         }
@@ -98,6 +113,10 @@ export default function SiteNav() {
         setProfile(null);
       }
     });
+    return () => {
+      stopAuth();
+      stopRefresh();
+    };
   }, []);
 
   // Close the mobile drawer when tapping outside the nav, so it feels like a
@@ -193,7 +212,7 @@ export default function SiteNav() {
         ))}
         {(isPartner || appliedPartner) && (
           <Link href="/partner" onClick={closeMenu}>
-            {appliedPartner ? 'My partner application' : 'Funeral director & partner page'}
+            {appliedPartner ? 'My partner application' : 'Partner'}
           </Link>
         )}
         {showAdmin && (
