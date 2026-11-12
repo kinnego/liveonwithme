@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
       skippedRows: parsed.skippedRows,
       uncertainCells: parsed.uncertainCells,
       notPersonRows: parsed.notPersonRows,
+      duplicateRows: parsed.duplicateRows,
       checks: parsed.checks.slice(0, 200),
       columns: parsed.columns,
       unknownHeaders: parsed.unknownHeaders,
@@ -147,6 +148,7 @@ export async function POST(req: NextRequest) {
     // write at a time, re-checking each grave, and lost races are skipped.
     const writes = plan.filter((p): p is Exclude<Plan, { kind: 'skip' }> => p.kind !== 'skip');
     let raced = 0;
+    const chunks = [];
     for (let i = 0; i < writes.length; i += 400) {
       const chunk = writes.slice(i, i + 400).map((p) => {
         const g = p.grave;
@@ -196,24 +198,41 @@ export async function POST(req: NextRequest) {
         };
       });
 
-      const batch = db.batch();
-      for (const w of chunk) {
-        if (w.p.kind === 'add') batch.create(w.ref, w.data);
-        else batch.update(w.ref, w.data, { lastUpdateTime: w.p.updateTime });
-      }
-      try {
-        await batch.commit();
-      } catch {
+      chunks.push(chunk);
+    }
+    // One write per grave: two writes to one record would fail its whole
+    // batch. The parser keeps keys apart, so this is only a safety net.
+    const seenPaths = new Set<string>();
+    const unique = chunks.map((chunk) =>
+      chunk.filter((w) => !seenPaths.has(w.ref.path) && (seenPaths.add(w.ref.path), true)),
+    );
+    // Batches go together, so a big register saves well inside the time
+    // the server allows. A failed batch is redone a few writes at a time.
+    await Promise.all(
+      unique.map(async (chunk) => {
+        const batch = db.batch();
         for (const w of chunk) {
-          try {
-            if (w.p.kind === 'add') await w.ref.create(w.data);
-            else await updateUnlessAdopted(db, w.ref, w.data);
-          } catch {
-            raced++;
+          if (w.p.kind === 'add') batch.create(w.ref, w.data);
+          else batch.update(w.ref, w.data, { lastUpdateTime: w.p.updateTime });
+        }
+        try {
+          await batch.commit();
+        } catch {
+          for (let j = 0; j < chunk.length; j += 25) {
+            await Promise.all(
+              chunk.slice(j, j + 25).map(async (w) => {
+                try {
+                  if (w.p.kind === 'add') await w.ref.create(w.data);
+                  else await updateUnlessAdopted(db, w.ref, w.data);
+                } catch {
+                  raced++;
+                }
+              }),
+            );
           }
         }
-      }
-    }
+      }),
+    );
     if (raced) summary.skippedAdopted += raced;
 
     await writeAuditAdmin({
