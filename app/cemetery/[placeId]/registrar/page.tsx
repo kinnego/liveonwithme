@@ -30,6 +30,7 @@ import { graveLabel } from '@/lib/grave-match';
 import { loadGoogleMaps } from '@/lib/places';
 import { customIdFromPlaceId, isCustomPlaceId, readCustomCemetery } from '@/lib/cemeteries';
 import { SUPER_ADMIN_EMAIL, type Cemetery, type GraveBurial } from '@/lib/types';
+import { GRAVEYARDS_CHANGED } from '@/components/SiteNav';
 
 export const dynamic = 'force-dynamic';
 
@@ -282,13 +283,8 @@ export default function RegistrarPage({
     setError('');
     try {
       await api('/api/registrar/join', { method: 'POST', body: JSON.stringify({ cemetery }) });
-      // The site menu caches "your graveyards"; drop it so this one shows
-      // there from the next page on.
-      try {
-        window.sessionStorage.removeItem('logw.myGraveyards');
-      } catch {
-        /* storage blocked */
-      }
+      // Tell the site menu, so "My graveyard register" appears at once.
+      window.dispatchEvent(new Event(GRAVEYARDS_CHANGED));
       await loadStatus();
     } catch (err: any) {
       setError(err.message);

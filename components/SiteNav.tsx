@@ -12,31 +12,20 @@ import { isSuperAdmin } from '@/lib/roles';
 // altogether. Without this flag we'd flash the signed-out nav for anyone who
 // is actually signed in. We mirror the hint from onAuthStateChanged below.
 const AUTH_HINT_KEY = 'logw.authHint';
-// The graveyards a registrar looks after, kept for a few minutes so the
-// menu doesn't ask the server on every page.
-const GRAVEYARDS_KEY = 'logw.myGraveyards';
-const GRAVEYARDS_TTL_MS = 10 * 60 * 1000;
+// Ask for the menu's graveyards again, e.g. right after joining as a
+// registrar: window.dispatchEvent(new Event(GRAVEYARDS_CHANGED)).
+export const GRAVEYARDS_CHANGED = 'logw:graveyards-changed';
 
+// Always asked fresh, so becoming (or stopping being) a registrar shows in
+// the menu straight away.
 async function loadMyGraveyards(u: User): Promise<Cemetery[]> {
   try {
-    const raw = window.sessionStorage.getItem(GRAVEYARDS_KEY);
-    if (raw) {
-      const hit = JSON.parse(raw) as { uid: string; at: number; list: Cemetery[] };
-      if (hit.uid === u.uid && Date.now() - hit.at < GRAVEYARDS_TTL_MS) return hit.list;
-    }
-  } catch {
-    /* storage blocked or bad JSON: ask the server */
-  }
-  try {
-    const res = await fetch('/api/registrar', { headers: { Authorization: `Bearer ${await u.getIdToken()}` } });
+    const res = await fetch('/api/registrar', {
+      headers: { Authorization: `Bearer ${await u.getIdToken()}` },
+      cache: 'no-store',
+    });
     const data = await res.json().catch(() => ({}));
-    const list: Cemetery[] = Array.isArray(data.cemeteries) ? data.cemeteries.filter(Boolean) : [];
-    try {
-      window.sessionStorage.setItem(GRAVEYARDS_KEY, JSON.stringify({ uid: u.uid, at: Date.now(), list }));
-    } catch {
-      /* storage blocked */
-    }
-    return list;
+    return Array.isArray(data.cemeteries) ? data.cemeteries.filter(Boolean) : [];
   } catch {
     return [];
   }
@@ -65,6 +54,7 @@ export default function SiteNav() {
     let stopRefresh: () => void = () => {};
     const stopAuth = onAuthStateChanged(auth, async (u) => {
       stopRefresh();
+      stopRefresh = () => {};
       setUser(u);
       if (typeof window !== 'undefined') {
         try {
@@ -83,7 +73,7 @@ export default function SiteNav() {
         // dynamic import runs once per sign-in; the browser caches the
         // module, so switching tabs doesn't refetch it.
         try {
-          const [{ doc, getDoc }, { db }] = await Promise.all([
+          const [{ doc, onSnapshot }, { db }] = await Promise.all([
             import('firebase/firestore'),
             import('@/lib/firebase'),
           ]);
@@ -91,21 +81,25 @@ export default function SiteNav() {
             setProfile(null);
             return;
           }
-          const snap = await getDoc(doc(db, 'users', u.uid));
-          setProfile(snap.exists() ? (snap.data() as UserProfile) : null);
-          // Re-read when they come back to the tab, so a change made
-          // elsewhere (such as being approved as a partner) shows up
-          // without signing out and in again.
-          stopRefresh();
-          const refresh = () => {
-            if (document.visibilityState !== 'visible') return;
-            getDoc(doc(db, 'users', u.uid))
-              .then((s2) => setProfile(s2.exists() ? (s2.data() as UserProfile) : null))
-              .catch(() => {});
-            loadMyGraveyards(u).then(setGraveyards);
+          // Live: when their role changes (approved as a partner, made an
+          // admin), the menu updates at once, with no reload or sign-out.
+          const stopProfile = onSnapshot(
+            doc(db, 'users', u.uid),
+            (snap) => setProfile(snap.exists() ? (snap.data() as UserProfile) : null),
+            () => setProfile(null),
+          );
+          // Registrar access lives on the server, so ask again when they come
+          // back to the tab or a page says it changed.
+          const refreshGraveyards = () => {
+            if (document.visibilityState === 'visible') loadMyGraveyards(u).then(setGraveyards);
           };
-          document.addEventListener('visibilitychange', refresh);
-          stopRefresh = () => document.removeEventListener('visibilitychange', refresh);
+          document.addEventListener('visibilitychange', refreshGraveyards);
+          window.addEventListener(GRAVEYARDS_CHANGED, refreshGraveyards);
+          stopRefresh = () => {
+            stopProfile();
+            document.removeEventListener('visibilitychange', refreshGraveyards);
+            window.removeEventListener(GRAVEYARDS_CHANGED, refreshGraveyards);
+          };
         } catch {
           setProfile(null);
         }

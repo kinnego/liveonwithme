@@ -10,7 +10,6 @@ import {
 import {
   collection,
   doc,
-  getDoc,
   onSnapshot,
   query,
   setDoc,
@@ -70,10 +69,13 @@ export default function Dashboard() {
     let stopOwned: (() => void) | undefined;
     let stopNominated: (() => void) | undefined;
     let stopCoManaging: (() => void) | undefined;
+    let stopProfile: (() => void) | undefined;
     const teardownListeners = () => {
       stopOwned?.();
       stopNominated?.();
       stopCoManaging?.();
+      stopProfile?.();
+      stopProfile = undefined;
       stopOwned = undefined;
       stopNominated = undefined;
       stopCoManaging = undefined;
@@ -90,12 +92,15 @@ export default function Dashboard() {
         router.push('/auth');
         return;
       }
-      getDoc(doc(db, 'users', u.uid))
-        .then((snap) => {
+      // Live, so being approved as a partner shows here at once.
+      stopProfile = onSnapshot(
+        doc(db, 'users', u.uid),
+        (snap) => {
           const p = snap.data() || {};
           setPartnerState(p.role === 'partner' ? 'partner' : p.partnerApplicationId ? 'applied' : 'none');
-        })
-        .catch(() => setPartnerState('none'));
+        },
+        () => setPartnerState('none'),
+      );
       const freshEmail = (u.email || '').toLowerCase();
       setUserEmail(freshEmail);
       // Keep users/{uid}.email in sync with the Auth-side email. Firebase
