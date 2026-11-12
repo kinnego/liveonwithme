@@ -15,6 +15,7 @@ import { SUPER_ADMIN_EMAIL, type GraveRecord } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
+const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
 async function loadGrave(id: string): Promise<PublicGrave | null> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
@@ -36,7 +37,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title: `${title} · LiveOnWith.me`,
     description,
-    openGraph: { title, description, url: `${SITE_URL}/grave/${id}`, type: 'website' },
+    openGraph: {
+      title,
+      description,
+      url: `${SITE_URL}/grave/${id}`,
+      type: 'website',
+      ...(g.photoPath && R2_PUBLIC_URL ? { images: [`${R2_PUBLIC_URL}/${g.photoPath}`] } : {}),
+    },
     alternates: { canonical: `${SITE_URL}/grave/${id}` },
   };
 }
@@ -64,6 +71,15 @@ export default async function GravePage({ params }: { params: Promise<{ id: stri
       <h1 style={{ fontSize: 'clamp(36px, 6vw, 56px)', margin: '10px 0 18px' }}>
         {g.burials.length === 1 ? g.burials[0].name : 'Resting here'}
       </h1>
+
+      {g.photoPath && R2_PUBLIC_URL && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`${R2_PUBLIC_URL}/${g.photoPath}`}
+          alt={`Headstone of ${namesOf(g) || 'this grave'}`}
+          style={{ display: 'block', width: '100%', maxHeight: 520, objectFit: 'contain', borderRadius: 18, background: 'var(--line)', marginBottom: 16 }}
+        />
+      )}
 
       <div className="card" style={{ fontSize: 17 }}>
         {g.burials.map((b, i) => (

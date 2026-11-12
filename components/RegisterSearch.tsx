@@ -12,7 +12,7 @@ type MemorialLite = { id: string; slug?: string; fullName: string; nickname?: st
 
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
-type Hit = { id: string; name: string; nickname?: string; died?: string; age?: string; label: string; hasPin: boolean; others: number };
+type Hit = { id: string; name: string; nickname?: string; died?: string; age?: string; label: string; hasPin: boolean; others: number; photoPath?: string | null };
 
 export default function RegisterSearch({
   placeId,
@@ -153,8 +153,20 @@ export default function RegisterSearch({
             <li key={h.id}>
               <Link
                 href={`/grave/${h.id}`}
-                style={{ display: 'block', padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 12, background: 'white' }}
+                style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 12, background: 'white' }}
               >
+                {h.photoPath && R2_PUBLIC_URL ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`${R2_PUBLIC_URL}/${h.photoPath}`}
+                    alt=""
+                    width={56}
+                    height={56}
+                    loading="lazy"
+                    style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+                  />
+                ) : null}
+                <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 650 }}>
                   {h.name}
                   {h.nickname && <span className="muted" style={{ fontWeight: 400 }}> ({h.nickname})</span>}
@@ -163,6 +175,7 @@ export default function RegisterSearch({
                   {[h.died && `Died ${h.died}`, h.age && `aged ${h.age}`, h.label, h.hasPin && '📍 on the map', h.others > 0 && `${h.others} more in this grave`, 'Burial register']
                     .filter(Boolean)
                     .join(' · ')}
+                </div>
                 </div>
               </Link>
             </li>
