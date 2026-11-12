@@ -239,15 +239,15 @@ export default function Dashboard() {
         <div className="card" style={{ marginBottom: 24, background: '#fffdf9' }}>
           <div className="eyebrow">Funeral directors &amp; partners</div>
           <h3 style={{ margin: '8px 0 6px' }}>
-            {partnerState === 'applied' ? 'Your partner application is with us' : 'Your partner page'}
+            {partnerState === 'applied' ? 'Your partner application is with us' : 'Memorials you set up for families'}
           </h3>
           <p className="muted" style={{ marginTop: 0 }}>
             {partnerState === 'applied'
               ? 'We\u2019ll email you once it\u2019s approved, usually within a working day. After that you can set up memorials for the families you serve.'
-              : 'Set up memorials for the families you serve, and see the ones you\u2019ve already set up.'}
+              : 'As a funeral director or partner, you set up memorials for the families you serve on a separate page. Your own memorials stay here.'}
           </p>
           <ButtonLink href="/partner" className="button secondary small">
-            {partnerState === 'applied' ? 'See my application' : 'Open my partner page'}
+            {partnerState === 'applied' ? 'See my application' : 'Go to memorials for families'}
           </ButtonLink>
         </div>
       )}

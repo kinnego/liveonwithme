@@ -179,8 +179,13 @@ export default function SiteNav() {
           </span>
         )}
         <Link href="/dashboard" onClick={closeMenu}>
-          My memorials
+          My own memorials
         </Link>
+        {(isPartner || appliedPartner) && (
+          <Link href="/partner" onClick={closeMenu}>
+            {appliedPartner ? 'My partner application' : 'Memorials I set up for families'}
+          </Link>
+        )}
         {graveyards.slice(0, 4).map((c) => (
           <Link
             key={c.placeId}
@@ -191,11 +196,6 @@ export default function SiteNav() {
             {graveyards.length === 1 ? 'My graveyard register' : `Register: ${c.name}`}
           </Link>
         ))}
-        {(isPartner || appliedPartner) && (
-          <Link href="/partner" onClick={closeMenu}>
-            {appliedPartner ? 'My partner application' : 'Funeral director & partner page'}
-          </Link>
-        )}
         {showAdmin && (
           <Link href="/admin" onClick={closeMenu}>
             Admin
