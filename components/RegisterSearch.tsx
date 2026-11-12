@@ -50,7 +50,11 @@ export default function RegisterSearch({
     setBusy(true);
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/graves/search?placeId=${encodeURIComponent(placeId)}&q=${encodeURIComponent(term)}`);
+        // q goes first so this URL never looks like the cached count request.
+        const r = await fetch(
+          `/api/graves/search?q=${encodeURIComponent(term)}&placeId=${encodeURIComponent(placeId)}`,
+          { cache: 'no-store' },
+        );
         const d = await r.json().catch(() => ({}));
         if (cancelled) return;
         setFailed(!r.ok);

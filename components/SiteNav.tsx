@@ -150,7 +150,10 @@ export default function SiteNav() {
     );
   }
 
-  const showPartner = profile?.role === 'partner' || isSuperAdmin(profile);
+  const isPartner = profile?.role === 'partner' || isSuperAdmin(profile);
+  // Someone who applied as a funeral director sees their application here
+  // while it waits, so they never wonder where it went.
+  const appliedPartner = !isPartner && !!profile?.partnerApplicationId;
   const showAdmin = isSuperAdmin(profile);
 
   return (
@@ -188,9 +191,9 @@ export default function SiteNav() {
             {graveyards.length === 1 ? 'My graveyard register' : `Register: ${c.name}`}
           </Link>
         ))}
-        {showPartner && (
+        {(isPartner || appliedPartner) && (
           <Link href="/partner" onClick={closeMenu}>
-            Partner
+            {appliedPartner ? 'My partner application' : 'Funeral director & partner page'}
           </Link>
         )}
         {showAdmin && (
