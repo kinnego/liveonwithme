@@ -15,13 +15,19 @@ import { SUPER_ADMIN_EMAIL, type GraveRecord } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.liveonwith.me';
-const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
 async function loadGrave(id: string): Promise<PublicGrave | null> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
   const snap = await adminDb().collection(GRAVE_COLLECTION).doc(id).get();
   if (!snap.exists) return null;
   return publicGrave(snap.id, snap.data() as GraveRecord);
+}
+
+// "Mary" from "Mary Doherty"; "Mrs Doherty" when the register only has a title.
+function firstName(full: string): string {
+  const words = full.trim().split(/\s+/);
+  if (words.length < 2) return full || 'them';
+  return /^(mr|mrs|miss|ms|dr|fr|sr|rev|lt|capt)\.?$/i.test(words[0]) ? full : words[0];
 }
 
 function namesOf(g: PublicGrave): string {
@@ -37,13 +43,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title: `${title} · LiveOnWith.me`,
     description,
-    openGraph: {
-      title,
-      description,
-      url: `${SITE_URL}/grave/${id}`,
-      type: 'website',
-      ...(g.photoPath && R2_PUBLIC_URL ? { images: [`${R2_PUBLIC_URL}/${g.photoPath}`] } : {}),
-    },
+    openGraph: { title, description, url: `${SITE_URL}/grave/${id}`, type: 'website' },
     alternates: { canonical: `${SITE_URL}/grave/${id}` },
   };
 }
@@ -60,6 +60,11 @@ export default async function GravePage({ params }: { params: Promise<{ id: stri
   if (g.cemeteryAddress) createQ.set('cemeteryAddress', g.cemeteryAddress);
   if (g.cemeteryLat !== null) createQ.set('cemeteryLat', String(g.cemeteryLat));
   if (g.cemeteryLng !== null) createQ.set('cemeteryLng', String(g.cemeteryLng));
+  const createHref = (name: string) => {
+    const q = new URLSearchParams(createQ);
+    if (name) q.set('name', name);
+    return `/create?${q.toString()}`;
+  };
 
   return (
     <main className="shell" style={{ maxWidth: 760 }}>
@@ -71,15 +76,6 @@ export default async function GravePage({ params }: { params: Promise<{ id: stri
       <h1 style={{ fontSize: 'clamp(36px, 6vw, 56px)', margin: '10px 0 18px' }}>
         {g.burials.length === 1 ? g.burials[0].name : 'Resting here'}
       </h1>
-
-      {g.photoPath && R2_PUBLIC_URL && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`${R2_PUBLIC_URL}/${g.photoPath}`}
-          alt={`Headstone of ${namesOf(g) || 'this grave'}`}
-          style={{ display: 'block', width: '100%', maxHeight: 520, objectFit: 'contain', borderRadius: 18, background: 'var(--line)', marginBottom: 16 }}
-        />
-      )}
 
       <div className="card" style={{ fontSize: 17 }}>
         {g.burials.map((b, i) => (
@@ -113,6 +109,23 @@ export default async function GravePage({ params }: { params: Promise<{ id: stri
         )}
       </div>
 
+      <div className="card" style={{ marginTop: 16, background: '#fffdf9' }}>
+        <h2 style={{ fontSize: 26, margin: '0 0 8px' }}>
+          {g.burials.length === 1 ? `Remember ${firstName(g.burials[0].name)} with a memorial` : 'Remember them with a memorial'}
+        </h2>
+        <p style={{ margin: '0 0 14px', fontSize: 17 }}>
+          A memorial page holds their photos, their story and the memories family and friends share.
+          It&rsquo;s linked to this grave at {g.cemeteryName}, so anyone who finds them here finds their page too.
+        </p>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {g.burials.map((b, i) => (
+            <ButtonLink key={i} href={createHref(b.name)} className={i === 0 ? 'button' : 'button secondary'}>
+              Add a memorial for {firstName(b.name)}
+            </ButtonLink>
+          ))}
+        </div>
+      </div>
+
       <div className="card" style={{ marginTop: 16 }}>
         <h2 style={{ fontSize: 26, margin: '0 0 8px' }}>Where to find the grave</h2>
         <p style={{ margin: '0 0 6px', fontSize: 17 }}>
@@ -134,16 +147,6 @@ export default async function GravePage({ params }: { params: Promise<{ id: stri
         )}
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <h2 style={{ fontSize: 26, margin: '0 0 8px' }}>Is this your family&rsquo;s grave?</h2>
-        <p style={{ margin: '0 0 14px' }}>
-          Make a memorial page with photos and memories. When you choose {g.cemeteryName}, we&rsquo;ll
-          offer you this grave, and its location comes with it.
-        </p>
-        <ButtonLink href={`/create?${createQ.toString()}`} className="button secondary">
-          Make a memorial page
-        </ButtonLink>
-      </div>
 
       <p className="muted" style={{ fontSize: 14, marginTop: 24 }}>
         This record comes from the parish burial register, kept by volunteers. If something looks

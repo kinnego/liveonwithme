@@ -109,6 +109,8 @@ function CreateInner() {
   // plot at this specific cemetery, so after creating the memorial we create
   // the plot for them with no extra picker step.
   const presetCemeteryName = searchParams?.get('cemeteryName') || '';
+  // From a grave's page: "Add a memorial for Mary" fills in her name.
+  const presetName = (searchParams?.get('name') || '').slice(0, 120);
   const presetCemeteryAddress = searchParams?.get('cemeteryAddress') || '';
   const presetCemeteryPlaceId = searchParams?.get('cemeteryPlaceId') || '';
   const presetCemeteryLatRaw = searchParams?.get('cemeteryLat');
@@ -817,7 +819,7 @@ function CreateInner() {
             placeholder={c.namePlaceholder}
             required
             autoFocus
-            defaultValue={draft.fullName || ''}
+            defaultValue={draft.fullName || presetName}
             onChange={(e) => persistDraft({ ...draft, fullName: e.target.value })}
           />
 
