@@ -108,6 +108,8 @@ export async function POST(req: NextRequest) {
       skippedExisting,
       skippedRows: parsed.skippedRows,
       uncertainCells: parsed.uncertainCells,
+      notPersonRows: parsed.notPersonRows,
+      checks: parsed.checks.slice(0, 200),
       columns: parsed.columns,
       unknownHeaders: parsed.unknownHeaders,
       matchedExisting: plan.filter((p) => p.kind !== 'add').length,
