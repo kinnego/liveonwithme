@@ -106,6 +106,14 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+// "Mary" for Mary Doherty; "Mrs Doherty" when the book only gives a title.
+function buttonName(b: GraveBurial | undefined): string {
+  if (!b) return '';
+  const first = (b.forenames || '').trim().split(/\s+/)[0] || '';
+  if (!first) return b.surname;
+  return /^(mr|mrs|miss|ms|dr|fr|sr|rev|lt|capt)\.?$/i.test(first) ? `${first} ${b.surname}` : first;
+}
+
 function sortKey(g: Grave): string {
   const pad = (s: string) => (/^\d+$/.test(s) ? s.padStart(6, '0') : s.toLowerCase());
   return [pad(g.section), pad(g.row), pad(g.plotNumber), (g.burials[0]?.surname || '').toLowerCase()].join('|');
@@ -786,7 +794,7 @@ export default function RegistrarPage({
                     <HeadstonePhoto
                       graveId={g.id}
                       photoPath={g.photoPath}
-                      personName={g.burials[0]?.forenames?.split(/\s+/)[0] || g.burials[0]?.surname}
+                      personName={buttonName(g.burials[0])}
                       onChange={(path) =>
                         setGraves((cur) => (cur ? cur.map((x) => (x.id === g.id ? { ...x, photoPath: path } : x)) : cur))
                       }
