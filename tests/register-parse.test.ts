@@ -175,3 +175,26 @@ describe('accepting AI-typed lists as they come', () => {
     expect(parseRegister('Who,When\nBoyle,1950').error).toMatch(/ask(ing)? ChatGPT/);
   });
 });
+
+describe('big sheets from spreadsheets', () => {
+  it('reads plot 135.0 as 135', () => {
+    const r = parseRegister('Section,Plot,Surname,Forenames\nA,135.0,Anderson,Catherine\nA,135,Anderson,John');
+    expect(r.graves).toHaveLength(1);
+    expect(r.graves[0].plotNumber).toBe('135');
+  });
+
+  it('adds a line typed twice only once, and says so', () => {
+    const r = parseRegister('Section,Plot,Surname,Forenames,Died\nA,1,Bradley,Rose,1891\nA,1,Bradley,Rose,1891\n,,Doherty,Ann,1950\n,,Doherty,Ann,1950');
+    expect(r.people).toBe(2);
+    expect(r.duplicateRows).toEqual([3, 5]);
+    expect(r.checks.filter((c) => c.kind === 'duplicate').map((c) => c.detail)).toEqual(['2', '4']);
+  });
+
+  it('keeps two different people with the same name and no plot as separate graves', () => {
+    const r = parseRegister('Surname,Forenames,Address\nBradley,John,Pound St\nBradley,John,Tulnaree\nBradley,John,Malin');
+    const keys = r.graves.map((g) => g.key);
+    expect(new Set(keys).size).toBe(3);
+    expect(keys[0]).not.toContain('#');
+    expect(keys[1]).toMatch(/#2$/);
+  });
+});

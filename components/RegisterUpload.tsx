@@ -17,6 +17,7 @@ type Summary = {
   skippedRows: number[];
   uncertainCells: number;
   notPersonRows?: number[];
+  duplicateRows?: number[];
   checks?: RegisterCheck[];
   unknownHeaders: string[];
   matchedExisting: number;
@@ -228,6 +229,8 @@ function checkSentence(c: RegisterCheck) {
       return <>&ldquo;{c.detail}&rdquo; isn&rsquo;t a person&rsquo;s name, so this line won&rsquo;t be added.</>;
     case 'titleOnly':
       return <>{who}: &ldquo;{c.detail}&rdquo; is a title, not a first name. That&rsquo;s fine if the book doesn&rsquo;t give one.</>;
+    case 'duplicate':
+      return <>{who}: line {c.row} is the same as line {c.detail}, so they&rsquo;re added once.</>;
     case 'similarSurname':
       return <>{who} and {c.detail} are both in {c.plot}. Is this one family spelled two ways? If so, use one spelling so people find them together.</>;
   }
@@ -238,13 +241,14 @@ const CHECK_HEADINGS: Record<RegisterCheck['kind'], string> = {
   unclear: 'Hard to read. These are saved as written, and you can fix them later.',
   titleOnly: 'Title instead of a first name',
   similarSurname: 'Same family?',
+  duplicate: 'In the sheet twice. Each is added once.',
 };
 
 /** The odd bits in the sheet, in plain words. Nothing here stops the save. */
 function CheckList({ checks }: { checks: RegisterCheck[] }) {
   const [showAll, setShowAll] = useState(false);
   const LIMIT = 8;
-  const order: RegisterCheck['kind'][] = ['notPerson', 'unclear', 'titleOnly', 'similarSurname'];
+  const order: RegisterCheck['kind'][] = ['notPerson', 'duplicate', 'unclear', 'titleOnly', 'similarSurname'];
   const sorted = [...checks].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || a.row - b.row);
   const shown = showAll ? sorted : sorted.slice(0, LIMIT);
   let lastKind: RegisterCheck['kind'] | null = null;

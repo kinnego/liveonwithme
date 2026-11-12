@@ -90,7 +90,17 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+  if (!res.ok) {
+    if (data.error) throw new Error(data.error);
+    // No message from us means the server gave up, usually on a very big
+    // upload. Saving is safe to repeat: nothing gets added twice.
+    if (res.status === 502 || res.status === 504) {
+      throw new Error(
+        'That took longer than the website allows. Some of it may already be saved. Please wait a minute and press the button again: nothing will be added twice.',
+      );
+    }
+    throw new Error(`Something went wrong (error ${res.status}). Please try again in a minute.`);
+  }
   return data as T;
 }
 

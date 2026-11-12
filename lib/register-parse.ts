@@ -188,7 +188,7 @@ export interface ParsedGrave {
 export interface RegisterCheck {
   /** Row number as the registrar sees it in the sheet (header is row 1). */
   row: number;
-  kind: 'unclear' | 'notPerson' | 'titleOnly' | 'similarSurname';
+  kind: 'unclear' | 'notPerson' | 'titleOnly' | 'similarSurname' | 'duplicate';
   /** The person's name as it will show, for the message. */
   name: string;
   /** What looked odd: the unclear text, the title, the other surname. */
@@ -204,6 +204,8 @@ export interface ParsedRegister {
   skippedRows: number[];
   /** Rows left out because they aren't a person ("Family", "Unknown"). */
   notPersonRows: number[];
+  /** Rows left out because an earlier row is exactly the same. */
+  duplicateRows: number[];
   /** Number of cells marked as unclear ("??", "?", "unclear", "not visible"). */
   uncertainCells: number;
   checks: RegisterCheck[];
@@ -289,7 +291,7 @@ export function similarSurnames(a: string, b: string): boolean {
 }
 
 export function parseRegister(text: string): ParsedRegister {
-  const empty: ParsedRegister = { graves: [], people: 0, skippedRows: [], notPersonRows: [], uncertainCells: 0, checks: [], columns: [], unknownHeaders: [] };
+  const empty: ParsedRegister = { graves: [], people: 0, skippedRows: [], notPersonRows: [], duplicateRows: [], uncertainCells: 0, checks: [], columns: [], unknownHeaders: [] };
   const rows = parseTable(text);
   if (rows.length < 2) return { ...empty, error: 'There’s nothing to import. Include the header row and at least one person.' };
   const { columns, unknown } = mapHeaders(rows[0]);
@@ -314,6 +316,11 @@ export function parseRegister(text: string): ParsedRegister {
   const graves = new Map<string, ParsedGrave>();
   const skippedRows: number[] = [];
   const notPersonRows: number[] = [];
+  const duplicateRows: number[] = [];
+  /** First sheet row of each exact row, to spot rows typed twice. */
+  const firstRowOf = new Map<string, number>();
+  /** How many graves with no plot number share each person key so far. */
+  const personKeyCount = new Map<string, number>();
   const checks: RegisterCheck[] = [];
   /** Sheet row of each burial, for similar-surname notes. */
   const rowOf = new Map<ParsedBurial, number>();
@@ -356,11 +363,37 @@ export function parseRegister(text: string): ParsedRegister {
 
     const section = get(r, 'section');
     const row = get(r, 'row');
-    const plotNumber = get(r, 'plotNumber');
-    const key = plotNumber ? plotKey(section, row, plotNumber) : `${personKey(burial)}#${i}`;
+    // Spreadsheets often save plot 135 as "135.0".
+    const plotNumber = get(r, 'plotNumber').replace(/^(\d+)\.0+$/, '$1');
+
+    // The same line typed twice: keep the first, say so, and move on.
+    const signature = JSON.stringify([simple(section), simple(row), simple(plotNumber), burial]);
+    const firstRow = firstRowOf.get(signature);
+    if (firstRow !== undefined) {
+      duplicateRows.push(sheetRow);
+      // Its unclear-cell notes were already given for the first copy.
+      while (checks.length && checks[checks.length - 1].row === sheetRow) checks.pop();
+      uncertainCells -= unclear.length;
+      checks.push({ row: sheetRow, kind: 'duplicate', name: shownName, detail: String(firstRow) });
+      return;
+    }
+    firstRowOf.set(signature, sheetRow);
+
+    // A grave with no plot number is known by the person in it. Two
+    // different people can share a name and year (two John Bradleys, no
+    // date), so number the repeats to keep each one its own grave.
+    let key: string;
+    if (plotNumber) {
+      key = plotKey(section, row, plotNumber);
+    } else {
+      const base = personKey(burial);
+      const n = (personKeyCount.get(base) || 0) + 1;
+      personKeyCount.set(base, n);
+      key = n === 1 ? base : `${base}#${n}`;
+    }
     let g = graves.get(key);
     if (!g) {
-      g = { key: plotNumber ? key : personKey(burial), section, row, plotNumber, inscription: '', lat: null, lng: null, burials: [] };
+      g = { key, section, row, plotNumber, inscription: '', lat: null, lng: null, burials: [] };
       graves.set(key, g);
     }
     g.burials.push(burial);
@@ -402,6 +435,7 @@ export function parseRegister(text: string): ParsedRegister {
     people,
     skippedRows,
     notPersonRows,
+    duplicateRows,
     uncertainCells,
     checks,
     columns: Object.keys(columns) as RegisterField[],
