@@ -25,6 +25,7 @@ export default function RegisterSearch({
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     fetch(`/api/graves/search?placeId=${encodeURIComponent(placeId)}`)
@@ -35,8 +36,12 @@ export default function RegisterSearch({
 
   useEffect(() => {
     const term = q.trim();
-    if (term.length < 3 || count === 0) {
+    // Always ask the register, even if the count said it was empty: the
+    // count is cached for a few minutes, so a register uploaded moments ago
+    // would otherwise be invisible here.
+    if (term.length < 3) {
       setHits(null);
+      setFailed(false);
       return;
     }
     let cancelled = false;
@@ -45,7 +50,14 @@ export default function RegisterSearch({
       try {
         const r = await fetch(`/api/graves/search?placeId=${encodeURIComponent(placeId)}&q=${encodeURIComponent(term)}`);
         const d = await r.json().catch(() => ({}));
-        if (!cancelled) setHits(Array.isArray(d.results) ? d.results : []);
+        if (cancelled) return;
+        setFailed(!r.ok);
+        setHits(Array.isArray(d.results) ? d.results : []);
+      } catch {
+        if (!cancelled) {
+          setFailed(true);
+          setHits([]);
+        }
       } finally {
         if (!cancelled) setBusy(false);
       }
@@ -54,10 +66,8 @@ export default function RegisterSearch({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [q, placeId, count]);
+  }, [q, placeId]);
 
-  const memorialCount = memorials?.length || 0;
-  if (count === 0 && memorialCount === 0) return null;
 
   // Memorials at this cemetery are already loaded on the page; match them here.
   const terms = q.trim().length >= 2 ? searchTerms(q) : [];
@@ -70,7 +80,7 @@ export default function RegisterSearch({
     : [];
   // Families' memorials replace the register entry for the same grave.
   const graveHits = hits || [];
-  const nothing = hits !== null && !busy && graveHits.length === 0 && memorialHits.length === 0;
+  const nothing = hits !== null && !busy && !failed && graveHits.length === 0 && memorialHits.length === 0;
 
   return (
     <div className="card" style={{ maxWidth: 620, margin: '0 auto 30px' }}>
@@ -78,7 +88,8 @@ export default function RegisterSearch({
       <h3 style={{ margin: '8px 0 6px' }}>Who are you looking for at {cemeteryName}?</h3>
       <p className="muted" style={{ marginTop: 0, fontSize: 15 }}>
         Type a name to find their memorial page
-        {count > 0 && <>, or where they&rsquo;re buried from the parish burial register</>}.
+        {count > 0 && <>, or where they&rsquo;re buried from the parish burial register</>}. Only people
+        buried here are shown.
       </p>
       <input
         type="search"
@@ -89,6 +100,11 @@ export default function RegisterSearch({
         autoComplete="off"
       />
       {busy && hits === null && <p className="muted" style={{ fontSize: 14 }}>Searching…</p>}
+      {failed && (
+        <p style={{ fontSize: 14, color: '#a94442' }}>
+          We couldn&rsquo;t search the burial register just now. Please try again in a minute.
+        </p>
+      )}
       {nothing && (
         <p className="muted" style={{ fontSize: 14 }}>No one by that name here yet. Try just the surname.</p>
       )}

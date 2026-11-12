@@ -5,7 +5,6 @@ import ButtonLink from '@/components/ButtonLink';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import CemeterySearch from '@/components/CemeterySearch';
 import RegisterSearch from '@/components/RegisterSearch';
 import CemeteryMap from '@/components/CemeteryMap';
 import {
@@ -291,12 +290,10 @@ export default function CemeteryPage({
         lng={cemeteryLng}
       />
 
-      <div style={{ maxWidth: 520, margin: '0 auto 40px', textAlign: 'center' }}>
-        <label className="fieldLabel" htmlFor="cemetery-search">
-          Search a different cemetery
-        </label>
-        <CemeterySearch />
-      </div>
+      <p className="muted" style={{ textAlign: 'center', margin: '0 auto 40px', fontSize: 15 }}>
+        Looking for someone in a different graveyard?{' '}
+        <Link href="/cemetery/nearby">Choose another graveyard</Link>
+      </p>
 
       {memorials === null && <p className="muted">Looking for memorials…</p>}
 

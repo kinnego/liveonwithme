@@ -282,6 +282,13 @@ export default function RegistrarPage({
     setError('');
     try {
       await api('/api/registrar/join', { method: 'POST', body: JSON.stringify({ cemetery }) });
+      // The site menu caches "your graveyards"; drop it so this one shows
+      // there from the next page on.
+      try {
+        window.sessionStorage.removeItem('logw.myGraveyards');
+      } catch {
+        /* storage blocked */
+      }
       await loadStatus();
     } catch (err: any) {
       setError(err.message);

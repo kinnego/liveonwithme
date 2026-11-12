@@ -4,7 +4,7 @@ import ButtonLink from '@/components/ButtonLink';
 import { useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase-auth';
-import { UserProfile } from '@/lib/types';
+import type { Cemetery, UserProfile } from '@/lib/types';
 import { isSuperAdmin } from '@/lib/roles';
 
 // Optimistic signed-in hint. Firebase's IndexedDB-backed persistence can take
@@ -12,12 +12,42 @@ import { isSuperAdmin } from '@/lib/roles';
 // altogether. Without this flag we'd flash the signed-out nav for anyone who
 // is actually signed in. We mirror the hint from onAuthStateChanged below.
 const AUTH_HINT_KEY = 'logw.authHint';
+// The graveyards a registrar looks after, kept for a few minutes so the
+// menu doesn't ask the server on every page.
+const GRAVEYARDS_KEY = 'logw.myGraveyards';
+const GRAVEYARDS_TTL_MS = 10 * 60 * 1000;
+
+async function loadMyGraveyards(u: User): Promise<Cemetery[]> {
+  try {
+    const raw = window.sessionStorage.getItem(GRAVEYARDS_KEY);
+    if (raw) {
+      const hit = JSON.parse(raw) as { uid: string; at: number; list: Cemetery[] };
+      if (hit.uid === u.uid && Date.now() - hit.at < GRAVEYARDS_TTL_MS) return hit.list;
+    }
+  } catch {
+    /* storage blocked or bad JSON: ask the server */
+  }
+  try {
+    const res = await fetch('/api/registrar', { headers: { Authorization: `Bearer ${await u.getIdToken()}` } });
+    const data = await res.json().catch(() => ({}));
+    const list: Cemetery[] = Array.isArray(data.cemeteries) ? data.cemeteries.filter(Boolean) : [];
+    try {
+      window.sessionStorage.setItem(GRAVEYARDS_KEY, JSON.stringify({ uid: u.uid, at: Date.now(), list }));
+    } catch {
+      /* storage blocked */
+    }
+    return list;
+  } catch {
+    return [];
+  }
+}
 
 export default function SiteNav() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [hintSignedIn, setHintSignedIn] = useState(false);
+  const [graveyards, setGraveyards] = useState<Cemetery[]>([]);
   const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -43,6 +73,8 @@ export default function SiteNav() {
         }
       }
       setHintSignedIn(!!u);
+      if (u) loadMyGraveyards(u).then(setGraveyards);
+      else setGraveyards([]);
       if (u) {
         // Lazy-import Firestore so logged-out visitors (the vast majority
         // of public memorial traffic) never pay for the ~150 KB SDK. The
@@ -146,6 +178,16 @@ export default function SiteNav() {
         <Link href="/dashboard" onClick={closeMenu}>
           My memorials
         </Link>
+        {graveyards.slice(0, 4).map((c) => (
+          <Link
+            key={c.placeId}
+            href={`/cemetery/${encodeURIComponent(c.placeId)}/registrar?name=${encodeURIComponent(c.name)}`}
+            onClick={closeMenu}
+            title={`Burial register for ${c.name}`}
+          >
+            {graveyards.length === 1 ? 'My graveyard register' : `Register: ${c.name}`}
+          </Link>
+        ))}
         {showPartner && (
           <Link href="/partner" onClick={closeMenu}>
             Partner
