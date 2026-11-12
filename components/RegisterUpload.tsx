@@ -104,7 +104,6 @@ export default function RegisterUpload({ cemetery, hasExisting, api, onDone }: P
 
   return (
     <div>
-      <h3 style={{ marginTop: 0, fontSize: 24 }}>Step 3 of 3: Paste the names in here</h3>
       <p style={{ marginTop: 0, fontSize: 17 }}>
         Paste the table you copied from ChatGPT or your spreadsheet into the box below.
       </p>

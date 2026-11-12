@@ -25,6 +25,7 @@ export type RegisterField =
   | 'relations'
   | 'inscription'
   | 'notes'
+  | 'source'
   | 'lat'
   | 'lng';
 
@@ -56,6 +57,9 @@ export const REGISTER_FIELDS: RegisterFieldInfo[] = [
   { key: 'relations', header: 'Relations', question: 'Family relations (e.g. "wife of John", "son of Mary")', aliases: ['relations', 'relation', 'relationship', 'relatives', 'family', 'spouse', 'parents', 'wifeof', 'sonof', 'daughterof'], askable: true },
   { key: 'inscription', header: 'Inscription', question: 'Headstone inscription', aliases: ['inscription', 'headstone', 'epitaph', 'headstoneinscription'], askable: true },
   { key: 'notes', header: 'Notes', question: 'Other notes or remarks (kept private, only registrars see them)', aliases: ['notes', 'note', 'remarks', 'comments', 'other', 'officiant', 'priest'], askable: true },
+  // Which photo or page a line came from, so a registrar can check it
+  // against the book. Kept with the private notes.
+  { key: 'source', header: 'Source', question: 'Which photo or page it came from', aliases: ['source', 'photo', 'image', 'page', 'sourcephoto', 'photoname', 'filename', 'frame'] },
   { key: 'lat', header: 'Latitude', question: 'Latitude', aliases: ['lat', 'latitude'] },
   { key: 'lng', header: 'Longitude', question: 'Longitude', aliases: ['lng', 'lon', 'long', 'longitude'] },
 ];
@@ -359,6 +363,8 @@ export function parseRegister(text: string): ParsedRegister {
       const v = get(r, f);
       if (v) burial[f] = v;
     }
+    const source = get(r, 'source');
+    if (source) burial.notes = [burial.notes, `Source: ${source}`].filter(Boolean).join('. ');
     if (died) burial.died = died;
 
     const section = get(r, 'section');
@@ -461,7 +467,12 @@ export function templateCsv(selected: RegisterField[]): string {
 export type RegisterFormat = 'handwritten' | 'typed' | 'spreadsheet' | 'cards' | 'other';
 
 export function buildAiPrompt(opts: { selected: RegisterField[]; format: RegisterFormat; cemeteryName?: string }): string {
-  const fields = fieldsForTemplate(opts.selected);
+  // Notes and Source always go in: Notes holds what ChatGPT couldn't read,
+  // and Source lets the registrar check any line against its photo.
+  const fields = [
+    ...fieldsForTemplate(opts.selected).filter((f) => f.key !== 'notes'),
+    ...REGISTER_FIELDS.filter((f) => f.key === 'notes' || f.key === 'source'),
+  ];
   const source =
     opts.format === 'handwritten'
       ? 'photos of pages from a handwritten burial register'
@@ -472,16 +483,24 @@ export function buildAiPrompt(opts: { selected: RegisterField[]; format: Registe
           : 'a burial register';
   const where = opts.cemeteryName ? ` for ${opts.cemeteryName}` : '';
   const lines = [
-    `These are ${source}${where}. Please transcribe every burial into one table.`,
+    `I will send you ${source}${where}. Please transcribe every burial on every page into one table. Accuracy and completeness matter more than speed.`,
     '',
     `Use exactly these columns, in this order: ${fields.map((f) => f.header).join(', ')}.`,
     '',
-    'Rules:',
+    'How to work:',
+    '- Go one photo at a time, in the order I send them. Before transcribing a photo, tell me: its name or number, the Section heading on the page, the first and last surname on it, and how many entries you can see.',
+    '- Transcribe every row on that photo, top to bottom, column by column. Then check your count of rows matches the number of entries you said you could see. If it doesn\u2019t, find the missing rows before moving on.',
+    '- In the Source column, put the photo\u2019s name or number (and the page or column if there are several), so each line can be checked against the photo.',
+    '- Never say a photo is finished unless every entry on it is in the table. If part of a page is cut off, blurred or hidden, say so plainly and tell me which names are affected.',
+    '- If two photos show the same page, still transcribe both. Don\u2019t leave lines out because they look like ones you already did: the website spots exact repeats itself.',
+    '',
+    'Rules for each line:',
     '- One row per person buried. If several people share a grave, give each their own row with the same Section, Row and Plot.',
     '- Only add a row for a named person. If the register just says "Family" or a grave has no names, leave it out.',
-    '- Copy names, places and dates exactly as written. Do not correct, translate or modernise spellings (keep Irish spellings and old abbreviations like "Jas." or "Margt.").',
-    '- Leave a cell empty if the register doesn’t give that detail. Never guess or invent information.',
-    `- If a word or number is hard to read, write your best guess followed by ${UNCERTAIN_MARK} (for example "Bridget${UNCERTAIN_MARK}" or "1923${UNCERTAIN_MARK}").`,
+    '- Copy names, places and dates exactly as written. Do not correct, translate or modernise spellings (keep Irish spellings, titles like "Fr" or "Mrs", and old abbreviations like "Jas." or "Margt.").',
+    '- Leave a cell empty only when the register really has nothing there. Never guess or invent information.',
+    `- If something is written but hard to read, write your best guess followed by ${UNCERTAIN_MARK} (for example "Bridget${UNCERTAIN_MARK}" or "1923${UNCERTAIN_MARK}"), and say what was unclear in Notes.`,
+    '- Write plot numbers as whole numbers (135, not 135.0).',
   ];
   if (fields.some((f) => f.key === 'relations')) {
     lines.push('- Put family relationships ("wife of John Boyle", "infant son of Patrick") in Relations, not in the name columns.');
@@ -491,9 +510,11 @@ export function buildAiPrompt(opts: { selected: RegisterField[]; format: Registe
   }
   lines.push(
     '- Put anything else written about the person in Notes.',
-    '- Don’t skip entries, even crossed-out or partial ones; note "crossed out" in Notes.',
+    '- Don\u2019t skip entries, even crossed-out or partial ones; note "crossed out" in Notes.',
     '',
-    'Give me the table as plain CSV text in a code block, with the column headings as the first line, so I can copy it straight into a spreadsheet. If there are many pages, do them all, then tell me how many people you transcribed from each page.',
+    'Give me the table as plain CSV text in a code block, with the column headings as the first line, so I can copy it straight into a spreadsheet. If I send several photos, keep adding to the same table and give me the whole table each time.',
+    '',
+    'At the end, give me a short check list: for each photo, the section, the first and last surname and the number of people; any sections that didn\u2019t appear; and any gaps in the alphabet between one page and the next that might mean a page is missing.',
   );
   return lines.join('\n');
 }

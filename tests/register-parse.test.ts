@@ -198,3 +198,18 @@ describe('big sheets from spreadsheets', () => {
     expect(keys[1]).toMatch(/#2$/);
   });
 });
+
+describe('source column', () => {
+  it('keeps which photo a line came from with the private notes', () => {
+    const r = parseRegister('Surname,Forenames,Notes,Source\nDiver,James,Year unclear,IMG_20341\nDiver,Mae,,IMG_20342');
+    expect(r.graves[0].burials[0].notes).toBe('Year unclear. Source: IMG_20341');
+    expect(r.graves[1].burials[0].notes).toBe('Source: IMG_20342');
+    expect(r.unknownHeaders).toEqual([]);
+  });
+
+  it('asks ChatGPT for Notes and Source columns and a per-photo count', () => {
+    const p = buildAiPrompt({ selected: ['section', 'plotNumber'], format: 'handwritten' });
+    expect(p).toContain('Section, Plot, Surname, Forenames, Died, Notes, Source');
+    expect(p).toContain('first and last surname');
+  });
+});

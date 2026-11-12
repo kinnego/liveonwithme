@@ -165,6 +165,8 @@ export default function RegistrarPage({
   const [inviteMsg, setInviteMsg] = useState('');
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [showImport, setShowImport] = useState(false);
+  // Which import step to open first; 2 jumps to the ChatGPT instructions.
+  const [importStep, setImportStep] = useState<1 | 2 | 3 | undefined>(undefined);
   const [walkMode, setWalkMode] = useState(false);
   const [pins, setPins] = useState<Record<string, PinState>>({});
 
@@ -536,17 +538,25 @@ export default function RegistrarPage({
               ← Back
             </button>
           </div>
-          <p className="muted" style={{ marginTop: 0 }}>Three short steps. Take your time: nothing is saved until the end.</p>
-          <RegisterSetup placeId={placeId} cemeteryName={cemeteryName} api={api} />
-          <div style={{ borderTop: '1px solid var(--line)', margin: '24px 0' }} />
-          <RegisterUpload
-            cemetery={cemetery}
-            hasExisting={!!graves && graves.length > 0}
+          <p className="muted" style={{ marginTop: 0 }}>
+            Three short steps. Tap a step to open it. Nothing is saved until the end.
+          </p>
+          <RegisterSetup
+            placeId={placeId}
+            cemeteryName={cemeteryName}
             api={api}
-            onDone={() => {
-              loadGraves();
-              loadUploads();
-            }}
+            initialStep={importStep}
+            upload={
+              <RegisterUpload
+                cemetery={cemetery}
+                hasExisting={!!graves && graves.length > 0}
+                api={api}
+                onDone={() => {
+                  loadGraves();
+                  loadUploads();
+                }}
+              />
+            }
           />
         </div>
       )}
@@ -652,8 +662,25 @@ export default function RegistrarPage({
           >
             {walkMode ? '✓ Walking the graveyard' : '📍 Walk the graveyard'}
           </button>
-          <button type="button" className="button secondary" onClick={() => setShowImport(true)}>
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => {
+              setImportStep(undefined);
+              setShowImport(true);
+            }}
+          >
             Upload more names
+          </button>
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => {
+              setImportStep(2);
+              setShowImport(true);
+            }}
+          >
+            ChatGPT instructions
           </button>
           <input
             type="search"
