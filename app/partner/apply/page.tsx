@@ -15,6 +15,7 @@ export default function PartnerApply() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
+  const [emailSent, setEmailSent] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -27,6 +28,12 @@ export default function PartnerApply() {
       // Ensure profile exists so the write to /users below works.
       const profRef = doc(db, 'users', u.uid);
       const snap = await getDoc(profRef);
+      // Already applied: show where their application stands instead of a
+      // blank form that invites a second application.
+      if (snap.exists() && (snap.data().partnerApplicationId || snap.data().role === 'partner')) {
+        router.replace('/partner');
+        return;
+      }
       if (!snap.exists()) {
         await setDoc(profRef, {
           uid: u.uid,
@@ -72,23 +79,32 @@ export default function PartnerApply() {
         actorEmail: auth.currentUser.email || undefined,
       });
 
-      // Fire-and-forget the notify route (applicant confirmation + admin
-      // notice). Not awaited — a SendGrid blip must not block the "thanks"
-      // screen or leave the user wondering whether their application landed.
+      // Send the confirmation email and the notice to our team. The
+      // application is already saved, so a failure here only changes what the
+      // thank-you screen says; it never loses the application. Capped at 15s
+      // so a slow mail service can't leave the button spinning.
+      let sent = false;
       try {
         const token = await auth.currentUser.getIdToken();
-        void fetch('/api/partner/application-notify', {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 15000);
+        const res = await fetch('/api/partner/application-notify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ applicationId: app.id }),
+          signal: ctrl.signal,
+          keepalive: true,
         });
+        clearTimeout(timer);
+        sent = res.ok;
       } catch {
-        // ignored — the application doc is already written
+        sent = false;
       }
 
+      setEmailSent(sent);
       setDone(true);
     } catch (err: any) {
       setError(err.message);
@@ -106,10 +122,24 @@ export default function PartnerApply() {
           <div className="eyebrow">Application received</div>
           <h2>Thank you.</h2>
           <p className="muted">
-            We&rsquo;ll review your application and reply within a working day. Once approved,
-            you&rsquo;ll see &lsquo;Set up a new memorial&rsquo; on your partner dashboard.
+            Your application has reached us. We&rsquo;ll review it and reply within a working day.
           </p>
-          <a href="/dashboard" className="button" style={{ marginTop: 20 }}>Back to my dashboard</a>
+          {emailSent ? (
+            <p className="muted">
+              We&rsquo;ve emailed you a copy. If it isn&rsquo;t in your inbox in a few minutes,
+              please check your spam or junk folder.
+            </p>
+          ) : (
+            <p className="muted">
+              We couldn&rsquo;t send your confirmation email just now, but your application is
+              safely saved and our team will still see it.
+            </p>
+          )}
+          <p className="muted">
+            You can check on it any time from &lsquo;My partner application&rsquo; in the menu.
+            Once you&rsquo;re approved, that page is where you set up memorials for families.
+          </p>
+          <a href="/partner" className="button" style={{ marginTop: 20 }}>See my application</a>
         </div>
       </main>
     );

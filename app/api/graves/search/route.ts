@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
   const placeId = (req.nextUrl.searchParams.get('placeId') || '').slice(0, 200);
   const terms = searchTerms(q);
   const countOnly = !!placeId && !q;
-  if (terms.length === 0 && !countOnly) return NextResponse.json({ results: [] });
+  if (terms.length === 0 && !countOnly) {
+    return NextResponse.json({ results: [] }, { headers: { 'Cache-Control': 'no-store' } });
+  }
 
   try {
     // Every path that touches Firestore is rate limited per IP, including
@@ -44,7 +46,14 @@ export async function GET(req: NextRequest) {
       const count = await registerCount(adminDb(), placeId);
       return NextResponse.json(
         { results: [], count },
-        { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300' } },
+        {
+          headers: {
+            'Cache-Control': 'public, max-age=60, s-maxage=300',
+            // Netlify's CDN must key this on the query string, or a cached
+            // count would be served back for name searches at the same path.
+            'Netlify-Vary': 'query',
+          },
+        },
       );
     }
 
@@ -76,7 +85,9 @@ export async function GET(req: NextRequest) {
       });
       if (results.length >= RETURN) break;
     }
-    return NextResponse.json({ results });
+    // Never cached: a stale or wrongly keyed copy here is what made the
+    // graveyard page show no graves after a register was uploaded.
+    return NextResponse.json({ results }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err) {
     console.error('Grave search failed:', err);
     return NextResponse.json({ error: 'Search failed.' }, { status: 500 });

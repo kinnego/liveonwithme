@@ -66,7 +66,9 @@ export default function PartnerDashboard() {
 
       const admin = isSuperAdmin(prof);
       if (prof.role !== 'partner' && !admin) {
-        setAccess('not_partner');
+        // Applied but not yet approved: say so, rather than asking them to
+        // apply again.
+        setAccess(prof.partnerApplicationId ? 'pending' : 'not_partner');
         return;
       }
       if (!admin) {
@@ -163,6 +165,13 @@ export default function PartnerDashboard() {
             Your partner application is with our team. We&rsquo;ll email you at{' '}
             <strong>{profile?.email}</strong> once it&rsquo;s approved. Most decisions take a working day.
           </p>
+          <p className="muted">
+            Until then you can still use your account as normal. You can come back to this page
+            any time from &lsquo;My partner application&rsquo; in the menu.
+          </p>
+          <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
+            <ButtonLink href="/dashboard" className="button secondary">Go to my dashboard</ButtonLink>
+          </div>
         </div>
       </main>
     );

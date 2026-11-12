@@ -60,16 +60,22 @@ export default function Dashboard() {
   const [emailChangeSent, setEmailChangeSent] = useState(false);
   const [emailChangeNeedsFreshSignIn, setEmailChangeNeedsFreshSignIn] =
     useState(false);
+  // 'applied' while a funeral director / partner application waits;
+  // 'partner' once approved. Shown at the top so they find their page.
+  const [partnerState, setPartnerState] = useState<'none' | 'applied' | 'partner'>('none');
   const router = useRouter();
 
   useEffect(() => {
     let stopOwned: (() => void) | undefined;
     let stopNominated: (() => void) | undefined;
     let stopCoManaging: (() => void) | undefined;
+    let stopProfile: (() => void) | undefined;
     const teardownListeners = () => {
       stopOwned?.();
       stopNominated?.();
       stopCoManaging?.();
+      stopProfile?.();
+      stopProfile = undefined;
       stopOwned = undefined;
       stopNominated = undefined;
       stopCoManaging = undefined;
@@ -86,6 +92,15 @@ export default function Dashboard() {
         router.push('/auth');
         return;
       }
+      // Live, so being approved as a partner shows here at once.
+      stopProfile = onSnapshot(
+        doc(db, 'users', u.uid),
+        (snap) => {
+          const p = snap.data() || {};
+          setPartnerState(p.role === 'partner' ? 'partner' : p.partnerApplicationId ? 'applied' : 'none');
+        },
+        () => setPartnerState('none'),
+      );
       const freshEmail = (u.email || '').toLowerCase();
       setUserEmail(freshEmail);
       // Keep users/{uid}.email in sync with the Auth-side email. Firebase
@@ -225,6 +240,22 @@ export default function Dashboard() {
           Create a page
         </ButtonLink>
       </div>
+      {partnerState !== 'none' && (
+        <div className="card" style={{ marginBottom: 24, background: '#fffdf9' }}>
+          <div className="eyebrow">Funeral directors &amp; partners</div>
+          <h3 style={{ margin: '8px 0 6px' }}>
+            {partnerState === 'applied' ? 'Your partner application is with us' : 'Your partner page'}
+          </h3>
+          <p className="muted" style={{ marginTop: 0 }}>
+            {partnerState === 'applied'
+              ? 'We\u2019ll email you once it\u2019s approved, usually within a working day. After that you can set up memorials for the families you serve.'
+              : 'Set up memorials for the families you serve, and see the ones you\u2019ve already set up.'}
+          </p>
+          <ButtonLink href="/partner" className="button secondary small">
+            {partnerState === 'applied' ? 'See my application' : 'Open my partner page'}
+          </ButtonLink>
+        </div>
+      )}
       {owned.length === 0 ? (
         <div className="card">
           <h3>No memorials yet</h3>
