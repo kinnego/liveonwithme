@@ -262,6 +262,7 @@ export function serializeGrave(id: string, data: Record<string, unknown>) {
     lng: typeof g.lng === 'number' ? g.lng : null,
     burials: g.burials || [],
     inscription: g.inscription || '',
+    photoPath: g.photoPath || null,
     status: g.status,
     adoptedPlotId: g.adoptedPlotId || null,
     source: g.source,

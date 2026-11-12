@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
         placeId: g.placeId,
         label: graveLabel(g),
         hasPin: typeof g.lat === 'number',
+        photoPath: g.photoPath || null,
         others: (g.burials || []).length - 1,
       });
       if (results.length >= RETURN) break;

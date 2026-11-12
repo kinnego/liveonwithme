@@ -16,6 +16,7 @@ import GraveForm, { emptyGrave, type GraveFormValue } from '@/components/GraveFo
 import RegisterSetup from '@/components/RegisterSetup';
 import RegisterUpload from '@/components/RegisterUpload';
 import MyGraveyards from '@/components/MyGraveyards';
+import HeadstonePhoto from '@/components/HeadstonePhoto';
 import {
   BookIcon,
   CameraIcon,
@@ -43,6 +44,7 @@ type Grave = {
   lng: number | null;
   burials: GraveBurial[];
   inscription: string;
+  photoPath: string | null;
   status: 'unclaimed' | 'adopted';
   adoptedPlotId: string | null;
   source: 'import' | 'registrar' | 'upload';
@@ -753,6 +755,15 @@ export default function RegistrarPage({
                         : 'Added by hand'}
                     {g.editedByHand && g.source !== 'registrar' && ' · fixed by hand since'}
                   </div>
+                  {g.status !== 'adopted' && (
+                    <HeadstonePhoto
+                      graveId={g.id}
+                      photoPath={g.photoPath}
+                      onChange={(path) =>
+                        setGraves((cur) => (cur ? cur.map((x) => (x.id === g.id ? { ...x, photoPath: path } : x)) : cur))
+                      }
+                    />
+                  )}
                   {(() => {
                     const st = pins[g.id];
                     if (!st || st.busy) return null;

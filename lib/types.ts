@@ -370,6 +370,8 @@ export interface GraveRecord {
   lng?: number | null;
   burials: GraveBurial[];
   inscription?: string;
+  /** Photo of the headstone, a key in the public R2 bucket. */
+  photoPath?: string | null;
   status: GraveRecordStatus;
   adoptedPlotId?: string | null;
   adoptedByUid?: string | null;

@@ -25,6 +25,8 @@ export interface PublicGrave {
   label: string;
   burials: PublicBurial[];
   inscription: string;
+  /** Headstone photo, a key in the public R2 bucket. */
+  photoPath: string | null;
   lat: number | null;
   lng: number | null;
   /** The family's plot page, once a family has adopted the grave. */
@@ -55,6 +57,7 @@ export function publicGrave(id: string, g: Partial<GraveRecord>): PublicGrave {
     label: graveLabel(g),
     burials: (g.burials || []).map(publicBurial),
     inscription: g.inscription || '',
+    photoPath: g.photoPath || null,
     lat: typeof g.lat === 'number' ? g.lat : null,
     lng: typeof g.lng === 'number' ? g.lng : null,
     plotId: g.status === 'adopted' ? g.adoptedPlotId ?? null : null,
