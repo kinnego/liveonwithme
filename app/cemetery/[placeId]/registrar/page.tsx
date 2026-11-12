@@ -786,6 +786,7 @@ export default function RegistrarPage({
                     <HeadstonePhoto
                       graveId={g.id}
                       photoPath={g.photoPath}
+                      personName={g.burials[0]?.forenames?.split(/\s+/)[0] || g.burials[0]?.surname}
                       onChange={(path) =>
                         setGraves((cur) => (cur ? cur.map((x) => (x.id === g.id ? { ...x, photoPath: path } : x)) : cur))
                       }

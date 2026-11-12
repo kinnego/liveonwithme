@@ -16,10 +16,13 @@ export function headstoneUrl(path: string | null | undefined): string | null {
 export default function HeadstonePhoto({
   graveId,
   photoPath,
+  personName,
   onChange,
 }: {
   graveId: string;
   photoPath: string | null;
+  /** First name of the first person in the grave, for the button. */
+  personName?: string;
   onChange: (path: string | null) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -86,7 +89,11 @@ export default function HeadstonePhoto({
         onChange={(e) => pick(e.target.files?.[0])}
       />
       <button type="button" className="button secondary small" disabled={busy} onClick={() => input.current?.click()}>
-        {busy ? 'Saving the photo…' : url ? 'Change the photo' : '📷 Add a headstone photo'}
+        {busy
+          ? 'Saving the photo…'
+          : url
+            ? 'Change the photo'
+            : `📷 Add a photo of ${personName ? `${personName}\u2019s` : 'the'} grave`}
       </button>
       {url && !busy && (
         <button
