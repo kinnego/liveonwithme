@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import type { Cemetery } from '@/lib/types';
+import type { RegisterCheck } from '@/lib/register-parse';
 
 type Summary = {
   people: number;
@@ -15,6 +16,8 @@ type Summary = {
   skippedExisting: number;
   skippedRows: number[];
   uncertainCells: number;
+  notPersonRows?: number[];
+  checks?: RegisterCheck[];
   unknownHeaders: string[];
   matchedExisting: number;
   sample: { label: string; names: string[] }[];
@@ -169,15 +172,19 @@ export default function RegisterUpload({ cemetery, hasExisting, api, onDone }: P
               it is&rdquo; to keep them.
             </p>
           )}
-          {summary.uncertainCells > 0 && (
-            <p>
-              {summary.uncertainCells} {summary.uncertainCells === 1 ? 'entry is' : 'entries are'} marked ?? as hard
-              to read. You can upload now and fix them later, or check them in the sheet first.
-            </p>
+          {summary.checks && summary.checks.length > 0 ? (
+            <CheckList checks={summary.checks} />
+          ) : (
+            summary.uncertainCells > 0 && (
+              <p>
+                {summary.uncertainCells} {summary.uncertainCells === 1 ? 'entry is' : 'entries are'} marked as hard to
+                read. You can save now and fix them later, or check them in the book first.
+              </p>
+            )
           )}
           {summary.skippedRows.length > 0 && (
             <p className="muted">
-              Rows with no surname will be skipped: row {summary.skippedRows.slice(0, 10).join(', ')}
+              Lines with no surname will be skipped: line {summary.skippedRows.slice(0, 10).join(', ')}
               {summary.skippedRows.length > 10 ? ` and ${summary.skippedRows.length - 10} more` : ''}.
             </p>
           )}
@@ -208,6 +215,64 @@ export default function RegisterUpload({ cemetery, hasExisting, api, onDone }: P
         </div>
       )}
       {error && <p style={{ color: '#a94442', fontSize: 14 }}>{error}</p>}
+    </div>
+  );
+}
+
+function checkSentence(c: RegisterCheck) {
+  const who = <strong>{c.name}</strong>;
+  switch (c.kind) {
+    case 'unclear':
+      return <>{who}: &ldquo;{c.detail}&rdquo;</>;
+    case 'notPerson':
+      return <>&ldquo;{c.detail}&rdquo; isn&rsquo;t a person&rsquo;s name, so this line won&rsquo;t be added.</>;
+    case 'titleOnly':
+      return <>{who}: &ldquo;{c.detail}&rdquo; is a title, not a first name. That&rsquo;s fine if the book doesn&rsquo;t give one.</>;
+    case 'similarSurname':
+      return <>{who} and {c.detail} are both in {c.plot}. Is this one family spelled two ways? If so, use one spelling so people find them together.</>;
+  }
+}
+
+const CHECK_HEADINGS: Record<RegisterCheck['kind'], string> = {
+  notPerson: 'Won’t be added',
+  unclear: 'Hard to read. These are saved as written, and you can fix them later.',
+  titleOnly: 'Title instead of a first name',
+  similarSurname: 'Same family?',
+};
+
+/** The odd bits in the sheet, in plain words. Nothing here stops the save. */
+function CheckList({ checks }: { checks: RegisterCheck[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const LIMIT = 8;
+  const order: RegisterCheck['kind'][] = ['notPerson', 'unclear', 'titleOnly', 'similarSurname'];
+  const sorted = [...checks].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || a.row - b.row);
+  const shown = showAll ? sorted : sorted.slice(0, LIMIT);
+  let lastKind: RegisterCheck['kind'] | null = null;
+  return (
+    <div style={{ border: '2px solid #e0c48a', background: '#fff8e8', borderRadius: 12, padding: '12px 14px', margin: '10px 0', fontSize: 16, color: '#3a2e14' }}>
+      <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 18 }}>
+        Please have a quick look at {checks.length === 1 ? 'this' : `these ${checks.length}`}
+      </p>
+      <p style={{ margin: '0 0 8px', fontSize: 15 }}>
+        You can still save. These are just things that looked unusual. Line numbers count the heading line as line 1.
+      </p>
+      {shown.map((c, i) => {
+        const heading = c.kind !== lastKind ? CHECK_HEADINGS[c.kind] : null;
+        lastKind = c.kind;
+        return (
+          <div key={i}>
+            {heading && <div style={{ fontWeight: 700, marginTop: i ? 10 : 0 }}>{heading}</div>}
+            <p style={{ margin: '4px 0 0', lineHeight: 1.45 }}>
+              <span style={{ fontWeight: 600 }}>Line {c.row}:</span> {checkSentence(c)}
+            </p>
+          </div>
+        );
+      })}
+      {sorted.length > LIMIT && (
+        <button type="button" className="button secondary small" style={{ marginTop: 10 }} onClick={() => setShowAll((v) => !v)}>
+          {showAll ? 'Show fewer' : `Show all ${sorted.length}`}
+        </button>
+      )}
     </div>
   );
 }

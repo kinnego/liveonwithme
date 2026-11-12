@@ -180,13 +180,33 @@ export interface ParsedGrave {
   burials: ParsedBurial[];
 }
 
+/**
+ * Something in the sheet worth a second look. AI-typed lists vary, so we
+ * accept them as they come and point out the odd bits in plain words
+ * rather than rejecting the sheet.
+ */
+export interface RegisterCheck {
+  /** Row number as the registrar sees it in the sheet (header is row 1). */
+  row: number;
+  kind: 'unclear' | 'notPerson' | 'titleOnly' | 'similarSurname';
+  /** The person's name as it will show, for the message. */
+  name: string;
+  /** What looked odd: the unclear text, the title, the other surname. */
+  detail: string;
+  /** Plot label for similar-surname notes. */
+  plot?: string;
+}
+
 export interface ParsedRegister {
   graves: ParsedGrave[];
   people: number;
   /** Data rows with no surname (skipped). */
   skippedRows: number[];
-  /** Number of cells the AI marked as unclear with "??". */
+  /** Rows left out because they aren't a person ("Family", "Unknown"). */
+  notPersonRows: number[];
+  /** Number of cells marked as unclear ("??", "?", "unclear", "not visible"). */
   uncertainCells: number;
+  checks: RegisterCheck[];
   columns: RegisterField[];
   unknownHeaders: string[];
   error?: string;
@@ -220,8 +240,56 @@ export function graveKeyOf(g: { section?: string; row?: string; plotNumber?: str
 
 export const MAX_UPLOAD_ROWS = 5000;
 
+/**
+ * A cell the AI (or the registrar) marked as hard to read. Our prompt asks
+ * for "??", but AI answers also use a single "?", or words like "unclear".
+ */
+const UNCLEAR_RE = /\?|\b(unclear|illegible|unreadable|not (?:visible|legible|readable|clear)|can'?t read|cannot read|hard to read|faded)\b/i;
+export function isUnclear(cell: string): boolean {
+  return UNCLEAR_RE.test(cell);
+}
+
+/** Placeholder names that mean "no actual person on this row". */
+const NOT_A_NAME = new Set(['family', 'families', 'unknown', 'unnamed', 'none', 'na', 'various', 'vacant', 'empty', 'reserved', 'blank', 'tbc', 'nil']);
+export function isPlaceholderName(s: string | undefined): boolean {
+  if (!s) return false;
+  const t = s.toLowerCase().replace(/[^a-z]/g, '');
+  return t !== '' && NOT_A_NAME.has(t);
+}
+
+/** Titles that appear before first names in registers. */
+const TITLES = new Set(['fr', 'father', 'rev', 'revd', 'reverend', 'canon', 'mgr', 'msgr', 'monsignor', 'sr', 'sister', 'br', 'brother', 'mother', 'dr', 'lt', 'capt', 'captain', 'sgt', 'col', 'major', 'mr', 'mrs', 'miss', 'ms', 'master']);
+/** True when the first-names cell is only a title ("Miss", "Fr."). */
+export function isTitleOnly(forenames: string | undefined): boolean {
+  if (!forenames) return false;
+  const words = forenames.trim().split(/\s+/);
+  return words.every((w) => TITLES.has(w.toLowerCase().replace(/\.$/, '')));
+}
+
+/** Edit distance, capped: we only care whether it's 0, 1 or 2. */
+function nearEdit(a: string, b: string, max = 2): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/** Two surnames that look like one family spelled two ways (Bonar, Boner). */
+export function similarSurnames(a: string, b: string): boolean {
+  const x = simple(a);
+  const y = simple(b);
+  if (!x || !y || x === y || x[0] !== y[0] || Math.min(x.length, y.length) < 4) return false;
+  return nearEdit(x, y) <= (Math.min(x.length, y.length) < 6 ? 1 : 2);
+}
+
 export function parseRegister(text: string): ParsedRegister {
-  const empty: ParsedRegister = { graves: [], people: 0, skippedRows: [], uncertainCells: 0, columns: [], unknownHeaders: [] };
+  const empty: ParsedRegister = { graves: [], people: 0, skippedRows: [], notPersonRows: [], uncertainCells: 0, checks: [], columns: [], unknownHeaders: [] };
   const rows = parseTable(text);
   if (rows.length < 2) return { ...empty, error: 'There’s nothing to import. Include the header row and at least one person.' };
   const { columns, unknown } = mapHeaders(rows[0]);
@@ -229,7 +297,10 @@ export function parseRegister(text: string): ParsedRegister {
     return {
       ...empty,
       unknownHeaders: unknown,
-      error: `We couldn’t find a Surname column. The first row should be the column headings; we found: ${rows[0].join(', ')}`,
+      error:
+        `We couldn’t find the surnames. The first line should be the column names, starting with Surname. ` +
+        `We found: ${rows[0].slice(0, 6).join(', ')}${rows[0].length > 6 ? '…' : ''}. ` +
+        `Try asking ChatGPT: “Please give me that again as a table with the first row: Surname, Forenames, Died”.`,
     };
   }
   if (rows.length - 1 > MAX_UPLOAD_ROWS) {
@@ -242,11 +313,15 @@ export function parseRegister(text: string): ParsedRegister {
 
   const graves = new Map<string, ParsedGrave>();
   const skippedRows: number[] = [];
+  const notPersonRows: number[] = [];
+  const checks: RegisterCheck[] = [];
+  /** Sheet row of each burial, for similar-surname notes. */
+  const rowOf = new Map<ParsedBurial, number>();
   let uncertainCells = 0;
   let people = 0;
 
   rows.slice(1).forEach((r, i) => {
-    for (const c of r) if (c.includes(UNCERTAIN_MARK)) uncertainCells++;
+    const sheetRow = i + 2;
     let surname = get(r, 'surname');
     let forenames = get(r, 'forenames');
     // Full name in one column: last word is the surname.
@@ -257,9 +332,19 @@ export function parseRegister(text: string): ParsedRegister {
       surname = words.slice(-cut).join(' ');
     }
     if (!surname) {
-      skippedRows.push(i + 2);
+      skippedRows.push(sheetRow);
       return;
     }
+    const shownName = [forenames, surname].filter(Boolean).join(' ');
+    if (isPlaceholderName(surname) || isPlaceholderName(forenames)) {
+      notPersonRows.push(sheetRow);
+      checks.push({ row: sheetRow, kind: 'notPerson', name: shownName, detail: isPlaceholderName(forenames) ? forenames : surname });
+      return;
+    }
+    const unclear = r.filter((c) => c && isUnclear(c));
+    uncertainCells += unclear.length;
+    if (unclear.length) checks.push({ row: sheetRow, kind: 'unclear', name: shownName, detail: unclear.join('; ') });
+    if (isTitleOnly(forenames)) checks.push({ row: sheetRow, kind: 'titleOnly', name: shownName, detail: forenames });
     const died = get(r, 'died');
     const burial: ParsedBurial = { surname, diedYear: registerYear(died) ?? registerYear(get(r, 'buried')) };
     if (forenames) burial.forenames = forenames;
@@ -279,6 +364,7 @@ export function parseRegister(text: string): ParsedRegister {
       graves.set(key, g);
     }
     g.burials.push(burial);
+    rowOf.set(burial, sheetRow);
     people++;
     const inscription = get(r, 'inscription');
     if (inscription && !g.inscription) g.inscription = inscription;
@@ -290,11 +376,34 @@ export function parseRegister(text: string): ParsedRegister {
     }
   });
 
+  // Same plot, surnames one or two letters apart: probably one family
+  // spelled two ways. Search treats them as different names, so say so.
+  for (const g of graves.values()) {
+    if (!g.plotNumber) continue;
+    const seen: ParsedBurial[] = [];
+    for (const b of g.burials) {
+      const other = seen.find((o) => similarSurnames(o.surname, b.surname));
+      if (other) {
+        checks.push({
+          row: rowOf.get(b) ?? 0,
+          kind: 'similarSurname',
+          name: [b.forenames, b.surname].filter(Boolean).join(' '),
+          detail: other.surname,
+          plot: [g.section && `Section ${g.section}`, g.row && `Row ${g.row}`, `Plot ${g.plotNumber}`].filter(Boolean).join(', '),
+        });
+      }
+      if (!seen.some((o) => simple(o.surname) === simple(b.surname))) seen.push(b);
+    }
+  }
+  checks.sort((a, b) => a.row - b.row);
+
   return {
     graves: [...graves.values()],
     people,
     skippedRows,
+    notPersonRows,
     uncertainCells,
+    checks,
     columns: Object.keys(columns) as RegisterField[],
     unknownHeaders: unknown,
   };
@@ -335,6 +444,7 @@ export function buildAiPrompt(opts: { selected: RegisterField[]; format: Registe
     '',
     'Rules:',
     '- One row per person buried. If several people share a grave, give each their own row with the same Section, Row and Plot.',
+    '- Only add a row for a named person. If the register just says "Family" or a grave has no names, leave it out.',
     '- Copy names, places and dates exactly as written. Do not correct, translate or modernise spellings (keep Irish spellings and old abbreviations like "Jas." or "Margt.").',
     '- Leave a cell empty if the register doesn’t give that detail. Never guess or invent information.',
     `- If a word or number is hard to read, write your best guess followed by ${UNCERTAIN_MARK} (for example "Bridget${UNCERTAIN_MARK}" or "1923${UNCERTAIN_MARK}").`,

@@ -125,3 +125,53 @@ describe('templates and prompt', () => {
     expect(p).toContain('??');
   });
 });
+
+describe('accepting AI-typed lists as they come', () => {
+  const sample = [
+    'Section,Plot,Surname,Forenames,Died,Age,Address,Notes',
+    'A,466,Bannon,Miss,March 1873,6,,',
+    'A,466,Bannon,Roseanne,November 187? ,32,,Year unclear in image',
+    'A,124,Bonar,Mickey,June 2005,84,,',
+    'A,124,Boner,Thomas J,February 1914,,,',
+    'A,374,Bennett,FR Sean,July 2010,84,Tiernaleague,',
+    'A,347,Bradley,Family,,,,Family entry',
+    'A,17,Bradley,Bridget,,,Tulnaree,Year/month not visible',
+    'A,449,Bradley,Bridie,,30,,',
+    'A,449,Brady,Sarah,1945,,,',
+  ].join('\n');
+  const res = parseRegister(sample);
+
+  it('keeps every real person and leaves out placeholder rows', () => {
+    expect(res.error).toBeUndefined();
+    expect(res.people).toBe(8);
+    expect(res.notPersonRows).toEqual([7]);
+    expect(res.checks.find((c) => c.kind === 'notPerson')).toMatchObject({ row: 7, detail: 'Family' });
+  });
+
+  it('flags a single ? and words like "unclear" or "not visible"', () => {
+    const unclear = res.checks.filter((c) => c.kind === 'unclear');
+    expect(unclear.map((c) => c.row)).toEqual([3, 8]);
+    expect(unclear[0].detail).toContain('November 187?');
+    expect(res.uncertainCells).toBe(3);
+  });
+
+  it('flags a first-name cell that is only a title, but not a title with a name', () => {
+    const titles = res.checks.filter((c) => c.kind === 'titleOnly');
+    expect(titles).toEqual([{ row: 2, kind: 'titleOnly', name: 'Miss Bannon', detail: 'Miss' }]);
+  });
+
+  it('notes near-identical surnames in one plot, not short different ones', () => {
+    const similar = res.checks.filter((c) => c.kind === 'similarSurname');
+    expect(similar).toHaveLength(1);
+    expect(similar[0]).toMatchObject({ row: 5, name: 'Thomas J Boner', detail: 'Bonar', plot: 'Section A, Plot 124' });
+  });
+
+  it('lists checks in sheet order', () => {
+    const rows = res.checks.map((c) => c.row);
+    expect(rows).toEqual([...rows].sort((a, b) => a - b));
+  });
+
+  it('tells the registrar what to ask ChatGPT when there are no surnames', () => {
+    expect(parseRegister('Who,When\nBoyle,1950').error).toMatch(/ask(ing)? ChatGPT/);
+  });
+});
