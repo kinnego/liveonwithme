@@ -16,7 +16,6 @@ import GraveForm, { emptyGrave, type GraveFormValue } from '@/components/GraveFo
 import RegisterSetup from '@/components/RegisterSetup';
 import RegisterUpload from '@/components/RegisterUpload';
 import MyGraveyards from '@/components/MyGraveyards';
-import HeadstonePhoto from '@/components/HeadstonePhoto';
 import {
   BookIcon,
   CameraIcon,
@@ -44,7 +43,6 @@ type Grave = {
   lng: number | null;
   burials: GraveBurial[];
   inscription: string;
-  photoPath: string | null;
   status: 'unclaimed' | 'adopted';
   adoptedPlotId: string | null;
   source: 'import' | 'registrar' | 'upload';
@@ -104,6 +102,18 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`Something went wrong (error ${res.status}). Please try again in a minute.`);
   }
   return data as T;
+}
+
+// The create page with the graveyard and the person's name filled in, so
+// a memorial (where photos and memories go) can be started from here.
+function memorialHref(c: Cemetery, b: GraveBurial): string {
+  const q = new URLSearchParams({ cemeteryName: c.name, cemeteryPlaceId: c.placeId });
+  if (c.address) q.set('cemeteryAddress', c.address);
+  if (typeof c.lat === 'number') q.set('cemeteryLat', String(c.lat));
+  if (typeof c.lng === 'number') q.set('cemeteryLng', String(c.lng));
+  const name = [b.forenames, b.surname].filter(Boolean).join(' ');
+  if (name) q.set('name', name);
+  return `/create?${q.toString()}`;
 }
 
 // "Mary" for Mary Doherty; "Mrs Doherty" when the book only gives a title.
@@ -790,15 +800,14 @@ export default function RegistrarPage({
                         : 'Added by hand'}
                     {g.editedByHand && g.source !== 'registrar' && ' · fixed by hand since'}
                   </div>
-                  {g.status !== 'adopted' && (
-                    <HeadstonePhoto
-                      graveId={g.id}
-                      photoPath={g.photoPath}
-                      personName={buttonName(g.burials[0])}
-                      onChange={(path) =>
-                        setGraves((cur) => (cur ? cur.map((x) => (x.id === g.id ? { ...x, photoPath: path } : x)) : cur))
-                      }
-                    />
+                  {g.status !== 'adopted' && cemetery && g.burials.length > 0 && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                      {g.burials.map((b, i) => (
+                        <Link key={i} href={memorialHref(cemetery, b)} className="button secondary small">
+                          Add a memorial for {buttonName(b)}
+                        </Link>
+                      ))}
+                    </div>
                   )}
                   {(() => {
                     const st = pins[g.id];
