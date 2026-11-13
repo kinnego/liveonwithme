@@ -9,7 +9,8 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { isSuperAdminEmail } from '@/lib/roles';
+import { isApprovedPartner, isSuperAdminEmail } from '@/lib/roles';
+import type { UserProfile } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,21 @@ async function ensureUserProfile(uid: string, email: string | null, displayName?
   } else if (isSuperAdminEmail(email) && snap.data().role !== 'super_admin') {
     // Auto-promote the known super admin email if it was created before.
     await setDoc(ref, { role: 'super_admin' }, { merge: true });
+  }
+}
+
+// Where to send someone once auth completes. A ?next= on the URL always wins
+// (e.g. shared memorial link → sign in → land back on it). Otherwise approved
+// partners get their own dashboard; everyone else goes to /dashboard.
+async function destinationAfterAuth(uid: string, explicitNext: string | null): Promise<string> {
+  if (explicitNext) return explicitNext;
+  if (!db) return '/dashboard';
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    const prof = snap.exists() ? (snap.data() as UserProfile) : null;
+    return isApprovedPartner(prof) ? '/partner' : '/dashboard';
+  } catch {
+    return '/dashboard';
   }
 }
 
@@ -144,11 +160,11 @@ export default function AuthPage() {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: fullName });
         await ensureUserProfile(cred.user.uid, cred.user.email, fullName);
-        router.push(nextPath() || '/dashboard');
+        router.push(await destinationAfterAuth(cred.user.uid, nextPath()));
       } else if (mode === 'login') {
         const cred = await signInWithEmailAndPassword(auth, email, password);
         await ensureUserProfile(cred.user.uid, cred.user.email, cred.user.displayName);
-        router.push(nextPath() || '/dashboard');
+        router.push(await destinationAfterAuth(cred.user.uid, nextPath()));
       } else if (mode === 'reset') {
         await fetch('/api/auth/request-reset', {
           method: 'POST',
@@ -176,7 +192,7 @@ export default function AuthPage() {
       const provider = new GoogleAuthProvider();
       const cred = await signInWithPopup(auth, provider);
       await ensureUserProfile(cred.user.uid, cred.user.email, cred.user.displayName);
-      router.push(nextPath() || '/dashboard');
+      router.push(await destinationAfterAuth(cred.user.uid, nextPath()));
     } catch (err: any) {
       setError(friendlyError(err.code, err.message));
     } finally {
