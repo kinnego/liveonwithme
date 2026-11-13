@@ -354,8 +354,9 @@ export interface GraveBurial {
 
 export type GraveRecordStatus = 'unclaimed' | 'adopted';
 // How the grave first got into the register: the command-line import, a
-// registrar typing it in by hand, or a registrar's spreadsheet upload.
-export type GraveRecordSource = 'import' | 'registrar' | 'upload';
+// registrar typing it in by hand, a registrar's spreadsheet upload, or a
+// funeral director's quick add.
+export type GraveRecordSource = 'import' | 'registrar' | 'upload' | 'partner';
 
 export interface GraveRecord {
   id: string;
@@ -610,6 +611,14 @@ export interface Referral {
   deceasedAddress?: string;
   deceasedBorn?: string;
   deceasedDied?: string;
+
+  // Where they rest, when the funeral director knows. Optional: left empty
+  // for a cremation, or for the family to add later. On claim it becomes the
+  // memorial's plot.
+  cemetery?: Cemetery | null;
+  graveSection?: string;
+  graveRow?: string;
+  gravePlotNumber?: string;
 
   status: ReferralStatus;
   wholesalePaymentStatus: WholesalePaymentStatus;

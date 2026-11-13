@@ -216,6 +216,20 @@ export default function PartnerDashboard() {
         style={{ marginBottom: 30, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}
       >
         <div style={{ flex: '1 1 240px' }}>
+          <h3 style={{ margin: 0 }}>Not having a memorial?</h3>
+          <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
+            You can still put their name in the cemetery&rsquo;s register so families can find their grave.
+            It&rsquo;s free.
+          </p>
+        </div>
+        <ButtonLink href="/partner/register" className="button secondary">Add to a cemetery register</ButtonLink>
+      </div>
+
+      <div
+        className="card"
+        style={{ marginBottom: 30, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}
+      >
+        <div style={{ flex: '1 1 240px' }}>
           <h3 style={{ margin: 0 }}>Demo QR for your shop</h3>
           <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
             A printable card with a QR that opens a sample memorial — handy for the counter when
