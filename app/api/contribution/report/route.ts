@@ -4,14 +4,14 @@
 // most reports never land.
 //
 // Rate limited hard per IP so a bad actor can't drown the admin inbox.
-// After the write we fire the admin notice via SendGrid — best-effort,
-// SendGrid failures don't fail the report submission.
+// After the write we fire the admin notice via the mail provider —
+// best-effort, send failures don't fail the report submission.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
-import { sendContributionReportAdmin } from '@/lib/sendgrid';
+import { sendContributionReportAdmin } from '@/lib/mail';
 
 export const runtime = 'nodejs';
 

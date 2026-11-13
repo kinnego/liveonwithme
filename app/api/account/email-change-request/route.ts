@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebase-admin';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
-import { sendEmailChangeNotice } from '@/lib/sendgrid';
+import { sendEmailChangeNotice } from '@/lib/mail';
 
 export const runtime = 'nodejs';
 

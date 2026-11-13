@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
-import { sendContributionAlert } from '@/lib/sendgrid';
+import { sendContributionAlert } from '@/lib/mail';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';

@@ -18,7 +18,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { getStripe, STRIPE_WEBHOOK_SECRET } from '@/lib/stripe';
 import { writeAuditAdmin } from '@/lib/audit-admin';
-import { sendWholesaleReceipt, sendMemorialPaymentReceipt } from '@/lib/sendgrid';
+import { sendWholesaleReceipt, sendMemorialPaymentReceipt } from '@/lib/mail';
 
 export const runtime = 'nodejs';
 

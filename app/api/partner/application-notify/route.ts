@@ -12,7 +12,7 @@ import { adminAuth, adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import {
   sendPartnerApplicationReceived,
   sendPartnerApplicationAdminNotice,
-} from '@/lib/sendgrid';
+} from '@/lib/mail';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import type { PartnerApplication } from '@/lib/types';
 

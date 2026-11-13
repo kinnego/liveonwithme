@@ -4,7 +4,7 @@ import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { slugify } from '@/lib/ids';
 import { writeAuditAdmin } from '@/lib/audit-admin';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
-import { sendFamilyClaimedReferral } from '@/lib/sendgrid';
+import { sendFamilyClaimedReferral } from '@/lib/mail';
 
 export const runtime = 'nodejs';
 
@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
 
     // Tell the partner the family took over. Non-fatal — the claim is
     // already committed and the family's sign-in must not be gated on
-    // SendGrid availability.
+    // mail provider availability.
     const partnerUid = (referral.partnerUid || referral.funeralDirectorUid) as string | undefined;
     if (partnerUid) {
       try {

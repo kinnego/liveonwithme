@@ -36,7 +36,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import { writeAuditAdmin } from '@/lib/audit-admin';
-import { sendAccountDeletedConfirmation } from '@/lib/sendgrid';
+import { sendAccountDeletedConfirmation } from '@/lib/mail';
 import { isSuperAdmin } from '@/lib/roles';
 import type { UserProfile } from '@/lib/types';
 

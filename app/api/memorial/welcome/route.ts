@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb, verifyIdToken } from '@/lib/firebase-admin';
-import { sendMemorialWelcome } from '@/lib/sendgrid';
+import { sendMemorialWelcome } from '@/lib/mail';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';

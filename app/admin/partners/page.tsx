@@ -98,7 +98,7 @@ export default function AdminPartners() {
 
       // Decision email for approved/rejected only — suspensions stay
       // internal. Fire-and-forget: the admin console must not stall on
-      // SendGrid.
+      // the mail provider.
       if (decision === 'approved' || decision === 'rejected') {
         try {
           const token = await auth.currentUser.getIdToken();
