@@ -414,7 +414,7 @@ export async function sendPartnerApplicationReceived(
     '',
     `Thanks for applying to join LiveOnWith.me as a ${typeLabel.toLowerCase()} — we've received your application for ${args.businessName}.`,
     '',
-    `We review each one by hand so there's a short wait. We'll be in touch once we've had a look. If anything's time-sensitive, just reply to this email.`,
+    `We review each one by hand so there's a short wait. We'll be in touch once we've had a look. If anything's time-sensitive, email ${SUPER_ADMIN_EMAIL}.`,
     '',
     '— LiveOnWith.me',
   ].join('\n');
@@ -428,7 +428,7 @@ export async function sendPartnerApplicationReceived(
           Thanks for applying to join LiveOnWith.me as a ${typeLabel.toLowerCase()} — we've received your application for <strong>${escapeHtml(args.businessName)}</strong>.
         </p>
         <p style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.6;color:#53635d;margin:0 0 22px;">
-          We review each one by hand so there's a short wait. We'll be in touch once we've had a look. If anything's time-sensitive, just reply to this email.
+          We review each one by hand so there's a short wait. We'll be in touch once we've had a look. If anything's time-sensitive, email <a href="mailto:${SUPER_ADMIN_EMAIL}" style="color:#25312d;">${SUPER_ADMIN_EMAIL}</a>.
         </p>
   `);
 
@@ -544,7 +544,7 @@ export async function sendPartnerApplicationRejected(
     '',
     `Thanks for your interest in LiveOnWith.me. We've reviewed your application for ${args.businessName} and we're not able to bring you on as a partner at this time.`,
     '',
-    'If you think we should reconsider — different partner type, more context about your business, questions about our model — just reply to this email and a person will get back to you.',
+    `If you think we should reconsider — different partner type, more context about your business, questions about our model — email ${SUPER_ADMIN_EMAIL} and a person will get back to you.`,
     '',
     '— LiveOnWith.me',
   ].join('\n');
@@ -558,7 +558,7 @@ export async function sendPartnerApplicationRejected(
           Thanks for your interest in LiveOnWith.me. We've reviewed your application for <strong>${escapeHtml(args.businessName)}</strong> and we're not able to bring you on as a partner at this time.
         </p>
         <p style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.6;color:#53635d;margin:0 0 22px;">
-          If you think we should reconsider — different partner type, more context about your business, questions about our model — just reply to this email and a person will get back to you.
+          If you think we should reconsider — different partner type, more context about your business, questions about our model — email <a href="mailto:${SUPER_ADMIN_EMAIL}" style="color:#25312d;">${SUPER_ADMIN_EMAIL}</a> and a person will get back to you.
         </p>
   `);
 
@@ -865,7 +865,7 @@ export async function sendAccountDeletedConfirmation(
   const orphanLines = args.orphanedMemorials.length
     ? [
         '',
-        `A few memorial pages you looked after had no one else assigned, so they've been taken offline. If this was a mistake, reply to this email before the date beside each one and we can restore it:`,
+        `A few memorial pages you looked after had no one else assigned, so they've been taken offline. If this was a mistake, email ${SUPER_ADMIN_EMAIL} before the date beside each one and we can restore it:`,
         '',
         ...args.orphanedMemorials.map(
           (m) => `• ${m.fullName} — restorable until ${m.restoreDeadline}`,
@@ -879,7 +879,7 @@ export async function sendAccountDeletedConfirmation(
     'Your LiveOnWith.me account has been deleted. Your sign-in, your profile, and the personal details on any memories you contributed on other pages have been removed.',
     ...orphanLines,
     '',
-    "If you didn't ask for this to happen, reply to this email as soon as possible.",
+    `If you didn't ask for this to happen, email ${SUPER_ADMIN_EMAIL} as soon as possible.`,
     '',
     '— LiveOnWith.me',
   ].join('\n');
@@ -887,7 +887,7 @@ export async function sendAccountDeletedConfirmation(
   const orphanHtml = args.orphanedMemorials.length
     ? `
         <p style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.6;color:#25312d;margin:22px 0 10px;">
-          A few memorial pages you looked after had no one else assigned, so they've been taken offline. If this was a mistake, reply to this email before the date beside each one and we can restore it:
+          A few memorial pages you looked after had no one else assigned, so they've been taken offline. If this was a mistake, email <a href="mailto:${SUPER_ADMIN_EMAIL}" style="color:#25312d;">${SUPER_ADMIN_EMAIL}</a> before the date beside each one and we can restore it:
         </p>
         <ul style="font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.7;color:#25312d;padding-left:20px;margin:0 0 22px;">
           ${args.orphanedMemorials
@@ -909,7 +909,7 @@ export async function sendAccountDeletedConfirmation(
         </p>
         ${orphanHtml}
         <p style="font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.6;color:#6d7772;margin:22px 0 0;">
-          If you didn't ask for this to happen, reply to this email as soon as possible and we'll help.
+          If you didn't ask for this to happen, email <a href="mailto:${SUPER_ADMIN_EMAIL}" style="color:#25312d;">${SUPER_ADMIN_EMAIL}</a> as soon as possible and we'll help.
         </p>
   `);
 
