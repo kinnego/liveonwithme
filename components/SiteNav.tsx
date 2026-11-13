@@ -193,6 +193,11 @@ export default function SiteNav() {
             {profile?.displayName || user.displayName || user.email}
           </span>
         )}
+        {(isPartner || appliedPartner) && (
+          <Link href="/partner" onClick={closeMenu}>
+            {appliedPartner ? 'My partner application' : 'Partner'}
+          </Link>
+        )}
         <Link href="/dashboard" onClick={closeMenu}>
           My memorials
         </Link>
@@ -206,11 +211,6 @@ export default function SiteNav() {
             {graveyards.length === 1 ? 'My graveyard register' : `Register: ${c.name}`}
           </Link>
         ))}
-        {(isPartner || appliedPartner) && (
-          <Link href="/partner" onClick={closeMenu}>
-            {appliedPartner ? 'My partner application' : 'Partner'}
-          </Link>
-        )}
         {showAdmin && (
           <Link href="/admin" onClick={closeMenu}>
             Admin

@@ -8,7 +8,10 @@ import Link from 'next/link';
 import ButtonLink from '@/components/ButtonLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import { isApprovedPartner } from '@/lib/roles';
+import type { UserProfile } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -64,12 +67,21 @@ function AuthActionInner() {
       // Try to sign the user straight in so they land on the dashboard without
       // a second password entry. If sign-in fails, fall back to /auth.
       try {
-        await signInWithEmailAndPassword(auth, data.email, password);
+        const cred = await signInWithEmailAndPassword(auth, data.email, password);
         setNotice('Password updated. Redirecting…');
+        // Approved partners start on their partner page; everyone else on
+        // their dashboard.
+        let home = '/dashboard';
+        try {
+          const snap = await getDoc(doc(db, 'users', cred.user.uid));
+          if (isApprovedPartner(snap.exists() ? (snap.data() as UserProfile) : null)) home = '/partner';
+        } catch {
+          /* keep /dashboard */
+        }
         const safeNext =
           continueUrl && continueUrl.startsWith('/') && !continueUrl.startsWith('//')
             ? continueUrl
-            : '/dashboard';
+            : home;
         router.push(safeNext);
       } catch {
         setNotice('Password updated. Please sign in with your new password.');

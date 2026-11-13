@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata, Viewport } from 'next';
 import SiteNav from '@/components/SiteNav';
+import BrandLink from '@/components/BrandLink';
 import ScrollToTopOnNav from '@/components/ScrollToTopOnNav';
 import PrivacyBanner from '@/components/PrivacyBanner';
 
@@ -80,7 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning>
         <ScrollToTopOnNav />
         <header className="siteHeader">
-          <Link className="brand" href="/">
+          <BrandLink>
             <Image
               src="/brand/live-on-with-me-logo-192.png"
               alt="LiveOnWith.me"
@@ -90,7 +91,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               className="brandLogo"
             />
             <span className="brandName">LiveOnWith.me</span>
-          </Link>
+          </BrandLink>
           <SiteNav />
         </header>
         {children}
