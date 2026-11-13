@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import ButtonLink from '@/components/ButtonLink';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase-auth';
 import type { Cemetery, UserProfile } from '@/lib/types';
@@ -38,6 +39,7 @@ export default function SiteNav() {
   const [hintSignedIn, setHintSignedIn] = useState(false);
   const [graveyards, setGraveyards] = useState<Cemetery[]>([]);
   const navRef = useRef<HTMLElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -217,9 +219,10 @@ export default function SiteNav() {
         <button
           type="button"
           className="button small secondary"
-          onClick={() => {
+          onClick={async () => {
             closeMenu();
-            signOut(auth);
+            await signOut(auth);
+            router.push('/auth?signedOut=1');
           }}
         >
           Sign out

@@ -87,13 +87,16 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
-  // A quiet confirmation after a successful account deletion. The dashboard
-  // sends the user here with ?deleted=1 once the server has removed them.
+  // A quiet confirmation after account deletion (?deleted=1) or a user-chosen
+  // sign-out from the nav (?signedOut=1). Without this, clicking sign out
+  // from the header gave no visible feedback — the page just reloaded.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('deleted') === '1') {
       setNotice('Your account has been removed. Thank you.');
+    } else if (params.get('signedOut') === '1') {
+      setNotice("You've been signed out.");
     }
   }, []);
 
