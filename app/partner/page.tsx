@@ -193,22 +193,36 @@ export default function PartnerDashboard() {
 
   return (
     <main className="shell">
-      <div className="dashboardHead">
-        <div>
-          <div className="eyebrow">Partner</div>
-          <h2 style={{ marginBottom: 4 }}>Your customers</h2>
-          <p className="muted" style={{ margin: 0 }}>
-            {profile?.partnerType ? PARTNER_TYPE_LABELS[profile.partnerType as PartnerType] : 'Approved partner'}
+      <div style={{ marginBottom: 16 }}>
+        <Link href="/" className="button secondary small">&larr; Home page</Link>
+      </div>
+      <div style={{ marginBottom: 24 }}>
+        <div className="eyebrow">Partner</div>
+        <h2 style={{ marginBottom: 4 }}>Your partner page</h2>
+        <p className="muted" style={{ margin: 0 }}>
+          {profile?.partnerType ? PARTNER_TYPE_LABELS[profile.partnerType as PartnerType] : 'Approved partner'}
+        </p>
+      </div>
+
+      <div
+        className="card"
+        style={{
+          marginBottom: 20,
+          display: 'flex',
+          gap: 16,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          border: '2px solid var(--sage)',
+        }}
+      >
+        <div style={{ flex: '1 1 240px' }}>
+          <h3 style={{ margin: 0 }}>Set up a memorial for a family</h3>
+          <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
+            You pay <strong>€150</strong> to Live On With Me per memorial and bill your customer separately at
+            whatever price you choose. We email the family a private link to take it over.
           </p>
         </div>
         <ButtonLink href="/partner/new" className="button">Set up a new memorial</ButtonLink>
-      </div>
-
-      <div className="card" style={{ marginBottom: 30, background: '#fffdf9' }}>
-        <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-          You pay <strong>€150</strong> to Live On With Me per memorial. You bill your customer separately at
-          whatever price you choose. We don&rsquo;t take a percentage. There are no commissions or payouts back to you.
-        </p>
       </div>
 
       <div
@@ -239,6 +253,7 @@ export default function PartnerDashboard() {
         <ButtonLink href="/demo-qr" className="button secondary">Get the demo QR</ButtonLink>
       </div>
 
+      <h3 style={{ marginTop: 10 }}>Your customers&rsquo; memorials</h3>
       {items.length === 0 ? (
         <div className="card">
           <h3>No memorials set up yet</h3>
