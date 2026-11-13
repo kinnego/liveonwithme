@@ -1,10 +1,15 @@
 'use client';
 // Homepage search — one input that returns both people (public memorials)
 // and cemeteries (Google Places + community-added), each row tagged with
-// its kind so the two are easy to tell apart at a glance. The three queries
-// fire in parallel; the dropdown renders them under section headers so a
-// single ambiguous first name like "Mary" doesn't bury the few matching
-// graveyards.
+// its kind so the two are easy to tell apart at a glance. The queries fire
+// in parallel; the dropdown renders them under section headers so a single
+// ambiguous first name like "Mary" doesn't bury the few matching graveyards.
+//
+// Register-only burials (from parish uploads) are intentionally NOT searched
+// here — only live memorials. Those non-memorial graves are findable from
+// inside the relevant cemetery page, which is the right context: a visitor
+// on a graveyard page is already narrowed to one place and expects to see
+// everyone resting there, memorial or not.
 //
 // Mobile: on focus the input scrolls to the top of the viewport so the
 // dropdown has room above the keyboard. Without this, typing on a phone
@@ -52,15 +57,6 @@ type CustomCemeteryHit = {
   address?: string;
 };
 type CemeteryHit = GoogleCemeteryHit | CustomCemeteryHit;
-// A grave from a parish burial register (see /api/graves/search).
-type GraveHit = {
-  id: string;
-  name: string;
-  nickname?: string;
-  died?: string;
-  cemeteryName: string;
-  label: string;
-};
 
 const MIN_CHARS = 2;
 const CEMETERY_MIN_CHARS = 3;
@@ -71,7 +67,6 @@ export default function UnifiedSearch() {
   const [term, setTerm] = useState('');
   const [resultsForTerm, setResultsForTerm] = useState('');
   const [people, setPeople] = useState<PersonHit[]>([]);
-  const [graves, setGraves] = useState<GraveHit[]>([]);
   const [googleCemeteries, setGoogleCemeteries] = useState<GoogleCemeteryHit[]>([]);
   const [customCemeteries, setCustomCemeteries] = useState<CustomCemeteryHit[]>([]);
   const [open, setOpen] = useState(false);
@@ -196,23 +191,13 @@ export default function UnifiedSearch() {
     }));
   }
 
-  async function fetchGraves(q: string): Promise<GraveHit[]> {
-    const res = await fetch(`/api/graves/search?q=${encodeURIComponent(q)}`);
-    if (!res.ok) return [];
-    const data = await res.json().catch(() => ({}));
-    return Array.isArray(data.results) ? data.results.slice(0, 6) : [];
-  }
-
   async function runSearch(q: string) {
     const seq = ++requestSeqRef.current;
     setStatus('searching');
     setOpen(true);
     try {
-      const [peopleData, gravesData, googleData, customData] = await Promise.all([
+      const [peopleData, googleData, customData] = await Promise.all([
         fetchPeople(q).catch(() => [] as PersonHit[]),
-        q.length >= CEMETERY_MIN_CHARS
-          ? fetchGraves(q).catch(() => [] as GraveHit[])
-          : Promise.resolve([] as GraveHit[]),
         q.length >= CEMETERY_MIN_CHARS
           ? fetchGoogleCemeteries(q).catch(() => [] as GoogleCemeteryHit[])
           : Promise.resolve([] as GoogleCemeteryHit[]),
@@ -222,7 +207,6 @@ export default function UnifiedSearch() {
       ]);
       if (seq !== requestSeqRef.current) return;
       setPeople(peopleData);
-      setGraves(gravesData);
       setGoogleCemeteries(googleData);
       setCustomCemeteries(customData);
       setResultsForTerm(q);
@@ -239,7 +223,6 @@ export default function UnifiedSearch() {
     if (q.length < MIN_CHARS) {
       requestSeqRef.current++;
       setPeople([]);
-      setGraves([]);
       setGoogleCemeteries([]);
       setCustomCemeteries([]);
       setResultsForTerm('');
@@ -255,11 +238,6 @@ export default function UnifiedSearch() {
   function goToPerson(p: PersonHit) {
     setOpen(false);
     router.push(`/m/${p.id}`);
-  }
-
-  function goToGrave(g: GraveHit) {
-    setOpen(false);
-    router.push(`/grave/${g.id}`);
   }
 
   function goToGoogleCemetery(c: GoogleCemeteryHit) {
@@ -278,7 +256,6 @@ export default function UnifiedSearch() {
     // Enter picks the top result, preferring people (the more specific
     // match given someone typically types a full name).
     if (people[0]) return goToPerson(people[0]);
-    if (graves[0]) return goToGrave(graves[0]);
     if (googleCemeteries[0]) return goToGoogleCemetery(googleCemeteries[0]);
     if (customCemeteries[0]) return goToCustomCemetery(customCemeteries[0]);
   }
@@ -300,7 +277,7 @@ export default function UnifiedSearch() {
   const showDropdown =
     open && trimmed.length >= MIN_CHARS && status !== 'idle';
   const hasAnyResults =
-    people.length > 0 || graves.length > 0 || googleCemeteries.length > 0 || customCemeteries.length > 0;
+    people.length > 0 || googleCemeteries.length > 0 || customCemeteries.length > 0;
   const addHref = `/cemetery/add${trimmed ? `?name=${encodeURIComponent(trimmed)}` : ''}`;
 
   return (
@@ -383,31 +360,6 @@ export default function UnifiedSearch() {
             </div>
           )}
 
-          {status === 'ready' && graves.length > 0 && (
-            <div>
-              <div style={sectionHeaderStyle}>Graves · from parish registers</div>
-              {graves.map((g) => (
-                <button key={g.id} type="button" onClick={() => goToGrave(g)} style={rowStyle}>
-                  <div style={rowTopStyle}>
-                    <div style={{ fontWeight: 600 }}>
-                      {g.name}
-                      {g.nickname && (
-                        <span className="muted" style={{ fontWeight: 400, marginLeft: 6 }}>
-                          ({g.nickname})
-                        </span>
-                      )}
-                    </div>
-                    <span style={{ ...pillStyle, background: '#e8eef3', color: '#2f4b5b' }}>Grave</span>
-                  </div>
-                  {g.died && <div style={{ fontSize: 13, marginTop: 2 }}>Died {g.died}</div>}
-                  <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                    {[g.cemeteryName, g.label].filter(Boolean).join(' · ')}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
           {status === 'ready' && (googleCemeteries.length > 0 || customCemeteries.length > 0) && (
             <div>
               <div style={sectionHeaderStyle}>Cemeteries</div>
@@ -456,7 +408,7 @@ export default function UnifiedSearch() {
 
           {status === 'ready' && !hasAnyResults && (
             <div className="muted" style={{ padding: '14px 16px', fontSize: 14 }}>
-              No memorials, graves or cemeteries match &ldquo;{resultsForTerm}&rdquo;.
+              No memorials or cemeteries match &ldquo;{resultsForTerm}&rdquo;.
             </div>
           )}
 

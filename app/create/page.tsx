@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { calculateAgeAtDeath } from '@/lib/age';
 import { resizeForMobile } from '@/lib/image';
@@ -75,6 +76,21 @@ const COPY: Record<MemorialKind, Copy> = {
     namePlaceholder: 'Mary O’Donnell',
     submitLabel: 'Create my page',
   },
+};
+
+// Approved partners see a different hat on the same form — this is for a
+// family they're helping, not their own personal legacy page. The usual
+// partner path is /partner/new (pre-paid from the wholesale bundle); this
+// page stays reachable so a partner can still create a standard-priced page
+// if they want to.
+const PARTNER_COPY: Copy = {
+  eyebrow: 'A memorial for a client',
+  heading: 'Tell us about them.',
+  intro:
+    "You're setting up a page for a family you're helping. Just the essentials for now — the family will take over editing once you hand it to them.",
+  nameLabel: 'Their full name',
+  namePlaceholder: "Mary O'Donnell",
+  submitLabel: 'Create memorial',
 };
 
 function CreateInner() {
@@ -725,7 +741,7 @@ function CreateInner() {
     );
   }
 
-  const c = COPY[mode];
+  const c = isPartner ? PARTNER_COPY : COPY[mode];
   const attachingToPlot = !!presetPlotId;
   const presetPlotReady = attachingToPlot ? !!presetPlot && !presetPlotError : true;
   const attachingToCemetery = !attachingToPlot && !!presetCemetery;
@@ -784,6 +800,27 @@ function CreateInner() {
               ← Pick a different page type
             </button>
           </p>
+        )}
+
+        {isPartner && !attachingToPlot && (
+          <div
+            style={{
+              marginTop: 16,
+              padding: '12px 14px',
+              background: 'var(--sage2)',
+              borderRadius: 12,
+              fontSize: 14,
+              lineHeight: 1.5,
+            }}
+          >
+            The usual partner flow is to{' '}
+            <Link href="/partner/new" style={{ color: 'var(--sage)', fontWeight: 600 }}>
+              record a referral
+            </Link>
+            {' '}— that sets the page up pre-paid from your wholesale bundle and
+            emails the family a secure link to take it over. Only carry on here
+            if you want to create a standard-priced page instead.
+          </div>
         )}
 
         {attachingToCemetery && presetCemetery && (
