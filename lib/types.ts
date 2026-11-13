@@ -612,6 +612,14 @@ export interface Referral {
   deceasedBorn?: string;
   deceasedDied?: string;
 
+  // Where they rest, when the funeral director knows. Optional: left empty
+  // for a cremation, or for the family to add later. On claim it becomes the
+  // memorial's plot.
+  cemetery?: Cemetery | null;
+  graveSection?: string;
+  graveRow?: string;
+  gravePlotNumber?: string;
+
   status: ReferralStatus;
   wholesalePaymentStatus: WholesalePaymentStatus;
   wholesalePaymentId?: string;

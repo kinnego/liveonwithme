@@ -10,7 +10,8 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { DEFAULT_PRICING, UserProfile } from '@/lib/types';
+import { Cemetery, DEFAULT_PRICING, UserProfile } from '@/lib/types';
+import CemeteryPicker from '@/components/CemeteryPicker';
 import { isSuperAdmin, isApprovedPartner } from '@/lib/roles';
 import { PageSkeleton } from '@/components/Skeleton';
 
@@ -22,6 +23,7 @@ export default function NewPartnerCustomer() {
   const [error, setError] = useState('');
   const [bereavedEmail, setBereavedEmail] = useState('');
   const [emailExists, setEmailExists] = useState(false);
+  const [cemetery, setCemetery] = useState<Cemetery | null>(null);
   const router = useRouter();
 
   // Debounced existence check — informational only, we never block submit.
@@ -79,6 +81,10 @@ export default function NewPartnerCustomer() {
         deceasedAddress: String(fd.get('deceasedAddress') || ''),
         deceasedBorn: String(fd.get('deceasedBorn') || ''),
         deceasedDied: String(fd.get('deceasedDied') || ''),
+        cemetery: cemetery || null,
+        graveSection: cemetery ? String(fd.get('graveSection') || '').trim() : '',
+        graveRow: cemetery ? String(fd.get('graveRow') || '').trim() : '',
+        gravePlotNumber: cemetery ? String(fd.get('gravePlotNumber') || '').trim() : '',
         status: 'pending' as const,
         wholesalePaymentStatus: 'unpaid' as const,
         wholesaleAmountCents: DEFAULT_PRICING.partnerWholesalePriceCents,
@@ -195,6 +201,29 @@ export default function NewPartnerCustomer() {
               <input id="deceasedDied" name="deceasedDied" type="date" />
             </div>
           </div>
+
+          <h3 style={{ marginTop: 30 }}>Resting place</h3>
+          <p className="muted" style={{ marginTop: 0, fontSize: 14 }}>
+            Optional. If you know the cemetery, choose it here and the memorial will show it. Leave it
+            empty for a cremation, or if the family would rather add it themselves.
+          </p>
+          <CemeteryPicker value={cemetery} onChange={setCemetery} />
+          {cemetery && (
+            <>
+              <div className="twoCol">
+                <div>
+                  <label htmlFor="graveSection">Section</label>
+                  <input id="graveSection" name="graveSection" />
+                </div>
+                <div>
+                  <label htmlFor="graveRow">Row</label>
+                  <input id="graveRow" name="graveRow" />
+                </div>
+              </div>
+              <label htmlFor="gravePlotNumber">Plot number</label>
+              <input id="gravePlotNumber" name="gravePlotNumber" />
+            </>
+          )}
 
           {error && <p style={{ color: '#a94442', marginTop: 14, fontSize: 14 }}>{error}</p>}
 

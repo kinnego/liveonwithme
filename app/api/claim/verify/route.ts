@@ -5,6 +5,7 @@ import { slugify } from '@/lib/ids';
 import { writeAuditAdmin } from '@/lib/audit-admin';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import { sendFamilyClaimedReferral } from '@/lib/mail';
+import { parseCemetery, uniquePlotShortId } from '@/lib/grave-records-admin';
 
 export const runtime = 'nodejs';
 
@@ -140,6 +141,19 @@ export async function POST(req: NextRequest) {
     const personRef = db.collection('persons').doc();
     const personId = personRef.id;
 
+    // The funeral director may have said where they rest. If so, the memorial
+    // starts with its plot in that cemetery; if not, the family adds it later.
+    const restingCemetery = parseCemetery(referral.cemetery);
+    const plotRef = restingCemetery ? db.collection('plots').doc() : null;
+    const plotShortId = restingCemetery ? await uniquePlotShortId(db) : '';
+    const plotName = [
+      referral.graveSection ? `Section ${referral.graveSection}` : '',
+      referral.graveRow ? `Row ${referral.graveRow}` : '',
+      referral.gravePlotNumber ? `Plot ${referral.gravePlotNumber}` : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+
     // Atomic claim: inside the transaction we re-check the token hasn't been
     // consumed by a parallel request, re-check the referral is still paid +
     // unclaimed, then do all the writes together. If any check fails, the
@@ -171,7 +185,7 @@ export async function POST(req: NextRequest) {
         ownerId: uid,
         createdByUid: uid,
         personId,
-        plotId: null,
+        plotId: plotRef ? plotRef.id : null,
         successorUids: [],
         coManagerUids: [],
         slug,
@@ -197,6 +211,29 @@ export async function POST(req: NextRequest) {
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
+
+      if (plotRef && restingCemetery) {
+        tx.set(plotRef, {
+          shortId: plotShortId,
+          cemetery: restingCemetery,
+          plotAdminUids: [uid],
+          plotAdminSuccessorUids: [],
+          createdByUid: uid,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          ...(plotName ? { name: plotName } : {}),
+        });
+        tx.set(db.collection('plotMemberships').doc(), {
+          plotId: plotRef.id,
+          memorialId: slug,
+          personId,
+          requestedByUid: uid,
+          status: 'approved',
+          approvedByUid: uid,
+          approvedAt: FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
 
       tx.update(refRef, {
         status: 'claimed',
