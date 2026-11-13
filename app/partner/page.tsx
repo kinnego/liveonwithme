@@ -201,10 +201,7 @@ export default function PartnerDashboard() {
             {profile?.partnerType ? PARTNER_TYPE_LABELS[profile.partnerType as PartnerType] : 'Approved partner'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <ButtonLink href="/partner/new" className="button">Set up a new memorial</ButtonLink>
-          <ButtonLink href="/partner/register" className="button secondary">Add someone to a cemetery register</ButtonLink>
-        </div>
+        <ButtonLink href="/partner/new" className="button">Set up a new memorial</ButtonLink>
       </div>
 
       <div className="card" style={{ marginBottom: 30, background: '#fffdf9' }}>
@@ -212,6 +209,20 @@ export default function PartnerDashboard() {
           You pay <strong>€150</strong> to Live On With Me per memorial. You bill your customer separately at
           whatever price you choose. We don&rsquo;t take a percentage. There are no commissions or payouts back to you.
         </p>
+      </div>
+
+      <div
+        className="card"
+        style={{ marginBottom: 30, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}
+      >
+        <div style={{ flex: '1 1 240px' }}>
+          <h3 style={{ margin: 0 }}>Not having a memorial?</h3>
+          <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
+            You can still put their name in the cemetery&rsquo;s register so families can find their grave.
+            It&rsquo;s free.
+          </p>
+        </div>
+        <ButtonLink href="/partner/register" className="button secondary">Add to a cemetery register</ButtonLink>
       </div>
 
       <div

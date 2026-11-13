@@ -158,6 +158,9 @@ export default function PartnerRegisterPage() {
           This puts their name in the cemetery&rsquo;s list of graves, so families can find them. It
           doesn&rsquo;t start a memorial and there&rsquo;s nothing to pay.
         </p>
+        <p className="muted" style={{ fontSize: 14 }}>
+          Is the family having a memorial? <a href="/partner/new" style={{ textDecoration: 'underline' }}>Set up the memorial instead</a>.
+        </p>
         <form onSubmit={submit} noValidate>
           <h3 style={{ marginTop: 26 }}>Which cemetery?</h3>
           <CemeteryPicker value={cemetery} onChange={setCemetery} />
