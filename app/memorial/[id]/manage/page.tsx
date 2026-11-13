@@ -37,6 +37,7 @@ import {
 } from '@/lib/types';
 import { PageSkeleton } from '@/components/Skeleton';
 import SongEditor from '@/components/SongEditor';
+import DeleteMemorial from '@/components/DeleteMemorial';
 
 function humanBytes(n: number): string {
   if (!n || n < 1024) return `${Math.max(0, n || 0)} B`;
@@ -1660,6 +1661,8 @@ export default function Manage({ params }: { params: Promise<{ id: string }> }) 
           </div>
         </div>
       )}
+
+      {isOwner && <DeleteMemorial memorialId={m.id} fullName={m.fullName || ''} word={isLegacy ? 'page' : 'memorial'} />}
 
       {toast && (
         <div
