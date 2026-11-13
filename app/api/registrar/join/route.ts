@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
 import { writeAuditAdmin } from '@/lib/audit-admin';
-import { sendRegistrarJoinedAdminNotice } from '@/lib/sendgrid';
+import { sendRegistrarJoinedAdminNotice } from '@/lib/mail';
 import {
   HttpError,
   REGISTRAR_COLLECTION,

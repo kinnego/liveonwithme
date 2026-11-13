@@ -12,7 +12,7 @@ import { adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import {
   sendPartnerApplicationApproved,
   sendPartnerApplicationRejected,
-} from '@/lib/sendgrid';
+} from '@/lib/mail';
 import { isSuperAdmin } from '@/lib/roles';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import type { PartnerApplication, UserProfile } from '@/lib/types';
@@ -45,9 +45,9 @@ export async function POST(req: NextRequest) {
     // Skip gracefully in environments without a mail provider (typically local
     // dev). The decision itself is already saved by the admin client — only
     // the email delivery is deferred.
-    if (!process.env.SENDGRID_API_KEY) {
-      console.warn('admin/partners/notify: SENDGRID_API_KEY not set — skipping email');
-      return NextResponse.json({ ok: true, skipped: 'sendgrid-not-configured' });
+    if (!process.env.RESEND_API_KEY) {
+      console.warn('admin/partners/notify: RESEND_API_KEY not set — skipping email');
+      return NextResponse.json({ ok: true, skipped: 'mail-not-configured' });
     }
 
     const { applicationId, decision } = await req.json();

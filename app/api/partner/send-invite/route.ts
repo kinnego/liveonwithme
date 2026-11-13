@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { adminDb, verifyIdToken } from '@/lib/firebase-admin';
-import { sendClaimInvite } from '@/lib/sendgrid';
+import { sendClaimInvite } from '@/lib/mail';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';

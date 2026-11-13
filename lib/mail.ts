@@ -1,4 +1,10 @@
-import sgMail from '@sendgrid/mail';
+// Transactional email via Resend. Drop-in replacement for the old SendGrid
+// lib — every export keeps its signature so callers didn't need to change
+// anything other than the import path. Resend doesn't inject click/open
+// tracking or list-management footers by default, so the SendGrid-era
+// TRANSACTIONAL_SETTINGS shim is gone too.
+
+import { Resend } from 'resend';
 import { PARTNER_TYPE_LABELS, PartnerType, SUPER_ADMIN_EMAIL } from './types';
 
 function formatMoney(amountMinor: number, currency: string): string {
@@ -20,25 +26,39 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-let _initialized = false;
+let _client: Resend | null = null;
 
-function client() {
-  if (_initialized) return sgMail;
-  const key = process.env.SENDGRID_API_KEY;
-  if (!key) throw new Error('SENDGRID_API_KEY is not set');
-  sgMail.setApiKey(key);
-  _initialized = true;
-  return sgMail;
+function client(): Resend {
+  if (_client) return _client;
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error('RESEND_API_KEY is not set');
+  _client = new Resend(key);
+  return _client;
 }
 
 function fromAddress() {
-  const from = process.env.SENDGRID_FROM_EMAIL;
-  if (!from) throw new Error('SENDGRID_FROM_EMAIL is not set');
+  const from = process.env.MAIL_FROM_EMAIL;
+  if (!from) throw new Error('MAIL_FROM_EMAIL is not set');
   return from;
 }
 
 function siteUrl() {
   return process.env.SITE_URL || 'https://www.liveonwith.me';
+}
+
+async function sendEmail(args: { to: string; subject: string; text: string; html: string }) {
+  const { error } = await client().emails.send({
+    from: fromAddress(),
+    to: args.to,
+    subject: args.subject,
+    text: args.text,
+    html: args.html,
+  });
+  if (error) {
+    const err = new Error(error.message || 'Resend send failed');
+    (err as any).name = error.name || 'ResendError';
+    throw err;
+  }
 }
 
 function wrapEmail(innerHtml: string): string {
@@ -59,20 +79,6 @@ function wrapEmail(innerHtml: string): string {
   </body>
 </html>`;
 }
-
-const TRANSACTIONAL_SETTINGS = {
-  // Password reset and claim invites are transactional + security-sensitive.
-  // Disable tracking so links aren't rewritten through sendgrid.net (which
-  // tanks inbox rate for new senders) and no 1x1 pixel is injected.
-  trackingSettings: {
-    clickTracking: { enable: false, enableText: false },
-    openTracking: { enable: false },
-    subscriptionTracking: { enable: false },
-  },
-  mailSettings: {
-    bypassListManagement: { enable: true },
-  },
-} as const;
 
 export async function sendPasswordResetEmail(to: string, token: string) {
   const link = `${siteUrl()}/auth/action?mode=resetPassword&token=${encodeURIComponent(token)}`;
@@ -111,14 +117,7 @@ export async function sendPasswordResetEmail(to: string, token: string) {
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 function firstName(fullName?: string): string {
@@ -191,14 +190,7 @@ export async function sendCustodyInvite(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendContributionAlert(
@@ -276,14 +268,7 @@ export async function sendContributionAlert(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendMemorialWelcome(
@@ -356,14 +341,7 @@ export async function sendMemorialWelcome(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendClaimInvite(
@@ -417,14 +395,7 @@ export async function sendClaimInvite(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 // ─── Partner application lifecycle ──────────────────────────────────────────
@@ -461,14 +432,7 @@ export async function sendPartnerApplicationReceived(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendPartnerApplicationAdminNotice(args: {
@@ -524,14 +488,7 @@ export async function sendPartnerApplicationAdminNotice(args: {
         </p>
   `);
 
-  await client().send({
-    to: SUPER_ADMIN_EMAIL,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to: SUPER_ADMIN_EMAIL, subject, text, html });
 }
 
 export async function sendPartnerApplicationApproved(
@@ -571,14 +528,7 @@ export async function sendPartnerApplicationApproved(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendPartnerApplicationRejected(
@@ -612,14 +562,7 @@ export async function sendPartnerApplicationRejected(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 // ─── Receipts ───────────────────────────────────────────────────────────────
@@ -681,14 +624,7 @@ export async function sendWholesaleReceipt(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendFamilyClaimedReferral(
@@ -731,14 +667,7 @@ export async function sendFamilyClaimedReferral(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendMemorialPaymentReceipt(
@@ -797,14 +726,7 @@ export async function sendMemorialPaymentReceipt(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 // ─── Custody acceptance follow-ups ──────────────────────────────────────────
@@ -850,14 +772,7 @@ export async function sendCoManagerAcceptedToOwner(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendCoManagerConfirmation(
@@ -894,14 +809,7 @@ export async function sendCoManagerConfirmation(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendSuccessionCompletedToNewOwner(
@@ -938,14 +846,7 @@ export async function sendSuccessionCompletedToNewOwner(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 // ─── Account deletion (GDPR Article 17) ─────────────────────────────────────
@@ -1012,14 +913,7 @@ export async function sendAccountDeletedConfirmation(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendSuccessionCompletedToPreviousOwner(
@@ -1063,14 +957,7 @@ export async function sendSuccessionCompletedToPreviousOwner(
         </p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 export async function sendContributionReportAdmin(args: {
@@ -1137,14 +1024,7 @@ export async function sendContributionReportAdmin(args: {
         </p>
   `);
 
-  await client().send({
-    to: SUPER_ADMIN_EMAIL,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to: SUPER_ADMIN_EMAIL, subject, text, html });
 }
 
 export async function sendEmailChangeNotice(
@@ -1189,14 +1069,7 @@ export async function sendEmailChangeNotice(
         <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;color:#6d7772;margin:28px 0 0;">— LiveOnWith.me</p>
   `);
 
-  await client().send({
-    to,
-    from: fromAddress(),
-    subject,
-    text,
-    html,
-    ...TRANSACTIONAL_SETTINGS,
-  });
+  await sendEmail({ to, subject, text, html });
 }
 
 /**
@@ -1246,5 +1119,5 @@ export async function sendRegistrarJoinedAdminNotice(args: {
           <a href="${adminLink}" style="color:#6d7772;">Remove a registrar in admin</a>
         </p>
   `);
-  await client().send({ to: SUPER_ADMIN_EMAIL, from: fromAddress(), subject, text, html, ...TRANSACTIONAL_SETTINGS });
+  await sendEmail({ to: SUPER_ADMIN_EMAIL, subject, text, html });
 }

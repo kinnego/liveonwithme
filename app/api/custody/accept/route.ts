@@ -12,7 +12,7 @@ import {
   sendCoManagerConfirmation,
   sendSuccessionCompletedToNewOwner,
   sendSuccessionCompletedToPreviousOwner,
-} from '@/lib/sendgrid';
+} from '@/lib/mail';
 
 export const runtime = 'nodejs';
 
@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Follow-up emails. All non-fatal — custody is already committed, we
-    // don't want a SendGrid blip to surface as an acceptance failure.
+    // don't want a mail-provider blip to surface as an acceptance failure.
     const memorialName = (memorial.fullName as string) || 'the memorial';
     const memorialId = transfer.memorialId as string;
     try {

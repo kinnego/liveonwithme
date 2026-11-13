@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb, verifyIdToken } from '@/lib/firebase-admin';
 import { writeAuditAdmin } from '@/lib/audit-admin';
-import { sendCustodyInvite } from '@/lib/sendgrid';
+import { sendCustodyInvite } from '@/lib/mail';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
