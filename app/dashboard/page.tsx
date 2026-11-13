@@ -64,6 +64,31 @@ export default function Dashboard() {
   // 'partner' once approved. Shown at the top so they find their page.
   const [partnerState, setPartnerState] = useState<'none' | 'applied' | 'partner'>('none');
   const router = useRouter();
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('deleted') === '1') {
+      setNotice('Deleted. You can restore it from here for 30 days.');
+      window.history.replaceState(null, '', '/dashboard');
+    }
+  }, []);
+
+  async function restore(id: string) {
+    setRestoring(id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/memorial/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ memorialId: id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setNotice(res.ok ? 'Restored. It’s back as it was.' : data.error || 'Could not restore it. Please try again.');
+    } finally {
+      setRestoring(null);
+    }
+  }
 
   useEffect(() => {
     let stopOwned: (() => void) | undefined;
@@ -240,6 +265,11 @@ export default function Dashboard() {
           Create a page
         </ButtonLink>
       </div>
+      {notice && (
+        <div className="card" role="status" style={{ marginBottom: 16, padding: '12px 16px' }}>
+          {notice}
+        </div>
+      )}
       {partnerState !== 'none' && (
         <div className="card" style={{ marginBottom: 24, background: '#fffdf9' }}>
           <div className="eyebrow">Funeral directors &amp; partners</div>
@@ -267,7 +297,31 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="featureGrid">
-          {owned.map((m) => (
+          {owned.map((m) => {
+            const due: Date | null = m.pendingDeletionReason === 'owner_deleted' ? m.pendingDeletionAt?.toDate?.() ?? null : null;
+            if (due) {
+              return (
+                <article className="card" key={m.id} style={{ borderColor: '#e6c9c5' }}>
+                  <span style={{ display: 'inline-block', borderRadius: 999, padding: '4px 10px', fontSize: 11, fontWeight: 750, background: '#f6e3e0', color: '#a94442' }}>
+                    Deleted
+                  </span>
+                  <h3 style={{ marginTop: 18 }}>{m.fullName}</h3>
+                  <p className="muted">
+                    Nobody can see it. It will be gone for good on{' '}
+                    {due.toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })}.
+                  </p>
+                  <button
+                    type="button"
+                    className="button secondary small"
+                    disabled={restoring === m.id}
+                    onClick={() => restore(m.id)}
+                  >
+                    {restoring === m.id ? 'Restoring…' : 'Restore it'}
+                  </button>
+                </article>
+              );
+            }
+            return (
             <article className="card" key={m.id}>
               <StatusBadge status={m.status} />
               <h3 style={{ marginTop: 18 }}>{m.fullName}</h3>
@@ -287,7 +341,8 @@ export default function Dashboard() {
                 )}
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
 
