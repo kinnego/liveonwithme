@@ -3,9 +3,9 @@
 // memorial and the records around it (owner, plot, contributions, custody
 // transfers, referrals, payments, audit trail).
 //
-// Deliberately read-only. Admin write actions (delete, force publish, etc.)
-// live in dedicated flows in the admin console so they get their own audit
-// entries and never impersonate the family custodian.
+// Read-only apart from "Delete this memorial" at the bottom, which goes
+// through its own admin route with its own audit entry and never
+// impersonates the family custodian.
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -22,6 +22,7 @@ import {
 import { auth, db } from '@/lib/firebase';
 import { isSuperAdmin } from '@/lib/roles';
 import { plotAdmins } from '@/lib/plot';
+import AdminDeleteMemorial from '@/components/AdminDeleteMemorial';
 import type {
   AuditEvent,
   Contribution,
@@ -666,6 +667,8 @@ export default function AdminMemorialInspector({
           </ul>
         )}
       </div>
+
+      <AdminDeleteMemorial memorialId={m.id} fullName={m.fullName || ''} />
     </main>
   );
 }
