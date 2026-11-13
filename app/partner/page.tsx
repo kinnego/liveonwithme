@@ -201,7 +201,10 @@ export default function PartnerDashboard() {
             {profile?.partnerType ? PARTNER_TYPE_LABELS[profile.partnerType as PartnerType] : 'Approved partner'}
           </p>
         </div>
-        <ButtonLink href="/partner/new" className="button">Set up a new memorial</ButtonLink>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <ButtonLink href="/partner/new" className="button">Set up a new memorial</ButtonLink>
+          <ButtonLink href="/partner/register" className="button secondary">Add someone to a cemetery register</ButtonLink>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 30, background: '#fffdf9' }}>

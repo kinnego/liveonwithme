@@ -472,6 +472,9 @@ service cloud.firestore {
     match /graveIndex/{placeId} { allow read, write: if false; }
     match /cemeteryRegistrars/{id} { allow read, write: if false; }
     match /graveReports/{id} { allow read, write: if false; }
+    // Family contacts from a funeral director's quick add. Private: never
+    // shown on the site, read only by the server.
+    match /familyContacts/{id} { allow read, write: if false; }
     match /registerUploads/{id} { allow read, write: if false; }
     match /registerProfiles/{placeId} { allow read, write: if false; }
 

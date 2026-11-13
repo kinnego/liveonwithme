@@ -354,8 +354,9 @@ export interface GraveBurial {
 
 export type GraveRecordStatus = 'unclaimed' | 'adopted';
 // How the grave first got into the register: the command-line import, a
-// registrar typing it in by hand, or a registrar's spreadsheet upload.
-export type GraveRecordSource = 'import' | 'registrar' | 'upload';
+// registrar typing it in by hand, a registrar's spreadsheet upload, or a
+// funeral director's quick add.
+export type GraveRecordSource = 'import' | 'registrar' | 'upload' | 'partner';
 
 export interface GraveRecord {
   id: string;

@@ -45,7 +45,7 @@ type Grave = {
   inscription: string;
   status: 'unclaimed' | 'adopted';
   adoptedPlotId: string | null;
-  source: 'import' | 'registrar' | 'upload';
+  source: 'import' | 'registrar' | 'upload' | 'partner';
   uploadId: string | null;
   editedByHand: boolean;
   updatedAt: number | null;
@@ -797,7 +797,9 @@ export default function RegistrarPage({
                       ? `From ${g.uploadId && uploadName.get(g.uploadId) ? `“${uploadName.get(g.uploadId)}”` : 'an uploaded sheet'}`
                       : g.source === 'import'
                         ? 'Imported by LiveOnWith.me'
-                        : 'Added by hand'}
+                        : g.source === 'partner'
+                          ? 'Added by a funeral director'
+                          : 'Added by hand'}
                     {g.editedByHand && g.source !== 'registrar' && ' · fixed by hand since'}
                   </div>
                   {g.status !== 'adopted' && cemetery && g.burials.length > 0 && (
