@@ -71,5 +71,5 @@ nav{position:relative}
 .partnerApplyPerksList{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:10px}
 .partnerApplyPerksList li{display:flex;gap:10px;align-items:flex-start;font-size:15px}
 .partnerApplyPerksTick{color:var(--sage);font-weight:700;flex:0 0 auto;line-height:1.4}
-#story,#favourites,#memories,#photos,#share{scroll-margin-top:52px}
-@media(max-width:800px){#story,#favourites,#memories,#photos,#share{scroll-margin-top:70px}}
+#story,#favourites,#clips,#memories,#photos,#share{scroll-margin-top:52px}
+@media(max-width:800px){#story,#favourites,#clips,#memories,#photos,#share{scroll-margin-top:70px}}
