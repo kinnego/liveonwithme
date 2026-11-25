@@ -6,7 +6,11 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
+  limit,
+  query,
   serverTimestamp,
+  where,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -24,6 +28,8 @@ export default function NewPartnerCustomer() {
   const [bereavedEmail, setBereavedEmail] = useState('');
   const [emailExists, setEmailExists] = useState(false);
   const [cemetery, setCemetery] = useState<Cemetery | null>(null);
+  const [deceasedName, setDeceasedName] = useState('');
+  const [existingDraftId, setExistingDraftId] = useState<string | null>(null);
   const router = useRouter();
 
   // Debounced existence check — informational only, we never block submit.
@@ -60,6 +66,40 @@ export default function NewPartnerCustomer() {
       setOk(isSuperAdmin(prof) || isApprovedPartner(prof));
     });
   }, [router]);
+
+  // Flag "you already have a draft for this person" before they pay for a
+  // second one. Matches on normalised name across the partner's own pending
+  // + unpaid referrals only — we don't want to treat a real repeat booking
+  // (same family, different person) as a duplicate.
+  useEffect(() => {
+    const normalised = deceasedName.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!normalised || normalised.length < 3 || !auth?.currentUser) {
+      setExistingDraftId(null);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, 'referrals'),
+            where('partnerUid', '==', auth.currentUser!.uid),
+            where('status', '==', 'pending'),
+            limit(25),
+          )
+        );
+        const match = snap.docs.find((d) => {
+          const data = d.data() as any;
+          if (data.wholesalePaymentStatus === 'paid') return false;
+          const name = String(data.deceasedFullName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+          return name && name === normalised;
+        });
+        setExistingDraftId(match ? match.id : null);
+      } catch {
+        setExistingDraftId(null);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [deceasedName]);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -132,10 +172,10 @@ export default function NewPartnerCustomer() {
 
   return (
     <main className="shell">
-      <div style={{ maxWidth: 690, margin: '0 auto 10px' }}>
+      <div style={{ marginBottom: 10 }}>
         <a href="/partner" className="button secondary small">Partner dashboard</a>
       </div>
-      <div className="formCard">
+      <div className="formCard wide">
         <div className="eyebrow">Set up a new memorial</div>
         <h2>Start a memorial for a family.</h2>
         <p className="muted">
@@ -178,7 +218,23 @@ export default function NewPartnerCustomer() {
 
           <h3 style={{ marginTop: 30 }}>About the deceased</h3>
           <label htmlFor="deceasedFullName">Full name</label>
-          <input id="deceasedFullName" name="deceasedFullName" placeholder="Mary O'Donnell" required />
+          <input
+            id="deceasedFullName"
+            name="deceasedFullName"
+            placeholder="Mary O'Donnell"
+            required
+            value={deceasedName}
+            onChange={(e) => setDeceasedName(e.target.value)}
+          />
+          {existingDraftId && (
+            <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+              You already have an unpaid draft for this person.{' '}
+              <a href={`/partner/referrals/${existingDraftId}`} style={{ textDecoration: 'underline' }}>
+                Continue that draft
+              </a>{' '}
+              instead of paying twice.
+            </p>
+          )}
           <div className="twoCol">
             <div>
               <label htmlFor="deceasedNickname">Nickname</label>

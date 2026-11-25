@@ -267,7 +267,11 @@ function CreateInner() {
             try {
               const memSnap = await getDoc(doc(db, 'memorials', memId));
               if (!memSnap.exists()) continue;
-              const name = (memSnap.data() as any)?.fullName;
+              const memData = memSnap.data() as any;
+              // Skip memorials pending deletion — they're offline during the
+              // 30-day restore window and shouldn't be offered as a plot-mate.
+              if (memData?.pendingDeletionAt) continue;
+              const name = memData?.fullName;
               if (typeof name === 'string' && name) names.push(name);
             } catch {
               // Memorial may not be readable (e.g. private draft owned by

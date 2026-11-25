@@ -148,10 +148,10 @@ export default function PartnerRegisterPage() {
 
   return (
     <main className="shell">
-      <div style={{ maxWidth: 690, margin: '0 auto 10px' }}>
+      <div style={{ marginBottom: 10 }}>
         <a href="/partner" className="button secondary small">Partner page</a>
       </div>
-      <div className="formCard">
+      <div className="formCard wide">
         <div className="eyebrow">Cemetery register</div>
         <h2>Add someone to a cemetery register.</h2>
         <p className="muted">

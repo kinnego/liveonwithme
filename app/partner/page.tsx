@@ -5,6 +5,7 @@ import ButtonLink from '@/components/ButtonLink';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   onSnapshot,
@@ -17,6 +18,8 @@ import { useRouter } from 'next/navigation';
 import { PARTNER_TYPE_LABELS, PartnerStatus, PartnerType, UserProfile } from '@/lib/types';
 import { isSuperAdmin } from '@/lib/roles';
 import { PageSkeleton } from '@/components/Skeleton';
+import PartnerPublicPageCard from '@/components/PartnerPublicPageCard';
+import { writeAudit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +40,39 @@ export default function PartnerDashboard() {
   const [items, setItems] = useState<any[]>([]);
   const [plotIds, setPlotIds] = useState<Record<string, string | null>>({});
   const [search, setSearch] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
+
+  async function deleteDraft(r: any) {
+    if (!auth?.currentUser) return;
+    // Belt + braces: the UI only shows the button for drafts, but if the
+    // user is clicking fast and payment just landed, we'd rather refuse
+    // the delete than quietly wipe a paid referral.
+    if (r.status !== 'pending' || r.wholesalePaymentStatus === 'paid') return;
+    const ok = window.confirm(
+      `Delete the draft for ${r.deceasedFullName || 'this person'}? You can always start a new one.`
+    );
+    if (!ok) return;
+    setDeletingId(r.id);
+    try {
+      await deleteDoc(doc(db, 'referrals', r.id));
+      await writeAudit({
+        entityType: 'referral',
+        entityId: r.id,
+        action: 'delete_draft',
+        actorUid: auth.currentUser.uid,
+        actorEmail: auth.currentUser.email || undefined,
+        details: {
+          deceasedFullName: r.deceasedFullName || '',
+          bereavedEmail: r.bereavedEmail || '',
+        },
+      });
+    } catch (err: any) {
+      window.alert(err?.message || 'Could not delete');
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   useEffect(() => {
     if (!auth) {
@@ -225,6 +260,13 @@ export default function PartnerDashboard() {
         <ButtonLink href="/partner/new" className="button">Set up a new memorial</ButtonLink>
       </div>
 
+      {profile && auth?.currentUser && (
+        (profile.role === 'partner' && profile.partnerStatus === 'approved') ||
+        isSuperAdmin(profile)
+      ) && (
+        <PartnerPublicPageCard uid={auth.currentUser.uid} profile={profile} />
+      )}
+
       <div
         className="card"
         style={{ marginBottom: 30, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}
@@ -327,6 +369,16 @@ export default function PartnerDashboard() {
                           <ButtonLink href={`/plot/${plotId}/artwork`} className="button secondary small">
                             Headstone artwork
                           </ButtonLink>
+                        )}
+                        {r.status === 'pending' && r.wholesalePaymentStatus !== 'paid' && (
+                          <button
+                            type="button"
+                            className="button secondary small"
+                            onClick={() => deleteDraft(r)}
+                            disabled={deletingId === r.id}
+                          >
+                            {deletingId === r.id ? 'Deleting…' : 'Delete draft'}
+                          </button>
                         )}
                       </div>
                     </article>

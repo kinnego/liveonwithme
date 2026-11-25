@@ -585,6 +585,22 @@ export interface UserProfile {
   partnerStatus?: PartnerStatus;
   partnerApplicationId?: string;
   createdAt?: unknown;
+
+  // Public partner page (approved partners only). partnerPublic treated as
+  // true when undefined so pages for already-approved partners work without
+  // a backfill write. Slug is set server-side via /api/partner/slug —
+  // firestore rules block client writes to it.
+  partnerSlug?: string;
+  partnerPublic?: boolean;
+  partnerBusinessName?: string;
+  partnerBlurb?: string;
+  partnerWebsite?: string;
+  partnerPhone?: string;
+  partnerShowPhone?: boolean;
+  partnerShowEmail?: boolean;
+  // R2 object key for the partner's public-page hero photo. Empty/missing →
+  // the page falls back to a lifestyle photo seeded from the partner's uid.
+  partnerHeroPhotoPath?: string;
 }
 
 // ─── Referral (partner→customer link) ────────────────────────────────────────

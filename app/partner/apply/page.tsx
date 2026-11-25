@@ -147,10 +147,10 @@ export default function PartnerApply() {
 
   return (
     <main className="shell">
-      <div style={{ maxWidth: 690, margin: '0 auto 10px' }}>
+      <div style={{ marginBottom: 10 }}>
         <a href="/dashboard" className="button secondary small">Dashboard</a>
       </div>
-      <div className="formCard">
+      <div className="formCard wide">
         <div className="eyebrow">Partner application</div>
         <h2>Join the partner network.</h2>
         <p className="muted">
@@ -159,6 +159,46 @@ export default function PartnerApply() {
           memorials on behalf of families and receive the wholesale terms we&rsquo;ll
           share directly with you after we review your application.
         </p>
+
+        <div className="partnerApplyPerks">
+          <div className="eyebrow" style={{ marginBottom: 6 }}>What you get, free</div>
+          <h3 style={{ margin: '0 0 6px' }}>Your own public page on LiveOnWith.me.</h3>
+          <p className="muted" style={{ marginTop: 0 }}>
+            A warm, mobile-friendly homepage families can find before they ever walk through
+            your door — with your name, your photo, your contact details and a QR code you can
+            print. Approved partners get it at no extra cost.
+          </p>
+
+          <div className="partnerApplyUrlMock" aria-hidden="true">
+            <span className="partnerApplyUrlDot" />
+            <span className="partnerApplyUrlDot" />
+            <span className="partnerApplyUrlDot" />
+            <span className="partnerApplyUrlBar">
+              <span className="muted">liveonwith.me/partner/</span>
+              <span>your-firm-name</span>
+            </span>
+          </div>
+
+          <ul className="partnerApplyPerksList">
+            <li>
+              <span className="partnerApplyPerksTick" aria-hidden="true">✓</span>
+              A shareable link and QR you can put on paperwork, keepsakes or a window sign.
+            </li>
+            <li>
+              <span className="partnerApplyPerksTick" aria-hidden="true">✓</span>
+              Edit your blurb, hero photo and contact details in one click, any time.
+            </li>
+            <li>
+              <span className="partnerApplyPerksTick" aria-hidden="true">✓</span>
+              Lists the cemeteries you work with, so local families recognise your name.
+            </li>
+            <li>
+              <span className="partnerApplyPerksTick" aria-hidden="true">✓</span>
+              Set memorials up on behalf of families, at wholesale terms we agree with you.
+            </li>
+          </ul>
+        </div>
+
         <form onSubmit={submit}>
           <label htmlFor="partnerType">Your role</label>
           <select id="partnerType" name="partnerType" required defaultValue="funeral_director">

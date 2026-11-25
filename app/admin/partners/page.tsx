@@ -72,11 +72,40 @@ export default function AdminPartners() {
       });
 
       if (decision === 'approved') {
+        // Copy application fields onto the user profile so the public page
+        // and dashboard don't have to re-read the application doc each time.
+        // The partner can edit businessName/website/phone later on their
+        // dashboard; these are just sensible defaults from what they typed
+        // when applying. partnerPublic is left undefined → treated as true
+        // (public by default; opt-out via the dashboard).
         await updateDoc(doc(db, 'users', app.applicantUid), {
           role: 'partner',
           partnerStatus: 'approved',
           partnerType: app.partnerType,
+          partnerBusinessName: app.businessName,
+          partnerWebsite: app.website || '',
+          partnerPhone: app.contactPhone || '',
         });
+
+        // Assign a public /partner/<slug> URL. Server-side so we can
+        // transact on the uniqueness reservation. Non-fatal if it fails —
+        // the partner can backfill from their dashboard.
+        try {
+          const token = await auth.currentUser.getIdToken();
+          await fetch('/api/partner/slug', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              targetUid: app.applicantUid,
+              fallbackFromName: app.businessName,
+            }),
+          });
+        } catch {
+          // ignored — the approval itself has already landed
+        }
       } else if (decision === 'suspended') {
         await updateDoc(doc(db, 'users', app.applicantUid), {
           partnerStatus: 'suspended',
@@ -203,6 +232,14 @@ export default function AdminPartners() {
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+              {app.status === 'approved' && (
+                <ButtonLink
+                  href={`/admin/partners/${app.applicantUid}`}
+                  className="button secondary small"
+                >
+                  Review details
+                </ButtonLink>
+              )}
               {app.status !== 'approved' && (
                 <button
                   className="button small"

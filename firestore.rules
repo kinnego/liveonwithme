@@ -545,6 +545,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ─── partner slug reservations (server-only) ─────────────────────────────
+    // Enforces unique /partner/<slug> URLs. One doc per claimed slug, written
+    // transactionally by /api/partner/slug (and by the admin approval flow).
+    // Never touched by clients directly.
+    match /partnerSlugs/{slug} {
+      allow read, write: if false;
+    }
+
     // ─── users ───────────────────────────────────────────────────────────────
     match /users/{uid} {
       // Role elevation guard: the super_admin check uses the Firebase-issued
@@ -566,10 +574,14 @@ service cloud.firestore {
       allow list: if isSuperAdmin();
 
       // User can update their own profile but cannot elevate role/partner
-      // status themselves — those are super-admin controlled.
+      // status themselves — those are super-admin controlled. partnerSlug is
+      // locked too: it must round-trip through /api/partner/slug so the
+      // /partnerSlugs reservation collection stays authoritative on
+      // uniqueness.
       allow update: if (isSelf(uid)
         && request.resource.data.role == resource.data.role
         && request.resource.data.get('partnerStatus', null) == resource.data.get('partnerStatus', null)
+        && request.resource.data.get('partnerSlug', null) == resource.data.get('partnerSlug', null)
       ) || isSuperAdmin();
 
       allow delete: if isSuperAdmin();
