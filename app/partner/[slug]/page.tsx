@@ -7,7 +7,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
-import ButtonLink from '@/components/ButtonLink';
 import PartnerPublicPageEditor from '@/components/PartnerPublicPageEditor';
 import { adminDb } from '@/lib/firebase-admin';
 import { PARTNER_TYPE_LABELS, PartnerType, UserProfile } from '@/lib/types';
@@ -164,6 +163,20 @@ export default async function PartnerPublicPage({
   const typeLabel = p.partnerType ? PARTNER_TYPE_LABELS[p.partnerType] : 'Partner';
   const tagline = p.blurb || 'A special place to remember, celebrate and share the lives of those we love.';
 
+  // Preferred way for a family to start the conversation with this partner,
+  // using whichever contact channel they've made public. Order matches most
+  // families' muscle memory for a funeral firm: phone first, then email,
+  // then website. The full list still appears in the "Get in touch" section
+  // below, so nobody is cut off from their preferred channel.
+  const primaryContact: { href: string; label: string } | null =
+    p.showPhone && p.phone
+      ? { href: `tel:${p.phone.replace(/\s+/g, '')}`, label: `Call ${p.businessName}` }
+      : p.showEmail && p.email
+        ? { href: `mailto:${p.email}`, label: `Email ${p.businessName}` }
+        : p.website
+          ? { href: normaliseHref(p.website), label: `Visit ${p.businessName}` }
+          : null;
+
   return (
     <main>
       <section className="hero">
@@ -171,11 +184,13 @@ export default async function PartnerPublicPage({
           <div className="eyebrow">{typeLabel}</div>
           <h1>{p.businessName}</h1>
           <p className="lead">{tagline}</p>
-          <div className="actions">
-            <ButtonLink href="/create" className="button">
-              Create a Memorial
-            </ButtonLink>
-          </div>
+          {primaryContact && (
+            <div className="actions">
+              <a href={primaryContact.href} className="button">
+                {primaryContact.label}
+              </a>
+            </div>
+          )}
           <p className="muted" style={{ marginTop: 18, fontSize: 14 }}>
             Every life tells a story. Keep their memories alive.
           </p>
@@ -254,12 +269,20 @@ export default async function PartnerPublicPage({
           <div className="eyebrow">Begin gently</div>
           <h2 style={{ marginTop: 6 }}>A memory worth keeping.</h2>
           <p className="lead" style={{ margin: '0 auto 24px', maxWidth: 620 }}>
-            Create a memorial for someone you love — a peaceful place family and
-            friends can return to for years to come.
+            Speak to {p.businessName} and they&rsquo;ll help you set up a memorial —
+            a peaceful place family and friends can return to for years to come.
           </p>
-          <ButtonLink href="/create" className="button">
-            Create Your Memorial
-          </ButtonLink>
+          {primaryContact && (
+            <a href={primaryContact.href} className="button">
+              {primaryContact.label}
+            </a>
+          )}
+          <p className="muted" style={{ fontSize: 14, marginTop: 20 }}>
+            Curious what a memorial looks like?{' '}
+            <a href="/m/mary-demo" style={{ textDecoration: 'underline' }}>
+              See a sample memorial →
+            </a>
+          </p>
         </div>
       </section>
 

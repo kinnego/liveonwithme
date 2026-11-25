@@ -34,7 +34,7 @@ const demoClips = [
   {
     id: 'demo-clip-1',
     label: 'A voicemail Mary left for Aoife, 2019',
-    url: '/demo/mary-voicemail.m4a',
+    url: '/demo/mary-voicemail.mp3',
     note: 'An illustrative sample voice — recorded for this demo.',
   },
 ];

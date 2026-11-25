@@ -111,6 +111,10 @@ function CreateInner() {
   // secondary rate.
   const [presetPlot, setPresetPlot] = useState<Plot | null>(null);
   const [presetPlotError, setPresetPlotError] = useState('');
+  // The user arrived with ?plot=X but then said "actually, this isn't the
+  // right plot" — keep the URL as-is so a refresh reproduces the attach
+  // flow, but hide the plot UI and treat submission as a standalone memorial.
+  const [plotDetached, setPlotDetached] = useState(false);
   // Plots the signed-in user administers, discovered lazily once they pick
   // memorial mode and we don't already have a `?plot=` preset. `null` means
   // "not yet queried"; empty array means "queried, nothing to show".
@@ -278,6 +282,9 @@ function CreateInner() {
               // someone else) — skip without failing the whole discovery.
             }
           }
+          // Every memorial on this plot has been soft-deleted — there's no
+          // one left to rest with, so don't offer the plot in the picker.
+          if (names.length === 0) continue;
           results.push({ plot, memorialNames: names });
         }
         if (!cancelled) setOwnerPlots(results);
@@ -390,7 +397,7 @@ function CreateInner() {
         updatedAt: serverTimestamp(),
       });
 
-      if (presetPlot) {
+      if (presetPlot && !plotDetached) {
         setProgress('Adding to the plot…');
         await attachMemorialToExistingPlot({
           memorialId: slug,
@@ -698,23 +705,15 @@ function CreateInner() {
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setPlotStepSkipped(true)}
-            style={{
-              display: 'block',
-              margin: '28px auto 0',
-              background: 'none',
-              border: 'none',
-              color: 'var(--sage)',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-              fontSize: 15,
-              padding: 6,
-            }}
-          >
-            No, this is a new memorial for someone I love
-          </button>
+          <div style={{ textAlign: 'center', marginTop: 28 }}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setPlotStepSkipped(true)}
+            >
+              No, this is a new memorial for someone I love
+            </button>
+          </div>
         </div>
 
         <style jsx>{`
@@ -746,7 +745,7 @@ function CreateInner() {
   }
 
   const c = isPartner ? PARTNER_COPY : COPY[mode];
-  const attachingToPlot = !!presetPlotId;
+  const attachingToPlot = !!presetPlotId && !plotDetached;
   const presetPlotReady = attachingToPlot ? !!presetPlot && !presetPlotError : true;
   const attachingToCemetery = !attachingToPlot && !!presetCemetery;
 
@@ -784,6 +783,17 @@ function CreateInner() {
             <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }}>
               Publishing this second memorial uses the reduced rate for additional names on the same plot.
             </p>
+          </div>
+        )}
+        {attachingToPlot && (
+          <div style={{ marginTop: 14 }}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setPlotDetached(true)}
+            >
+              This isn&rsquo;t the right plot — start a new memorial
+            </button>
           </div>
         )}
         {!attachingToPlot && !isPartner && (

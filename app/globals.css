@@ -5,8 +5,8 @@
 .skRow{display:flex;gap:12px;align-items:center}
 .skStack{display:flex;flex-direction:column;gap:10px}
 iframe#nl-badge-frame,iframe[title="Powered by Netlify"]{display:none!important}
-.link-hint{display:inline-block;width:.55em;height:.55em;margin-left:.45em;border-radius:50%;background:currentColor;opacity:0;visibility:hidden;vertical-align:middle}
-.link-hint.is-pending{visibility:visible;animation:linkHintFade .2s ease 100ms forwards,linkHintPulse 1s ease-in-out 100ms infinite}
+.link-hint{display:inline-block;width:0;height:.55em;margin-left:0;border-radius:50%;background:currentColor;opacity:0;visibility:hidden;vertical-align:middle}
+.link-hint.is-pending{width:.55em;margin-left:.45em;visibility:visible;animation:linkHintFade .2s ease 100ms forwards,linkHintPulse 1s ease-in-out 100ms infinite}
 @keyframes linkHintFade{to{opacity:.6}}
 @keyframes linkHintPulse{50%{opacity:.2}}
 @media (prefers-reduced-motion:reduce){.link-hint.is-pending{animation:linkHintFade .2s ease 100ms forwards}}
@@ -71,3 +71,5 @@ nav{position:relative}
 .partnerApplyPerksList{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:10px}
 .partnerApplyPerksList li{display:flex;gap:10px;align-items:flex-start;font-size:15px}
 .partnerApplyPerksTick{color:var(--sage);font-weight:700;flex:0 0 auto;line-height:1.4}
+#story,#favourites,#clips,#memories,#photos,#share{scroll-margin-top:52px}
+@media(max-width:800px){#story,#favourites,#clips,#memories,#photos,#share{scroll-margin-top:70px}}
