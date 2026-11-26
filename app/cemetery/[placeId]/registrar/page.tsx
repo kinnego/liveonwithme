@@ -592,7 +592,7 @@ export default function RegistrarPage({
               {
                 icon: <CameraIcon size={30} />,
                 title: 'From photos of the book',
-                text: 'Take photos with your phone. A free app, ChatGPT, types the names into a list, and you paste that list in here. We show you how.',
+                text: 'Take photos with your phone. A free AI assistant (like ChatGPT or Claude) types the names into a list, and you paste that list in here. We show you how.',
                 onClick: () => setShowImport(true),
               },
               {

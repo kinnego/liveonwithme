@@ -74,9 +74,9 @@ const nameOptions: { icon: React.ReactNode; title: string; body: React.ReactNode
     title: 'Take photos of the book',
     body: (
       <>
-        Our app can&rsquo;t read handwriting by itself, so a free app called <strong>ChatGPT</strong>{' '}
-        does the typing in the middle. We give you the exact words to paste into ChatGPT, so it
-        lays the names out the way our app needs.
+        Our app can&rsquo;t read handwriting by itself, so a free AI assistant (like{' '}
+        <strong>ChatGPT</strong> or <strong>Claude</strong>) does the typing in the middle. We
+        give you the exact words to paste in, so it lays the names out the way our app needs.
         <PhotoToAppFlow />
         Not sure how? We&rsquo;ll guide you through it, one step at a time, once you sign up.
       </>
@@ -236,7 +236,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
     ),
   },
   {
-    q: 'Is it safe to put photos of the book into ChatGPT?',
+    q: 'Is it safe to put photos of the book into an AI assistant?',
     a: (
       <>
         Burial registers are usually about people who died many years ago. But if your book has
@@ -284,7 +284,16 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
 ];
 
-export default function ParishesPage() {
+export default async function ParishesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ digitise?: string }>;
+}) {
+  // Off by default. Appended to outreach links so only the people we send to
+  // see the paid "we'll handle it" offer; the public parishes page stays
+  // strictly free-tier.
+  const showDigitise = (await searchParams)?.digitise === '1';
+
   return (
     <main style={{ fontSize: 18 }}>
       <section className="section" style={{ maxWidth: 820 }}>
@@ -401,6 +410,31 @@ export default function ParishesPage() {
           page. If not, nothing happens. Uploads never change a memorial a family has made.
         </p>
       </section>
+
+      {showDigitise && (
+        <section className="section" style={{ maxWidth: 820 }}>
+          <div className="card" style={{ padding: '28px 26px' }}>
+            <div className="eyebrow">Short on time?</div>
+            <h2 style={{ marginTop: 6 }}>We&rsquo;ll handle it for you.</h2>
+            <p>
+              If the register is in a drawer and nobody has time to type it up, send us what you
+              have &mdash; a photo of the book, a scan, a spreadsheet, whatever shape it&rsquo;s in
+              &mdash; and we&rsquo;ll do the work.
+            </p>
+            <p>
+              You see every name before anything goes online, and you can stop at any time.
+            </p>
+            <p>
+              Email{' '}
+              <a href={`mailto:${SUPER_ADMIN_EMAIL}`} style={{ textDecoration: 'underline' }}>
+                {SUPER_ADMIN_EMAIL}
+              </a>{' '}
+              with the name of the graveyard and roughly how many graves. We&rsquo;ll come back
+              with a price.
+            </p>
+          </div>
+        </section>
+      )}
 
       <section className="section" style={{ maxWidth: 820 }}>
         <h2>Your questions</h2>

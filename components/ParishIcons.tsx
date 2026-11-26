@@ -189,7 +189,7 @@ export function TableIcon(p: P) {
 export function PhotoToAppFlow({ compact = false }: { compact?: boolean }) {
   const steps = [
     { icon: <CameraIcon size={30} />, label: 'You take a photo of a page' },
-    { icon: <ChatIcon size={30} />, label: 'ChatGPT types it out as a list' },
+    { icon: <ChatIcon size={30} />, label: 'An AI assistant types it out as a list' },
     { icon: <TableIcon size={30} />, label: 'You paste the list in here' },
   ];
   return (
@@ -205,7 +205,7 @@ export function PhotoToAppFlow({ compact = false }: { compact?: boolean }) {
           .ptaArrow { padding: 0; width: 52px; text-align: center; line-height: 1; transform: rotate(90deg); }
         }
       `}</style>
-      <div className="ptaFlow" role="img" aria-label="You take a photo of a page, ChatGPT types it out as a list, and you paste the list in here">
+      <div className="ptaFlow" role="img" aria-label="You take a photo of a page, an AI assistant types it out as a list, and you paste the list in here">
         {steps.map((s, i) => (
           <div key={s.label} style={{ display: 'contents' }}>
             {i > 0 && <div className="ptaArrow" aria-hidden="true">→</div>}
