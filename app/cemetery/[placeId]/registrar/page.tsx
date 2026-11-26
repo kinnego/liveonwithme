@@ -189,6 +189,8 @@ export default function RegistrarPage({
   const [showImport, setShowImport] = useState(false);
   // Which import step to open first; 2 jumps to the ChatGPT instructions.
   const [importStep, setImportStep] = useState<1 | 2 | 3 | undefined>(undefined);
+  // Paste/upload only — skips the photos+AI explainer.
+  const [pasteOnly, setPasteOnly] = useState(false);
   const [walkMode, setWalkMode] = useState(false);
   const [pins, setPins] = useState<Record<string, PinState>>({});
 
@@ -553,13 +555,14 @@ export default function RegistrarPage({
       )}
 
       {cemetery && showImport && (
-        <div className="card" style={{ marginBottom: 18 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <h2 style={{ margin: '0 0 6px', fontSize: 30 }}>Put the names in from photos or a spreadsheet</h2>
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
             <button type="button" className="button secondary small" onClick={() => setShowImport(false)}>
               ← Back
             </button>
           </div>
+        <div className="card" style={{ marginBottom: 18 }}>
+          <h2 style={{ margin: '0 0 6px', fontSize: 30 }}>Put the names in from photos or a spreadsheet</h2>
           <p className="muted" style={{ marginTop: 0 }}>
             Three short steps. Tap a step to open it. Nothing is saved until the end.
           </p>
@@ -581,9 +584,10 @@ export default function RegistrarPage({
             }
           />
         </div>
+        </>
       )}
 
-      {cemetery && !showImport && !adding && !showAddOrUpload && graves && graves.length === 0 && (
+      {cemetery && !showImport && !adding && !showAddOrUpload && !pasteOnly && graves && graves.length === 0 && (
         <div className="card" style={{ marginBottom: 18 }}>
           <h2 style={{ margin: '0 0 6px', fontSize: 30 }}>Put the names online</h2>
           <p style={{ marginTop: 0, fontSize: 18 }}>
@@ -649,17 +653,8 @@ export default function RegistrarPage({
       )}
 
       {cemetery && showAddOrUpload && !adding && !showImport && (
-        <div className="card" style={{ marginBottom: 18 }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 10,
-              alignItems: 'baseline',
-              flexWrap: 'wrap',
-            }}
-          >
-            <h2 style={{ margin: '0 0 6px', fontSize: 28 }}>How would you like to add them?</h2>
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
             <button
               type="button"
               className="button secondary small"
@@ -668,6 +663,8 @@ export default function RegistrarPage({
               ← Back
             </button>
           </div>
+        <div className="card" style={{ marginBottom: 18 }}>
+          <h2 style={{ margin: '0 0 6px', fontSize: 28 }}>How would you like to add them?</h2>
           <div style={{ display: 'grid', gap: 8, marginTop: 6 }}>
             <button
               type="button"
@@ -705,8 +702,7 @@ export default function RegistrarPage({
             <button
               type="button"
               onClick={() => {
-                setImportStep(3);
-                setShowImport(true);
+                setPasteOnly(true);
                 setShowAddOrUpload(false);
               }}
               style={{
@@ -738,11 +734,12 @@ export default function RegistrarPage({
             </button>
           </div>
         </div>
+        </>
       )}
 
       {cemetery && adding && (
         <>
-          <div style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
             <button
               type="button"
               className="button secondary small"
@@ -761,7 +758,37 @@ export default function RegistrarPage({
         </>
       )}
 
-      {!adding && !showImport && graves && graves.length > 0 && (
+      {cemetery && pasteOnly && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+            <button
+              type="button"
+              className="button secondary small"
+              onClick={() => setPasteOnly(false)}
+            >
+              ← Back
+            </button>
+          </div>
+        <div className="card" style={{ marginBottom: 18 }}>
+          <h2 style={{ margin: '0 0 6px', fontSize: 28 }}>Paste or upload a prepared list</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            From Excel, Google Sheets, or a .csv / .txt file. The first row is the column headings;
+            one person per row underneath.
+          </p>
+          <RegisterUpload
+            cemetery={cemetery}
+            hasExisting={!!graves && graves.length > 0}
+            api={api}
+            onDone={() => {
+              loadGraves();
+              loadUploads();
+            }}
+          />
+        </div>
+        </>
+      )}
+
+      {!adding && !showImport && !pasteOnly && graves && graves.length > 0 && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18 }}>
           <button
             type="button"
