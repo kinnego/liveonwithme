@@ -85,7 +85,34 @@ const nameOptions: { icon: React.ReactNode; title: string; body: React.ReactNode
   {
     icon: <KeyboardIcon size={36} />,
     title: 'Type the names in yourself',
-    body: <>One grave at a time, on your phone or a computer. Only the surname is needed.</>,
+    body: (
+      <>
+        <p style={{ margin: 0 }}>
+          <strong>One grave at a time</strong> on your phone or a computer. Only the surname is
+          needed.
+        </p>
+        <p style={{ margin: '10px 0 6px' }}>
+          <strong>Or prepare a list</strong> in Excel, Google Sheets or a text editor and paste it
+          in. The first row is the column headings; one person per row underneath. At a minimum:
+        </p>
+        <pre
+          style={{
+            margin: '4px 0 0',
+            padding: '8px 12px',
+            background: 'var(--sage2)',
+            borderRadius: 8,
+            fontSize: 14,
+            overflowX: 'auto',
+          }}
+        >
+          Surname, First names, Died
+        </pre>
+        <p className="muted" style={{ margin: '8px 0 0', fontSize: 15 }}>
+          You can add columns like Section, Row, Plot, Age, Address, Known as, Born, Buried and
+          Inscription if your book has them.
+        </p>
+      </>
+    ),
   },
   {
     icon: <EnvelopeIcon size={36} />,
@@ -384,6 +411,11 @@ export default async function ParishesPage({
             </li>
           ))}
         </ol>
+        <div style={{ textAlign: 'center', marginTop: 28 }}>
+          <ButtonLink href="#start" className="button">
+            Get started
+          </ButtonLink>
+        </div>
       </section>
 
       <section className="section" style={{ maxWidth: 820 }}>

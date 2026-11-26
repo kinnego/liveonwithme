@@ -256,7 +256,7 @@ export default function RegisterSetup({ placeId, cemeteryName, api, upload, init
 
       <Step
         n={2}
-        title={format === 'spreadsheet' ? 'Get your spreadsheet ready' : 'Let ChatGPT type out the names'}
+        title={format === 'spreadsheet' ? 'Get your spreadsheet ready' : 'Let an AI assistant type out the names'}
         done={copiedOnce}
         open={open.has(2)}
         onToggle={() => toggleStep(2)}
@@ -278,9 +278,10 @@ export default function RegisterSetup({ placeId, cemeteryName, api, upload, init
       ) : (
         <>
           <p style={{ marginTop: 0 }}>
-            Our app can&rsquo;t read handwriting by itself. So you use <strong>ChatGPT</strong>, a free
-            app that can read photos, to type the book out as a tidy list. Our instructions tell it
-            exactly how to lay the list out, so it fits straight into LiveOnWith.me.
+            Our app can&rsquo;t read handwriting by itself. So you use a free AI assistant (like{' '}
+            <strong>ChatGPT</strong> or <strong>Claude</strong>) that can read photos, to type the
+            book out as a tidy list. Our instructions tell it exactly how to lay the list out, so
+            it fits straight into LiveOnWith.me.
           </p>
           <PhotoToAppFlow />
           <ol style={{ marginTop: 0, paddingLeft: 22, display: 'grid', gap: 8 }}>

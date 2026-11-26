@@ -19,6 +19,7 @@ import MyGraveyards from '@/components/MyGraveyards';
 import {
   BookIcon,
   CameraIcon,
+  ChecklistIcon,
   EnvelopeIcon,
   HeadstoneIcon,
   IconCircle,
@@ -178,6 +179,7 @@ export default function RegistrarPage({
   const [error, setError] = useState('');
   const [joining, setJoining] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [showAddOrUpload, setShowAddOrUpload] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [shown, setShown] = useState(PAGE);
@@ -581,7 +583,7 @@ export default function RegistrarPage({
         </div>
       )}
 
-      {cemetery && !showImport && !adding && graves && graves.length === 0 && (
+      {cemetery && !showImport && !adding && !showAddOrUpload && graves && graves.length === 0 && (
         <div className="card" style={{ marginBottom: 18 }}>
           <h2 style={{ margin: '0 0 6px', fontSize: 30 }}>Put the names online</h2>
           <p style={{ marginTop: 0, fontSize: 18 }}>
@@ -597,12 +599,9 @@ export default function RegistrarPage({
               },
               {
                 icon: <KeyboardIcon size={30} />,
-                title: 'Type them in myself',
-                text: 'One grave at a time. Only the surname is needed.',
-                onClick: () => {
-                  setAdding(true);
-                  setEditingId(null);
-                },
+                title: 'Type them in yourself or upload them directly',
+                text: 'Add one grave at a time, or paste/upload a list you already have from Excel, Google Sheets or a text file.',
+                onClick: () => setShowAddOrUpload(true),
               },
               {
                 icon: <EnvelopeIcon size={30} />,
@@ -649,14 +648,117 @@ export default function RegistrarPage({
         </div>
       )}
 
+      {cemetery && showAddOrUpload && !adding && !showImport && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: 10,
+              alignItems: 'baseline',
+              flexWrap: 'wrap',
+            }}
+          >
+            <h2 style={{ margin: '0 0 6px', fontSize: 28 }}>How would you like to add them?</h2>
+            <button
+              type="button"
+              className="button secondary small"
+              onClick={() => setShowAddOrUpload(false)}
+            >
+              ← Back
+            </button>
+          </div>
+          <div style={{ display: 'grid', gap: 8, marginTop: 6 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setAdding(true);
+                setEditingId(null);
+              }}
+              style={{
+                display: 'flex',
+                gap: 14,
+                alignItems: 'center',
+                width: '100%',
+                textAlign: 'left',
+                border: '2px solid var(--line)',
+                borderRadius: 16,
+                padding: '14px 16px',
+                background: 'white',
+                color: 'inherit',
+                font: 'inherit',
+                cursor: 'pointer',
+              }}
+            >
+              <IconCircle size={52}>
+                <KeyboardIcon size={30} />
+              </IconCircle>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontWeight: 700, fontSize: 19 }}>
+                  Add one grave at a time
+                </span>
+                <span className="muted" style={{ display: 'block', fontSize: 16 }}>
+                  Good for small graveyards, or while walking the ground.
+                </span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setImportStep(3);
+                setShowImport(true);
+                setShowAddOrUpload(false);
+              }}
+              style={{
+                display: 'flex',
+                gap: 14,
+                alignItems: 'center',
+                width: '100%',
+                textAlign: 'left',
+                border: '2px solid var(--line)',
+                borderRadius: 16,
+                padding: '14px 16px',
+                background: 'white',
+                color: 'inherit',
+                font: 'inherit',
+                cursor: 'pointer',
+              }}
+            >
+              <IconCircle size={52}>
+                <ChecklistIcon size={30} />
+              </IconCircle>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontWeight: 700, fontSize: 19 }}>
+                  Paste or upload a prepared list
+                </span>
+                <span className="muted" style={{ display: 'block', fontSize: 16 }}>
+                  From Excel, Google Sheets, or a .csv / .txt file.
+                </span>
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {cemetery && adding && (
-        <GraveForm
-          cemetery={cemetery}
-          initial={emptyGrave()}
-          isNew
-          onSave={saveNew}
-          onCancel={() => setAdding(false)}
-        />
+        <>
+          <div style={{ marginBottom: 10 }}>
+            <button
+              type="button"
+              className="button secondary small"
+              onClick={() => setAdding(false)}
+            >
+              ← Back
+            </button>
+          </div>
+          <GraveForm
+            cemetery={cemetery}
+            initial={emptyGrave()}
+            isNew
+            onSave={saveNew}
+            onCancel={() => setAdding(false)}
+          />
+        </>
       )}
 
       {!adding && !showImport && graves && graves.length > 0 && (
